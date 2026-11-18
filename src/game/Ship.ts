@@ -14,7 +14,7 @@ const BOOST_SPEED = 44;
 const BOOST_TIME = 0.28; // seconds of dash
 export const BOOST_COOLDOWN = 1.4;
 const BOOST_INVULNERABLE = 0.35; // dodge through enemy shots while dashing
-export const HOVER_HEIGHT = 6.5;
+export const HOVER_HEIGHT = 32.5; // well above the jungle canopy
 
 // ---- Weapons ----
 const GUN_SPEED = 0.85; // fly slightly slower while shooting
@@ -354,7 +354,8 @@ export class Ship {
     c.width = c.height = 64;
     const g = c.getContext('2d')!;
     const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-    grad.addColorStop(0, 'rgba(10,0,15,0.55)');
+    grad.addColorStop(0, 'rgba(10,0,25,0.7)');
+    grad.addColorStop(0.55, 'rgba(10,0,25,0.45)');
     grad.addColorStop(1, 'rgba(10,0,15,0)');
     g.fillStyle = grad;
     g.fillRect(0, 0, 64, 64);
@@ -364,7 +365,7 @@ export class Ship {
       new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false }),
     );
     mesh.geometry.rotateX(-Math.PI / 2);
-    mesh.scale.set(5, 1, 6.5);
+    mesh.scale.set(6, 1, 7.5);
     mesh.renderOrder = 1;
     return mesh;
   }

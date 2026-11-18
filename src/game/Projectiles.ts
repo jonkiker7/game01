@@ -7,8 +7,10 @@ interface Shot {
   y: number;
   z: number;
   vx: number;
+  vy: number;
   vz: number;
-  targetY: number;
+  /** Climbing shots stop rising at this height (enemy orbs level off at the ship's altitude). */
+  ceiling: number;
   life: number;
 }
 
@@ -29,7 +31,8 @@ class ShotPool {
   private readonly q = new THREE.Quaternion();
   private readonly p = new THREE.Vector3();
   private readonly s = new THREE.Vector3();
-  private readonly up = new THREE.Vector3(0, 1, 0);
+  private readonly forward = new THREE.Vector3(0, 0, 1);
+  private readonly dir = new THREE.Vector3();
   private time = 0;
 
   constructor(
@@ -62,7 +65,7 @@ class ShotPool {
       s.life -= dt;
       s.x += s.vx * dt;
       s.z += s.vz * dt;
-      s.y += (s.targetY - s.y) * (1 - Math.exp(-8 * dt));
+      s.y = Math.min(s.ceiling, s.y + s.vy * dt);
       if (s.life <= 0 || hit(s)) {
         list[i] = list[list.length - 1];
         list.pop();
@@ -74,7 +77,9 @@ class ShotPool {
       this.s.copy(this.size).multiplyScalar(k);
       for (let i = 0; i < list.length; i++) {
         const sh = list[i];
-        this.q.setFromAxisAngle(this.up, Math.atan2(sh.vx, sh.vz));
+        // Point each shot along its 3D direction of travel (bullets angle down toward the ground).
+        const climbing = sh.y < sh.ceiling ? sh.vy : 0;
+        this.q.setFromUnitVectors(this.forward, this.dir.set(sh.vx, climbing, sh.vz).normalize());
         this.p.set(sh.x, sh.y, sh.z);
         mesh.setMatrixAt(i, this.m.compose(this.p, this.q, this.s));
       }
@@ -93,7 +98,7 @@ export interface Hittable {
 }
 
 const BULLET_SPEED = 80;
-const BULLET_LIFE = 0.47; // → ~38 units of range (about what fits on screen)
+const BULLET_LIFE = 0.8; // → 64 units: enough to reach targets ~38 units away from 32 units up
 const BULLET_DAMAGE = 7;
 
 /** The player's machine-gun rounds. */
@@ -112,30 +117,39 @@ export class Bullets {
     ]);
   }
 
-  fire(from: THREE.Vector3, dirX: number, dirZ: number): void {
+  /** `dir` is a normalized 3D direction (bullets usually angle down from the ship). */
+  fire(from: THREE.Vector3, dir: THREE.Vector3): void {
     this.pool.add({
       x: from.x,
       y: from.y,
       z: from.z,
-      vx: dirX * BULLET_SPEED,
-      vz: dirZ * BULLET_SPEED,
-      targetY: from.y,
+      vx: dir.x * BULLET_SPEED,
+      vy: dir.y * BULLET_SPEED,
+      vz: dir.z * BULLET_SPEED,
+      ceiling: Infinity,
       life: BULLET_LIFE,
     });
   }
 
-  update(dt: number, targets: readonly Hittable[]): void {
+  update(dt: number, targets: readonly Hittable[], groundY: (x: number, z: number) => number): void {
     this.pool.update(dt, (s) => {
-      // Top-down game: hits are checked on the ground plane, like the classic 16-bit shooters.
       for (const t of targets) {
         if (!t.alive) continue;
-        const dx = t.root.position.x - s.x;
-        const dz = t.root.position.z - s.z;
-        if (dx * dx + dz * dz < t.radius * t.radius) {
+        const tp = t.root.position;
+        const dx = tp.x - s.x;
+        const dz = tp.z - s.z;
+        // Generous hit box: the enemy's footprint, from just below it to a few units above.
+        if (dx * dx + dz * dz < t.radius * t.radius && s.y > tp.y - 2.5 && s.y < tp.y + 5) {
           t.damage(BULLET_DAMAGE);
-          this.effects.spark(this.tmp.set(s.x, t.root.position.y + 1, s.z));
+          this.effects.spark(this.tmp.set(s.x, s.y, s.z));
           return true;
         }
+      }
+      // Bullets that reach the ground kick up a spark and stop.
+      const gy = groundY(s.x, s.z);
+      if (s.y < gy + 0.2) {
+        this.effects.spark(this.tmp.set(s.x, gy + 0.3, s.z), '#fff2b0', 0.7);
+        return true;
       }
       return false;
     });
@@ -177,8 +191,23 @@ export class EnemyShots {
     );
   }
 
-  fire(from: THREE.Vector3, dirX: number, dirZ: number, speed: number, targetY: number): void {
-    this.pool.add({ x: from.x, y: from.y, z: from.z, vx: dirX * speed, vz: dirZ * speed, targetY, life: 4 });
+  /**
+   * Fires a shot along (dirX, dirZ). Shots from the ground climb steadily so they reach
+   * `targetY` (the ship's altitude) after about `travel` units, then fly level.
+   */
+  fire(from: THREE.Vector3, dirX: number, dirZ: number, speed: number, targetY: number, travel: number): void {
+    const climb = targetY - from.y;
+    const vy = climb > 0 ? (climb * speed) / Math.max(travel, 6) : 0;
+    this.pool.add({
+      x: from.x,
+      y: from.y,
+      z: from.z,
+      vx: dirX * speed,
+      vy,
+      vz: dirZ * speed,
+      ceiling: Math.max(targetY, from.y),
+      life: 4,
+    });
   }
 
   update(dt: number, player: Hittable & { invulnerable: number }): void {

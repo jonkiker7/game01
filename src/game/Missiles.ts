@@ -99,7 +99,9 @@ export class MissileSystem {
     const ex = origin.x + dx * range;
     const ez = origin.z + dz * range;
     m.end.set(ex, this.world.heightAt(ex, ez) + 0.3, ez);
-    m.duration = Math.max(0.18, range / (40 + 25 * charge));
+    // Travel time from the full 3D distance (the ship is high above the ground).
+    const dist3 = Math.hypot(range, m.start.y - m.end.y);
+    m.duration = Math.max(0.25, dist3 / (45 + 25 * charge));
     m.arc = 0.5 + range * 0.05;
     m.power = charge;
     m.t = 0;
@@ -139,7 +141,9 @@ export class MissileSystem {
           const r = e.radius + PROXIMITY;
           const ex = e.root.position.x - p.x;
           const ez = e.root.position.z - p.z;
-          if (ex * ex + ez * ez < r * r) {
+          const ey = p.y - e.root.position.y;
+          // Only when the missile has actually come down (or across) to the enemy's height.
+          if (ex * ex + ez * ez < r * r && ey > -2.5 && ey < 5) {
             this.detonate(m, p);
             break;
           }

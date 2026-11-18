@@ -163,7 +163,8 @@ class Motes {
     this.base = new Float32Array(count * 3);
     this.phase = new Float32Array(count);
     for (let i = 0; i < count; i++) {
-      this.base.set([rand() * Motes.W, 2 + rand() * 14, rand() * Motes.D], i * 3);
+      // Height relative to the camera focus (the ship): from near the ground up past the ship.
+      this.base.set([rand() * Motes.W, -28 + rand() * 36, rand() * Motes.D], i * 3);
       this.phase[i] = rand() * Math.PI * 2;
     }
     scene.add(this.mesh);
@@ -264,8 +265,10 @@ export class Effects {
     this.blasts.spawn(pos, '#ffb347', 0.5, size * 0.2, size, 1);
     this.blasts.spawn(pos, '#fff3c4', 0.22, size * 0.15, size * 0.55, 1);
     this.blasts.spawn(pos, '#ff5a3c', 0.75, size * 0.5, size * 1.4, 0.35);
-    this.tmp.set(pos.x, groundY + 0.3, pos.z);
-    this.rings.spawn(this.tmp, '#ffd27a', 0.5, size * 0.3, size * 2.2, 0.8);
+    if (pos.y - groundY < 6) {
+      this.tmp.set(pos.x, groundY + 0.3, pos.z);
+      this.rings.spawn(this.tmp, '#ffd27a', 0.5, size * 0.3, size * 2.2, 0.8);
+    }
     this.embersBurst(pos, Math.round(8 + size * 3), 8 + size * 2.5);
     // Chunks of rock and metal thrown out of the blast.
     const chunks = Math.round(3 + size);
