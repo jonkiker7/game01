@@ -340,15 +340,30 @@ export class EnemyManager {
     }
   }
 
-  /** Splash damage (missiles). */
-  damageCircle(x: number, z: number, radius: number, amount: number): void {
+  /**
+   * Splash damage (missiles), judged on screen: the blast and every enemy are projected to the
+   * ship's altitude along the camera's line of sight, so anything that looks inside the blast
+   * is hit, whether it's a drone at your height or a tower gun below.
+   */
+  damageAt(point: THREE.Vector3, radius: number, amount: number): void {
+    const b = this.projectToPlane(point, this.probe);
     for (const e of this.enemies) {
       if (!e.alive) continue;
+      const v = this.visualPosition(e, this.probe2);
       const r = radius + e.radius;
-      const dx = e.root.position.x - x;
-      const dz = e.root.position.z - z;
+      const dx = v.x - b.x;
+      const dz = v.z - b.z;
       if (dx * dx + dz * dz < r * r) e.damage(amount);
     }
+  }
+
+  /** Slide a point along the camera's line of sight up to the ship's altitude. */
+  private projectToPlane(point: THREE.Vector3, out: THREE.Vector3): THREE.Vector3 {
+    out.copy(point);
+    const c = this.camPos;
+    if (out.y >= this.planeY - 0.01 || c.y <= this.planeY) return out;
+    const k = (this.planeY - c.y) / (out.y - c.y);
+    return out.set(c.x + (out.x - c.x) * k, this.planeY, c.z + (out.z - c.z) * k);
   }
 
   /**
@@ -359,10 +374,7 @@ export class EnemyManager {
   visualPosition(e: Enemy, out: THREE.Vector3): THREE.Vector3 {
     out.copy(e.root.position);
     out.y += e.aimHeight;
-    const c = this.camPos;
-    if (out.y >= this.planeY - 0.01 || c.y <= this.planeY) return out;
-    const k = (this.planeY - c.y) / (out.y - c.y);
-    return out.set(c.x + (out.x - c.x) * k, this.planeY, c.z + (out.z - c.z) * k);
+    return this.projectToPlane(out, out);
   }
 
   /**

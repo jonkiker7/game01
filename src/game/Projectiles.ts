@@ -93,7 +93,7 @@ class ShotPool {
  * Shortest distance between a ray (origin `o`, unit direction `d`) and a vertical segment at
  * (x, z) from height y0 to y1. Writes the closest point on the segment into `out`.
  */
-function rayToVerticalSegment(
+export function rayToVerticalSegment(
   o: THREE.Vector3,
   d: THREE.Vector3,
   x: number,

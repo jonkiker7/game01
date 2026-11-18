@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { Effects } from './Effects';
 import { glow, toon } from './materials';
-import type { Hittable } from './Projectiles';
+import { type Hittable, rayToVerticalSegment } from './Projectiles';
 import type { World } from './World';
 
 /** How far a missile flies for a given charge (0..1). Shared by the aim indicator. */
@@ -12,8 +12,10 @@ export const missileDamage = (charge: number) => 30 + 90 * charge;
 /** Aim-line leeway for locking on (radians either side), and extra reach beyond the range. */
 export const MISSILE_LOCK_ANGLE = 0.22;
 export const MISSILE_LOCK_REACH = 4;
-/** A missile explodes early if it flies within this distance of an enemy's edge. */
+/** A missile explodes early if it passes within this distance of an enemy's edge (on screen). */
 const PROXIMITY = 1.2;
+/** Positions checked per frame, so a fast missile can't skip past a small drone between frames. */
+const SUBSTEPS = 4;
 
 interface Missile {
   obj: THREE.Group;
@@ -40,6 +42,10 @@ export class MissileSystem {
 
   private readonly missiles: Missile[] = [];
   private readonly tmp = new THREE.Vector3();
+  private readonly prev = new THREE.Vector3();
+  private readonly sample = new THREE.Vector3();
+  private readonly ray = new THREE.Vector3();
+  private readonly hitPoint = new THREE.Vector3();
 
   constructor(
     scene: THREE.Scene,
@@ -98,11 +104,13 @@ export class MissileSystem {
     m.start.set(origin.x + dx * 1.2, origin.y - 0.8, origin.z + dz * 1.2);
     const ex = origin.x + dx * range;
     const ez = origin.z + dz * range;
-    m.end.set(ex, this.world.heightAt(ex, ez) + 0.3, ez);
+    // Unlocked missiles fly level along the aim line and burst in the air at its end,
+    // so the line you see on screen is the path the missile takes.
+    m.end.set(ex, origin.y - 0.8, ez);
     // Travel time from the full 3D distance (the ship is high above the ground).
     const dist3 = Math.hypot(range, m.start.y - m.end.y);
     m.duration = Math.max(0.25, dist3 / (45 + 25 * charge));
-    m.arc = 0.5 + range * 0.05;
+    m.arc = 0.3 + range * 0.03;
     m.power = charge;
     m.t = 0;
     m.puffTimer = 0;
@@ -111,9 +119,14 @@ export class MissileSystem {
     m.obj.position.copy(m.start);
   }
 
-  update(dt: number, enemies: readonly Hittable[]): void {
+  /**
+   * @param camera camera position, for on-screen hit checks (same rule as bullets: a missile
+   *   hits whatever it visually passes over).
+   */
+  update(dt: number, enemies: readonly Hittable[], camera: THREE.Vector3): void {
     for (const m of this.missiles) {
       if (!m.active) continue;
+      this.prev.copy(m.obj.position);
       // Homing: keep the end of the flight path on the locked target.
       if (m.target?.alive) {
         const tp = m.target.root.position;
@@ -131,25 +144,50 @@ export class MissileSystem {
         this.effects.smoke(m.obj.position, 1.5 + m.power * 0.8);
       }
 
-      // Explode on the first enemy the missile flies into, not just at the end of its path.
-      if (u >= 1) {
+      // Explode on the first enemy the missile flies into (or over, on screen), not just at the end.
+      const hit = u > 0.03 ? this.findHit(this.prev, m.obj.position, enemies, camera) : null;
+      if (hit) {
+        this.detonate(m, this.hitPoint);
+      } else if (u >= 1) {
         this.detonate(m, m.end);
-      } else if (u > 0.05) {
-        const p = m.obj.position;
-        for (const e of enemies) {
-          if (!e.alive) continue;
-          const r = e.radius + PROXIMITY;
-          const ex = e.root.position.x - p.x;
-          const ez = e.root.position.z - p.z;
-          const ey = p.y - e.root.position.y;
-          // Only when the missile is actually at the enemy's height (anywhere from a tower's foot to its gun).
-          if (ex * ex + ez * ez < r * r && ey > Math.min(e.hitBottom, 0) && ey < e.hitTop) {
-            this.detonate(m, p);
-            break;
-          }
+      }
+    }
+  }
+
+  /**
+   * Checks the stretch the missile travelled this frame against every enemy.
+   * Hits if the missile touches an enemy in 3D (e.g. a tower pillar), or if it passes over an
+   * enemy's hit area on screen (the camera ray through the missile comes close to it).
+   * Sets `hitPoint` to where the explosion should appear.
+   */
+  private findHit(
+    from: THREE.Vector3,
+    to: THREE.Vector3,
+    enemies: readonly Hittable[],
+    camera: THREE.Vector3,
+  ): Hittable | null {
+    for (let i = 1; i <= SUBSTEPS; i++) {
+      const p = this.sample.lerpVectors(from, to, i / SUBSTEPS);
+      this.ray.subVectors(p, camera).normalize();
+      for (const e of enemies) {
+        if (!e.alive) continue;
+        const tp = e.root.position;
+        const r = e.radius + PROXIMITY;
+        // On screen: passes over the enemy's hit area.
+        if (rayToVerticalSegment(camera, this.ray, tp.x, tp.z, tp.y + e.hitBottom, tp.y + e.hitTop, this.hitPoint) < r) {
+          return e;
+        }
+        // In 3D: flew into any part of it (a tower's whole pillar counts).
+        const ex = tp.x - p.x;
+        const ez = tp.z - p.z;
+        const ey = p.y - tp.y;
+        if (ex * ex + ez * ez < r * r && ey > Math.min(e.hitBottom, 0) && ey < e.hitTop) {
+          this.hitPoint.copy(p);
+          return e;
         }
       }
     }
+    return null;
   }
 
   private detonate(m: Missile, at: THREE.Vector3): void {

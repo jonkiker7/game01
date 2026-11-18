@@ -80,6 +80,11 @@ const enemyShots = new EnemyShots(scene, effects);
 const enemies = new EnemyManager(scene, world, effects);
 const hud = new Hud($('hud'));
 
+// ?debug in the URL exposes game objects for automated tests and console tinkering.
+if (new URLSearchParams(location.search).has('debug')) {
+  Object.assign(window, { __game: { ship, enemies, missiles } });
+}
+
 const rig = new CameraRig(window.innerWidth / window.innerHeight);
 rig.snapTo(ship.root.position);
 
@@ -141,7 +146,7 @@ ship.onRespawn = () => hud.show('BACK IN THE FIGHT', 1.5);
 
 missiles.onExplode = (pos, power) => {
   freeze(0.03 + power * 0.04);
-  enemies.damageCircle(pos.x, pos.z, missileBlastRadius(power), missileDamage(power));
+  enemies.damageAt(pos, missileBlastRadius(power), missileDamage(power));
   rig.kick(0, 0.5 + power * 0.9);
   input.vibrate(25 + Math.round(power * 30));
 };
@@ -265,12 +270,12 @@ renderer.setAnimationLoop((now: number) => {
   enemies.update(dt, ship, enemyShots, rig.camera);
   bullets.update(dt, enemies.enemies, (x, z) => world.heightAt(x, z), cameraPos.setFromMatrixPosition(rig.camera.matrixWorld));
   enemyShots.update(dt, ship);
-  missiles.update(dt, enemies.enemies);
+  missiles.update(dt, enemies.enemies, cameraPos.setFromMatrixPosition(rig.camera.matrixWorld));
   if (ship.isBoosting && ship.alive) {
     for (let i = 0; i < 2; i++) effects.trail(ship.getEngine(i, enginePos));
   }
   effects.update(dt, rig.lookTarget);
-  aim.update(dt, ship, world, ship.isCharging ? missileLock(ship.charge, ship.aimHeading) : null);
+  aim.update(dt, ship, ship.isCharging ? missileLock(ship.charge, ship.aimHeading) : null);
   world.update(dt);
 
   // While charging a missile, lean the camera toward the target so it stays on screen.
