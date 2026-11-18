@@ -12,42 +12,40 @@ interface Shot {
   life: number;
 }
 
+/** One visual layer of a projectile (e.g. bright core, dark outline, soft halo). */
+interface Layer {
+  material: THREE.Material;
+  scale: number;
+}
+
 /**
- * A pool of simple straight-flying projectiles drawn with one InstancedMesh
- * (a single draw call no matter how many are on screen).
+ * A pool of simple straight-flying projectiles. Each visual layer is one InstancedMesh,
+ * so it's a single draw call per layer no matter how many shots are on screen.
  */
 class ShotPool {
   readonly shots: Shot[] = [];
-  private readonly mesh: THREE.InstancedMesh;
-  private readonly halo?: THREE.InstancedMesh;
+  private readonly meshes: { mesh: THREE.InstancedMesh; scale: number }[] = [];
   private readonly m = new THREE.Matrix4();
   private readonly q = new THREE.Quaternion();
   private readonly p = new THREE.Vector3();
-  private readonly s: THREE.Vector3;
+  private readonly s = new THREE.Vector3();
   private readonly up = new THREE.Vector3(0, 1, 0);
+  private time = 0;
 
   constructor(
     scene: THREE.Scene,
     geo: THREE.BufferGeometry,
-    color: string,
     private readonly max: number,
-    scale: THREE.Vector3,
-    haloColor?: string,
+    private readonly size: THREE.Vector3,
+    layers: Layer[],
+    private readonly pulse = 0,
   ) {
-    this.s = scale;
-    this.mesh = new THREE.InstancedMesh(geo, glow(color), max);
-    this.mesh.count = 0;
-    this.mesh.frustumCulled = false;
-    scene.add(this.mesh);
-    if (haloColor) {
-      this.halo = new THREE.InstancedMesh(
-        new THREE.SphereGeometry(1, 10, 8),
-        glow(haloColor, { transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending }),
-        max,
-      );
-      this.halo.count = 0;
-      this.halo.frustumCulled = false;
-      scene.add(this.halo);
+    for (const layer of layers) {
+      const mesh = new THREE.InstancedMesh(geo, layer.material, max);
+      mesh.count = 0;
+      mesh.frustumCulled = false;
+      scene.add(mesh);
+      this.meshes.push({ mesh, scale: layer.scale });
     }
   }
 
@@ -57,6 +55,7 @@ class ShotPool {
 
   /** Moves every shot; `hit` returns true to remove a shot. */
   update(dt: number, hit: (s: Shot) => boolean): void {
+    this.time += dt;
     const list = this.shots;
     for (let i = list.length - 1; i >= 0; i--) {
       const s = list[i];
@@ -69,18 +68,18 @@ class ShotPool {
         list.pop();
       }
     }
-    for (let i = 0; i < list.length; i++) {
-      const s = list[i];
-      this.q.setFromAxisAngle(this.up, Math.atan2(s.vx, s.vz));
-      this.p.set(s.x, s.y, s.z);
-      this.mesh.setMatrixAt(i, this.m.compose(this.p, this.q, this.s));
-      if (this.halo) this.halo.setMatrixAt(i, this.m.makeScale(1.1, 1.1, 1.1).setPosition(this.p));
-    }
-    this.mesh.count = list.length;
-    this.mesh.instanceMatrix.needsUpdate = true;
-    if (this.halo) {
-      this.halo.count = list.length;
-      this.halo.instanceMatrix.needsUpdate = true;
+    const pulse = 1 + Math.sin(this.time * 14) * this.pulse;
+    for (const { mesh, scale } of this.meshes) {
+      const k = scale * pulse;
+      this.s.copy(this.size).multiplyScalar(k);
+      for (let i = 0; i < list.length; i++) {
+        const sh = list[i];
+        this.q.setFromAxisAngle(this.up, Math.atan2(sh.vx, sh.vz));
+        this.p.set(sh.x, sh.y, sh.z);
+        mesh.setMatrixAt(i, this.m.compose(this.p, this.q, this.s));
+      }
+      mesh.count = list.length;
+      mesh.instanceMatrix.needsUpdate = true;
     }
   }
 }
@@ -108,7 +107,9 @@ export class Bullets {
   ) {
     const geo = new THREE.CapsuleGeometry(0.5, 1, 2, 6);
     geo.rotateX(Math.PI / 2); // long axis along +Z
-    this.pool = new ShotPool(scene, geo, '#ffe27a', 120, new THREE.Vector3(0.38, 0.38, 1.2));
+    this.pool = new ShotPool(scene, geo, 120, new THREE.Vector3(0.38, 0.38, 1.2), [
+      { material: glow('#ffe27a'), scale: 1 },
+    ]);
   }
 
   fire(from: THREE.Vector3, dirX: number, dirZ: number): void {
@@ -153,13 +154,26 @@ export class EnemyShots {
     scene: THREE.Scene,
     private readonly effects: Effects,
   ) {
+    // Bright core + thick dark outline (ink style) + faint red halo: readable on any ground colour.
     this.pool = new ShotPool(
       scene,
-      new THREE.SphereGeometry(1, 10, 8),
-      '#ffe0ea',
+      new THREE.SphereGeometry(1, 12, 10),
       160,
-      new THREE.Vector3(0.45, 0.45, 0.45),
-      '#ff2e63',
+      new THREE.Vector3(0.6, 0.6, 0.6),
+      [
+        {
+          material: glow('#ff3d6e', {
+            transparent: true,
+            opacity: 0.3,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+          }),
+          scale: 2,
+        },
+        { material: glow('#2a0014', { side: THREE.BackSide }), scale: 1.4 },
+        { material: glow('#fff4f7'), scale: 1 },
+      ],
+      0.12,
     );
   }
 

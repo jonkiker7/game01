@@ -20,7 +20,9 @@ strafe. Bullets bend slightly toward enemies near your line of fire (aim assist)
 Missiles work like a charged bow shot: hold **MSL** and an aim line grows across the ground
 (cyan while charging, gold at full power). Drag your thumb away from the button to aim; the ship
 turns to face that way and slows down while charging. Let go to fire. A quick tap drops a missile
-just in front of the ship. Missiles do splash damage.
+just in front of the ship. Missiles do splash damage and explode on the first enemy they fly into.
+If an enemy is close to your aim line and in range, the target ring snaps onto it and turns red:
+the missile is locked on and will follow that enemy.
 
 Boosting makes you briefly invulnerable, so you can dash through enemy shots.
 

@@ -1,15 +1,17 @@
 import * as THREE from 'three';
 import { missileRange } from './Missiles';
+import type { Hittable } from './Projectiles';
 import type { Ship } from './Ship';
 import type { World } from './World';
 
 const CHARGING = new THREE.Color('#6ff7ff');
 const FULL = new THREE.Color('#ffd36b');
+const LOCKED = new THREE.Color('#ff3d6e');
 
 /**
  * Ground marker shown while the missile is charging: a beam that grows from the
  * ship as the charge builds, plus a target ring where the missile will land.
- * Turns gold and pulses when fully charged.
+ * Turns gold and pulses when fully charged; the ring snaps onto an enemy and turns red when locked.
  */
 export class AimIndicator {
   private readonly group = new THREE.Group();
@@ -43,7 +45,7 @@ export class AimIndicator {
     scene.add(this.group);
   }
 
-  update(dt: number, ship: Ship, world: World): void {
+  update(dt: number, ship: Ship, world: World, lock: Hittable | null): void {
     this.time += dt;
     if (!ship.isCharging) {
       this.group.visible = false;
@@ -52,9 +54,16 @@ export class AimIndicator {
     this.group.visible = true;
 
     const p = ship.root.position;
-    const range = missileRange(ship.charge);
+    let range = missileRange(ship.charge);
+    let heading = ship.aimHeading;
+    if (lock) {
+      const dx = lock.root.position.x - p.x;
+      const dz = lock.root.position.z - p.z;
+      range = Math.hypot(dx, dz);
+      heading = Math.atan2(-dx, -dz);
+    }
     this.group.position.set(p.x, world.heightAt(p.x, p.z) + 0.4, p.z);
-    this.group.rotation.y = ship.aimHeading;
+    this.group.rotation.y = heading;
 
     this.beam.scale.set(1.1 + ship.charge * 0.6, 1, range);
     this.reticle.position.z = -range;
@@ -63,6 +72,13 @@ export class AimIndicator {
     const pulse = full ? 0.75 + Math.sin(this.time * 18) * 0.25 : 1;
     this.color.copy(CHARGING).lerp(FULL, full ? 1 : 0);
     this.beamMat.color.copy(this.color).multiplyScalar(pulse);
+    if (lock) {
+      // Locked: a bigger red ring that wraps the target.
+      this.reticleMat.color.copy(LOCKED).multiplyScalar(0.8 + Math.sin(this.time * 18) * 0.2);
+      this.reticle.scale.setScalar(lock.radius * 0.75 + 0.6);
+      this.reticle.rotation.y += dt * 4;
+      return;
+    }
     this.reticleMat.color.copy(this.color).multiplyScalar(pulse);
     this.reticle.scale.setScalar(full ? 1.15 + Math.sin(this.time * 18) * 0.08 : 0.8 + ship.charge * 0.3);
   }

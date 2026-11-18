@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { Effects } from './Effects';
 import { glow, toon } from './materials';
+import type { Hittable } from './Projectiles';
 import type { World } from './World';
 
 /** How far a missile flies for a given charge (0..1). Shared by the aim indicator. */
@@ -8,6 +9,11 @@ export const missileRange = (charge: number) => 3 + 39 * charge;
 /** Blast radius and damage for a given charge. */
 export const missileBlastRadius = (charge: number) => 3.5 + 3.5 * charge;
 export const missileDamage = (charge: number) => 30 + 90 * charge;
+/** Aim-line leeway for locking on (radians either side), and extra reach beyond the range. */
+export const MISSILE_LOCK_ANGLE = 0.22;
+export const MISSILE_LOCK_REACH = 4;
+/** A missile explodes early if it flies within this distance of an enemy's edge. */
+const PROXIMITY = 1.2;
 
 interface Missile {
   obj: THREE.Group;
@@ -19,6 +25,7 @@ interface Missile {
   end: THREE.Vector3;
   arc: number;
   puffTimer: number;
+  target: Hittable | null;
 }
 
 const MISSILE_POOL = 12;
@@ -66,16 +73,27 @@ export class MissileSystem {
         end: new THREE.Vector3(),
         arc: 0,
         puffTimer: 0,
+        target: null,
       });
     }
   }
 
-  fire(origin: THREE.Vector3, heading: number, charge: number): void {
+  /**
+   * @param target optional locked enemy: the missile steers to it, wherever it moves.
+   */
+  fire(origin: THREE.Vector3, heading: number, charge: number, target: Hittable | null = null): void {
     const m = this.missiles.find((x) => !x.active);
     if (!m) return;
+    let range = missileRange(charge);
+    if (target) {
+      const tx = target.root.position.x - origin.x;
+      const tz = target.root.position.z - origin.z;
+      heading = Math.atan2(-tx, -tz);
+      range = Math.hypot(tx, tz);
+    }
     const dx = -Math.sin(heading);
     const dz = -Math.cos(heading);
-    const range = missileRange(charge);
+    m.target = target;
 
     m.start.set(origin.x + dx * 1.2, origin.y - 0.8, origin.z + dz * 1.2);
     const ex = origin.x + dx * range;
@@ -91,9 +109,14 @@ export class MissileSystem {
     m.obj.position.copy(m.start);
   }
 
-  update(dt: number): void {
+  update(dt: number, enemies: readonly Hittable[]): void {
     for (const m of this.missiles) {
       if (!m.active) continue;
+      // Homing: keep the end of the flight path on the locked target.
+      if (m.target?.alive) {
+        const tp = m.target.root.position;
+        m.end.set(tp.x, Math.max(tp.y + 1, this.world.heightAt(tp.x, tp.z) + 0.3), tp.z);
+      }
       m.t += dt;
       const u = Math.min(1, m.t / m.duration);
       this.pointOnPath(m, u, m.obj.position);
@@ -106,13 +129,32 @@ export class MissileSystem {
         this.effects.smoke(m.obj.position, 1.5 + m.power * 0.8);
       }
 
+      // Explode on the first enemy the missile flies into, not just at the end of its path.
       if (u >= 1) {
-        m.active = false;
-        m.obj.visible = false;
-        this.effects.explosion(m.end, missileBlastRadius(m.power), m.end.y);
-        this.onExplode?.(m.end, m.power);
+        this.detonate(m, m.end);
+      } else if (u > 0.05) {
+        const p = m.obj.position;
+        for (const e of enemies) {
+          if (!e.alive) continue;
+          const r = e.radius + PROXIMITY;
+          const ex = e.root.position.x - p.x;
+          const ez = e.root.position.z - p.z;
+          if (ex * ex + ez * ez < r * r) {
+            this.detonate(m, p);
+            break;
+          }
+        }
       }
     }
+  }
+
+  private detonate(m: Missile, at: THREE.Vector3): void {
+    m.active = false;
+    m.obj.visible = false;
+    m.target = null;
+    const pos = this.tmp.copy(at);
+    this.effects.explosion(pos, missileBlastRadius(m.power), this.world.heightAt(pos.x, pos.z));
+    this.onExplode?.(pos, m.power);
   }
 
   /** Straight line from start to end, lifted by a sine arc. */
