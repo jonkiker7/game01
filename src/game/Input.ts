@@ -1,12 +1,20 @@
 export type ButtonName = 'gun' | 'missile' | 'boost';
+/** Buttons that double as aiming sticks (hold and drag). */
+export type AimButton = 'gun' | 'missile';
 
 interface InputElements {
+  hud: HTMLElement;
   stickZone: HTMLElement;
   stickBase: HTMLElement;
   stickKnob: HTMLElement;
-  aimRing: HTMLElement;
-  aimKnob: HTMLElement;
   buttons: Record<ButtonName, HTMLElement>;
+}
+
+interface AimStick {
+  x: number;
+  y: number;
+  ring: HTMLElement;
+  knob: HTMLElement;
 }
 
 const DEADZONE = 0.12;
@@ -24,7 +32,7 @@ const KEY_BUTTONS: Record<string, ButtonName> = {
  * Touch + keyboard input.
  * - Left half of the screen: a floating stick that appears under your thumb.
  * - Right side: buttons (each tracked by its own finger, so you can hold GUN while tapping BOOST).
- *   MSL doubles as an aiming stick: hold it and drag your thumb toward where you want to shoot.
+ *   GUN and MSL double as aiming sticks: hold one and drag your thumb toward where you want to shoot.
  * - Keyboard for testing on a computer: WASD/arrows, J gun, K missile, L/Space boost.
  */
 export class Input {
@@ -39,10 +47,10 @@ export class Input {
   private readonly keys = new Set<string>();
   private readonly pressed = new Set<ButtonName>();
   private readonly released = new Set<ButtonName>();
-  private aimX = 0;
-  private aimY = 0;
+  private readonly aims: Record<AimButton, AimStick>;
 
   constructor(private readonly el: InputElements) {
+    this.aims = { gun: this.makeAimStick(), missile: this.makeAimStick() };
     this.bindStick();
     for (const name of Object.keys(el.buttons) as ButtonName[]) this.bindButton(name, el.buttons[name]);
     this.bindKeyboard();
@@ -82,11 +90,12 @@ export class Input {
   }
 
   /**
-   * Missile aim direction while dragging from the MSL button (x = right, y = up on screen).
+   * Aim direction while dragging from GUN or MSL (x = right, y = up on screen, length 1).
    * Returns {0, 0} when the thumb hasn't been dragged, meaning "aim straight ahead".
    */
-  getAim(): { x: number; y: number } {
-    return { x: this.aimX, y: this.aimY };
+  getAim(name: AimButton): { x: number; y: number } {
+    const a = this.aims[name];
+    return { x: a.x, y: a.y };
   }
 
   /** Call at the end of every frame so unused taps don't linger. */
@@ -165,8 +174,7 @@ export class Input {
     let pointer: number | null = null;
     let centerX = 0;
     let centerY = 0;
-    const isAimStick = name === 'missile';
-    const { aimRing, aimKnob } = this.el;
+    const aim = name === 'boost' ? null : this.aims[name];
 
     el.addEventListener('pointerdown', (e) => {
       e.preventDefault();
@@ -178,21 +186,21 @@ export class Input {
       el.classList.add('pressed');
       this.vibrate(8);
 
-      if (isAimStick) {
+      if (aim) {
         const r = el.getBoundingClientRect();
         centerX = r.left + r.width / 2;
         centerY = r.top + r.height / 2;
-        aimRing.style.left = `${centerX}px`;
-        aimRing.style.top = `${centerY}px`;
-        aimRing.classList.add('active');
-        this.updateAim(e.clientX - centerX, e.clientY - centerY);
+        aim.ring.style.left = `${centerX}px`;
+        aim.ring.style.top = `${centerY}px`;
+        aim.ring.classList.add('active');
+        this.updateAim(aim, e.clientX - centerX, e.clientY - centerY);
       }
     });
 
-    if (isAimStick) {
+    if (aim) {
       el.addEventListener('pointermove', (e) => {
         if (e.pointerId !== pointer) return;
-        this.updateAim(e.clientX - centerX, e.clientY - centerY);
+        this.updateAim(aim, e.clientX - centerX, e.clientY - centerY);
       });
     }
 
@@ -202,11 +210,11 @@ export class Input {
       this.touchHeld[name] = false;
       this.released.add(name);
       el.classList.remove('pressed');
-      if (isAimStick) {
-        aimRing.classList.remove('active');
-        aimKnob.style.transform = '';
-        this.aimX = 0;
-        this.aimY = 0;
+      if (aim) {
+        aim.ring.classList.remove('active');
+        aim.knob.style.transform = '';
+        aim.x = 0;
+        aim.y = 0;
       }
     };
     el.addEventListener('pointerup', release);
@@ -214,16 +222,26 @@ export class Input {
     el.addEventListener('lostpointercapture', release);
   }
 
-  private updateAim(dx: number, dy: number): void {
+  private makeAimStick(): AimStick {
+    const ring = document.createElement('div');
+    ring.className = 'aim-ring';
+    const knob = document.createElement('div');
+    knob.className = 'aim-knob';
+    ring.appendChild(knob);
+    this.el.hud.appendChild(ring);
+    return { x: 0, y: 0, ring, knob };
+  }
+
+  private updateAim(aim: AimStick, dx: number, dy: number): void {
     const dist = Math.hypot(dx, dy);
     const k = dist > AIM_RADIUS ? AIM_RADIUS / dist : 1;
-    this.el.aimKnob.style.transform = `translate(${dx * k}px, ${dy * k}px)`;
+    aim.knob.style.transform = `translate(${dx * k}px, ${dy * k}px)`;
     if (dist < AIM_DEADZONE) {
-      this.aimX = 0;
-      this.aimY = 0;
+      aim.x = 0;
+      aim.y = 0;
     } else {
-      this.aimX = dx / dist;
-      this.aimY = -dy / dist;
+      aim.x = dx / dist;
+      aim.y = -dy / dist;
     }
   }
 

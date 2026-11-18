@@ -137,8 +137,8 @@ body {
   bottom: 124px;
 }
 
-/* ---------- Missile aim stick (appears around MSL while held) ---------- */
-#aim-ring {
+/* ---------- Aim sticks (appear around GUN / MSL while held) ---------- */
+.aim-ring {
   position: absolute;
   width: 140px;
   height: 140px;
@@ -151,12 +151,12 @@ body {
   transition: opacity 0.12s, transform 0.12s;
 }
 
-#aim-ring.active {
+.aim-ring.active {
   opacity: 1;
   transform: scale(1);
 }
 
-#aim-knob {
+.aim-knob {
   position: absolute;
   left: 50%;
   top: 50%;
@@ -208,5 +208,99 @@ body {
 @media (orientation: portrait) and (pointer: coarse) {
   #rotate {
     display: flex;
+  }
+}
+
+/* ---------- HUD readouts ---------- */
+#armor {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top));
+  left: calc(16px + env(safe-area-inset-left));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--gold);
+  text-shadow: 0 1px 2px #000;
+}
+
+#armor .bar {
+  width: 150px;
+  height: 12px;
+  border: 2px solid var(--gold-dim);
+  border-radius: 3px;
+  background: rgba(20, 5, 25, 0.7);
+  overflow: hidden;
+}
+
+#armor .fill {
+  height: 100%;
+  background: linear-gradient(#ffe3a8, var(--gold) 50%, #b07a26);
+  transform-origin: left center;
+  transition: transform 0.15s;
+}
+
+#armor .fill.low {
+  background: linear-gradient(#ff9aa8, #e0284a 50%, #8a1028);
+  animation: pulse 0.5s infinite alternate;
+}
+
+@keyframes pulse {
+  to {
+    filter: brightness(1.6);
+  }
+}
+
+#targets {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top));
+  right: calc(16px + env(safe-area-inset-right));
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--gold);
+  text-shadow: 0 1px 2px #000;
+}
+
+#message {
+  position: absolute;
+  top: 28%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 30px;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  color: var(--gold);
+  text-shadow: 0 0 12px rgba(242, 196, 109, 0.6), 0 2px 3px #000;
+  opacity: 0;
+  transform: scale(1.2);
+  transition: opacity 0.25s, transform 0.25s;
+}
+
+#message.visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+#damage {
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 90px 30px rgba(255, 30, 70, 0.8);
+  opacity: 0;
+}
+
+#damage.hit {
+  animation: hurt 0.35s ease-out;
+}
+
+@keyframes hurt {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
   }
 }

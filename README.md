@@ -9,15 +9,20 @@ classic 16-bit isometric helicopter shooters, with a painterly toon look.
 | Action | Phone | Keyboard |
 | --- | --- | --- |
 | Fly | Left thumb anywhere on the left half (floating stick) | WASD / arrow keys |
-| Machine gun (hold) | **GUN** button | J |
+| Machine gun (hold, drag to aim) | **GUN** button, used as an aiming stick | J (fires straight ahead) |
 | Missile (hold to charge, drag to aim, release to fire) | **MSL** button, used as an aiming stick | K (fires straight ahead) |
 | Boost (dash) | **BOOST** button | L / Space |
 
-Holding GUN slows turning so you can strafe around targets.
+Both weapon buttons are twin-stick style: hold and drag your thumb toward a target and the ship
+turns to face it. Holding GUN without dragging fires straight ahead and slows turning, so you can
+strafe. Bullets bend slightly toward enemies near your line of fire (aim assist).
 
 Missiles work like a charged bow shot: hold **MSL** and an aim line grows across the ground
 (cyan while charging, gold at full power). Drag your thumb away from the button to aim; the ship
-turns to face that way and slows down while charging. Let go to fire. A quick tap fires a short shot.
+turns to face that way and slows down while charging. Let go to fire. A quick tap drops a missile
+just in front of the ship. Missiles do splash damage.
+
+Boosting makes you briefly invulnerable, so you can dash through enemy shots.
 
 Play in landscape.
 On iPhone, use Share → **Add to Home Screen** for full-screen play.
@@ -36,7 +41,11 @@ npm run preview   # serve the production build
 - `src/main.ts`: renderer, lights, and the main loop
 - `src/game/Ship.ts`: ship model and flight handling (tuning constants at the top)
 - `src/game/Input.ts`: touch stick, buttons (MSL doubles as an aim stick), and keyboard
-- `src/game/Missiles.ts`: missile flight, smoke trail, and explosions (pooled)
+- `src/game/Missiles.ts`: missile flight, range, and splash damage
+- `src/game/Projectiles.ts`: player bullets and enemy orbs (instanced, one draw call each)
+- `src/game/Enemies.ts`: turrets, drones, outposts, and spawning
+- `src/game/Effects.ts`: pooled smoke, explosions, shockwaves, and hit sparks
+- `src/game/Hud.ts`: armor bar, targets counter, messages, and damage flash
 - `src/game/AimIndicator.ts`: the charging aim line and target ring
 - `src/game/CameraRig.ts`: follow camera with look-ahead, FOV kick, and shake
 - `src/game/World.ts`: test planet (terrain, rocks, crystals, map edge)
@@ -51,7 +60,7 @@ One-time setup: **Settings → Pages → Source: GitHub Actions**.
 ## Roadmap
 
 1. ✅ Flying prototype: stick flight, camera, buttons, Pages deploy
-2. Combat: machine gun, homing missiles, enemies, health, explosions
+2. ✅ Combat: twin-stick gun and missiles, turrets, drones, armor, explosions
 3. Art pass: outlines, rim light, bloom, particles, screen shake
 4. Game loop: fuel, armor, ammo, pickups, objectives, minimap, HUD
 5. Content: more planets, enemies, bosses
