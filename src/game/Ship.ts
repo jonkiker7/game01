@@ -22,7 +22,7 @@ const GUN_SPEED = 0.85; // fly slightly slower while shooting
 const CHARGE_TIME = 0.75; // seconds for a missile to reach full power
 const CHARGING_SPEED = 0.5; // fly at half speed while charging a missile
 export const MISSILE_MAX = 3; // missiles you can hold
-export const MISSILE_RECHARGE = 3; // seconds to get one missile back (they refill one at a time)
+export const MISSILE_RECHARGE = 5; // seconds to get one missile back (they refill one at a time)
 
 // ---- Armor ----
 export const MAX_ARMOR = 100;
@@ -108,6 +108,12 @@ export class Ship {
   /** Called by the gun each time a bullet leaves a barrel. */
   flashMuzzle(): void {
     this.muzzleFlash = 0.05;
+  }
+
+  /** Restore armor (healing pickups). */
+  heal(amount: number): void {
+    if (!this.alive) return;
+    this.armor = Math.min(MAX_ARMOR, this.armor + amount);
   }
 
   damage(amount: number): void {
