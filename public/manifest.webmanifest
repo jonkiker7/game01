@@ -1,0 +1,11 @@
+{
+  "name": "Star Rotor",
+  "short_name": "Star Rotor",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#1c0a24",
+  "theme_color": "#1c0a24",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
