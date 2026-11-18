@@ -142,8 +142,8 @@ export class MissileSystem {
           const ex = e.root.position.x - p.x;
           const ez = e.root.position.z - p.z;
           const ey = p.y - e.root.position.y;
-          // Only when the missile is actually at the enemy's height (a tower counts along its full height).
-          if (ex * ex + ez * ez < r * r && ey > e.hitBottom && ey < e.hitTop) {
+          // Only when the missile is actually at the enemy's height (anywhere from a tower's foot to its gun).
+          if (ex * ex + ez * ez < r * r && ey > Math.min(e.hitBottom, 0) && ey < e.hitTop) {
             this.detonate(m, p);
             break;
           }

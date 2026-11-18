@@ -77,16 +77,17 @@ abstract class Enemy implements Hittable {
 }
 
 /**
- * Turret tower: a tall stone pillar with the gun on top, so the gun sits at the same
- * height below the ship that ground turrets used to. Tracks you and fires a fan of three orbs.
+ * Turret tower: a stone pillar with the gun on top, about halfway up to the ship.
+ * Tracks you and fires a fan of three orbs.
  */
-const TOWER_HEIGHT = HOVER_HEIGHT - 6.5; // platform top; the gun head sits just above it
+const TOWER_HEIGHT = (HOVER_HEIGHT - 6.5) / 2; // platform top (13 units); the gun head sits just above it
 
 class Turret extends Enemy {
   readonly radius = 2.6;
   readonly kind = 'turret';
-  readonly hitBottom = 0;
-  readonly hitTop = TOWER_HEIGHT + 6;
+  // Bullets hit the gun and platform on top (what looks like the tower's head on screen).
+  readonly hitBottom = TOWER_HEIGHT - 1.5;
+  readonly hitTop = TOWER_HEIGHT + 5;
   readonly aimHeight = TOWER_HEIGHT + 2.6;
   private readonly head = new THREE.Group();
   private readonly eye: THREE.MeshBasicMaterial;
@@ -280,6 +281,9 @@ export class EnemyManager {
   private readonly frustum = new THREE.Frustum();
   private readonly viewProj = new THREE.Matrix4();
   private readonly probe = new THREE.Vector3();
+  private readonly probe2 = new THREE.Vector3();
+  private readonly camPos = new THREE.Vector3();
+  private planeY = 0;
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -296,6 +300,8 @@ export class EnemyManager {
   }
 
   update(dt: number, ship: Ship, shots: EnemyShots, camera: THREE.Camera): void {
+    this.camPos.setFromMatrixPosition(camera.matrixWorld);
+    this.planeY = ship.root.position.y;
     this.viewProj.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     this.frustum.setFromProjectionMatrix(this.viewProj);
     const onScreen = (e: Enemy) => {
@@ -346,16 +352,31 @@ export class EnemyManager {
   }
 
   /**
-   * Aim assist: the closest living enemy inside a cone in front of the ship.
-   * Makes thumb-aiming forgiving on a small screen.
+   * Where an enemy *appears* to be at the ship's altitude: follow the line from the camera
+   * through the enemy's gun until it reaches the ship's height. A tower gun far below the ship
+   * looks like it's at this spot on screen, so aiming here lines up with what the player sees.
+   */
+  visualPosition(e: Enemy, out: THREE.Vector3): THREE.Vector3 {
+    out.copy(e.root.position);
+    out.y += e.aimHeight;
+    const c = this.camPos;
+    if (out.y >= this.planeY - 0.01 || c.y <= this.planeY) return out;
+    const k = (this.planeY - c.y) / (out.y - c.y);
+    return out.set(c.x + (out.x - c.x) * k, this.planeY, c.z + (out.z - c.z) * k);
+  }
+
+  /**
+   * Aim assist: the closest living enemy inside a cone in front of the ship, judged by where
+   * enemies appear on screen. Makes thumb-aiming forgiving on a small screen.
    */
   findInCone(x: number, z: number, heading: number, range: number, halfAngle: number): Enemy | null {
     let best: Enemy | null = null;
     let bestDist = range;
     for (const e of this.enemies) {
       if (!e.alive) continue;
-      const dx = e.root.position.x - x;
-      const dz = e.root.position.z - z;
+      const v = this.visualPosition(e, this.probe2);
+      const dx = v.x - x;
+      const dz = v.z - z;
       const dist = Math.hypot(dx, dz);
       if (dist > bestDist) continue;
       const off = Math.abs(wrapAngle(Math.atan2(-dx, -dz) - heading));
