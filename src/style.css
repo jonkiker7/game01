@@ -1,0 +1,181 @@
+:root {
+  --gold: #f2c46d;
+  --gold-dim: rgba(242, 196, 109, 0.55);
+  --crimson: #7a1328;
+  --bg: #1c0a24;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: #fff;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* Stop the browser from scrolling, zooming or selecting while playing. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+body {
+  position: fixed;
+  inset: 0;
+}
+
+#app,
+#app canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+#hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* ---------- Left thumb: floating movement stick ---------- */
+#stick-zone {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 50%;
+  height: 100%;
+  pointer-events: auto;
+}
+
+#stick-base {
+  position: absolute;
+  width: 128px;
+  height: 128px;
+  margin: -64px 0 0 -64px;
+  left: calc(110px + env(safe-area-inset-left));
+  top: calc(100% - 110px - env(safe-area-inset-bottom));
+  border-radius: 50%;
+  border: 2px solid var(--gold-dim);
+  background: radial-gradient(circle, rgba(122, 19, 40, 0.35), rgba(20, 5, 25, 0.25));
+  opacity: 0.45;
+  transition: opacity 0.15s;
+}
+
+#stick-base.active {
+  opacity: 1;
+  transition: none;
+}
+
+#stick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 58px;
+  height: 58px;
+  margin: -29px 0 0 -29px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffe3a8, var(--gold) 45%, #9c6a22);
+  box-shadow: 0 0 14px rgba(242, 196, 109, 0.5);
+}
+
+/* ---------- Right thumb: action buttons in an arc ---------- */
+#buttons {
+  position: absolute;
+  right: env(safe-area-inset-right);
+  bottom: env(safe-area-inset-bottom);
+  width: 260px;
+  height: 260px;
+}
+
+.btn {
+  position: absolute;
+  pointer-events: auto;
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--gold);
+  border: 2px solid var(--gold-dim);
+  background: radial-gradient(circle at 50% 35%, rgba(160, 30, 55, 0.75), rgba(40, 6, 20, 0.7));
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.35), inset 0 0 12px rgba(0, 0, 0, 0.5);
+  transition: transform 0.08s, filter 0.08s;
+  overflow: hidden;
+}
+
+.btn.pressed {
+  transform: scale(0.9);
+  filter: brightness(1.5);
+  border-color: var(--gold);
+}
+
+.btn-big {
+  width: 100px;
+  height: 100px;
+  font-size: 15px;
+}
+
+#btn-gun {
+  right: 26px;
+  bottom: 26px;
+}
+#btn-missile {
+  right: 146px;
+  bottom: 34px;
+}
+#btn-boost {
+  right: 42px;
+  bottom: 146px;
+}
+
+/* Boost cooldown: a dark wedge that sweeps away as boost recharges. */
+#btn-boost::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(rgba(0, 0, 0, 0.65) calc(var(--cd, 0) * 360deg), transparent 0);
+}
+
+#fps {
+  position: absolute;
+  top: calc(6px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  font: 11px ui-monospace, monospace;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* ---------- Portrait warning on phones ---------- */
+#rotate {
+  display: none;
+  position: absolute;
+  inset: 0;
+  background: rgba(20, 5, 25, 0.92);
+  color: var(--gold);
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+  align-items: center;
+  justify-content: center;
+}
+
+.rotate-icon {
+  font-size: 56px;
+  margin-bottom: 12px;
+}
+
+@media (orientation: portrait) and (pointer: coarse) {
+  #rotate {
+    display: flex;
+  }
+}
