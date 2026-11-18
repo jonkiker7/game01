@@ -118,7 +118,7 @@ class Turret extends Enemy {
       const yaw = this.head.rotation.y;
       for (const spread of [-0.22, 0, 0.22]) {
         const a = yaw + spread;
-        shots.fire(this.tmp, -Math.sin(a), -Math.cos(a), 15, ship.root.position.y);
+        shots.fire(this.tmp, -Math.sin(a), -Math.cos(a), 15, ship.root.position.y, dist * 0.8);
       }
     }
   }
@@ -204,7 +204,7 @@ class Drone extends Enemy {
         this.burstTimer = 0.14;
         this.burst--;
         this.tmp.set(p.x + nx * 1.2, p.y, p.z + nz * 1.2);
-        shots.fire(this.tmp, nx, nz, 19, ship.root.position.y);
+        shots.fire(this.tmp, nx, nz, 19, ship.root.position.y, dist);
       }
     }
   }

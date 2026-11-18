@@ -54,7 +54,7 @@ export class CameraRig {
     const lz = lead?.y ?? 0;
     this.focus.x = damp(this.focus.x, target.x + velocity.x * LOOK_AHEAD + lx, 4, dt);
     this.focus.z = damp(this.focus.z, target.z + velocity.y * LOOK_AHEAD + lz, 4, dt);
-    this.focus.y = damp(this.focus.y, target.y * 0.5, 4, dt);
+    this.focus.y = damp(this.focus.y, target.y, 4, dt); // keep the ship centred at any altitude
 
     this.camera.position.copy(this.focus).add(this.offset);
     if (this.shake > 0.001) {

@@ -20,13 +20,15 @@ export class AimIndicator {
   private readonly reticle: THREE.Group;
   private readonly reticleMat: THREE.MeshBasicMaterial;
   private readonly color = new THREE.Color();
+  private readonly target = new THREE.Vector3();
   private time = 0;
 
   constructor(scene: THREE.Scene) {
     this.beamMat = this.overlayMaterial(this.beamTexture());
     const geo = new THREE.PlaneGeometry(1, 1);
     geo.rotateX(-Math.PI / 2);
-    geo.translate(0, 0, -0.5); // starts at the ship and extends forward (-Z)
+    geo.translate(0, 0, -0.5);
+    geo.rotateY(Math.PI); // runs from the origin (ship) along +Z, which lookAt() points at the target
     this.beam = new THREE.Mesh(geo, this.beamMat);
 
     this.reticleMat = this.overlayMaterial();
@@ -62,11 +64,17 @@ export class AimIndicator {
       range = Math.hypot(dx, dz);
       heading = Math.atan2(-dx, -dz);
     }
-    this.group.position.set(p.x, world.heightAt(p.x, p.z) + 0.4, p.z);
-    this.group.rotation.y = heading;
+    // Target ring on the ground where the missile will land (or on the locked enemy).
+    const tx = p.x - Math.sin(heading) * range;
+    const tz = p.z - Math.cos(heading) * range;
+    this.target.set(tx, world.heightAt(tx, tz) + 0.4, tz);
+    if (lock) this.target.y = Math.max(this.target.y, lock.root.position.y + 0.4);
+    this.reticle.position.copy(this.target);
 
-    this.beam.scale.set(1.1 + ship.charge * 0.6, 1, range);
-    this.reticle.position.z = -range;
+    // Beam from the ship (high in the air) down to the target ring.
+    this.beam.position.set(p.x, p.y - 1, p.z);
+    this.beam.lookAt(this.target);
+    this.beam.scale.set(1.1 + ship.charge * 0.6, 1, this.beam.position.distanceTo(this.target));
 
     const full = ship.charge >= 1;
     const pulse = full ? 0.75 + Math.sin(this.time * 18) * 0.25 : 1;

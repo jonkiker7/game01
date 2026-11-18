@@ -28,6 +28,7 @@ const $ = (id: string) => document.getElementById(id) as HTMLElement;
 const GUN_RATE = 11; // bullets per second (alternating barrels)
 const AIM_ASSIST_ANGLE = 0.2; // radians either side of the nose where bullets bend toward an enemy
 const AIM_ASSIST_RANGE = 38;
+const GROUND_AIM_DISTANCE = 30; // with nothing targeted, bullets strike the ground this far ahead
 const GUN_SPREAD = 0.03;
 
 // ---------- Renderer ----------
@@ -58,7 +59,7 @@ let qualityChosen = savedQuality() !== null; // if the player picked one, don't 
 // ---------- Scene & lighting ----------
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(JUNGLE.sky);
-scene.fog = new THREE.Fog(JUNGLE.sky, 95, 230);
+scene.fog = new THREE.Fog(JUNGLE.sky, 120, 270);
 
 scene.add(new THREE.HemisphereLight(JUNGLE.hemiSky, JUNGLE.hemiGround, 1.1));
 const sun = new THREE.DirectionalLight('#fff1d6', 2.3);
@@ -156,6 +157,8 @@ enemies.onAreaCleared = () => hud.show('AREA CLEARED', 3);
 let gunTimer = 0;
 let barrel = 0;
 const muzzlePos = new THREE.Vector3();
+const aimPoint = new THREE.Vector3();
+const bulletDir = new THREE.Vector3();
 
 function updateGun(dt: number): void {
   gunTimer -= dt;
@@ -167,15 +170,24 @@ function updateGun(dt: number): void {
   barrel = 1 - barrel;
   ship.flashMuzzle();
 
-  // Shoot along the nose, bending toward an enemy if one is close to the line of fire.
-  let angle = ship.heading;
+  // Aim at an enemy near the line of fire (aim assist); otherwise at the ground ahead.
   const p = ship.root.position;
   const target = enemies.findInCone(p.x, p.z, ship.heading, AIM_ASSIST_RANGE, AIM_ASSIST_ANGLE);
   if (target) {
-    angle = Math.atan2(-(target.root.position.x - muzzlePos.x), -(target.root.position.z - muzzlePos.z));
+    aimPoint.copy(target.root.position);
+    if (target.kind === 'turret') aimPoint.y += 1.8;
+  } else {
+    const ax = p.x - Math.sin(ship.heading) * GROUND_AIM_DISTANCE;
+    const az = p.z - Math.cos(ship.heading) * GROUND_AIM_DISTANCE;
+    aimPoint.set(ax, world.heightAt(ax, az), az);
   }
-  angle += (Math.random() - 0.5) * GUN_SPREAD * 2;
-  bullets.fire(muzzlePos, -Math.sin(angle), -Math.cos(angle));
+  bulletDir.subVectors(aimPoint, muzzlePos).normalize();
+  // A little random spread sideways.
+  const spread = (Math.random() - 0.5) * GUN_SPREAD * 2;
+  const cos = Math.cos(spread);
+  const sin = Math.sin(spread);
+  bulletDir.set(bulletDir.x * cos + bulletDir.z * sin, bulletDir.y, -bulletDir.x * sin + bulletDir.z * cos);
+  bullets.fire(muzzlePos, bulletDir);
 }
 
 // ---------- Resize & fullscreen ----------
@@ -258,7 +270,7 @@ renderer.setAnimationLoop((now: number) => {
   ship.update(dt, input, world);
   updateGun(dt);
   enemies.update(dt, ship, enemyShots);
-  bullets.update(dt, enemies.enemies);
+  bullets.update(dt, enemies.enemies, (x, z) => world.heightAt(x, z));
   enemyShots.update(dt, ship);
   missiles.update(dt, enemies.enemies);
   if (ship.isBoosting && ship.alive) {
