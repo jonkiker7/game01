@@ -26,6 +26,10 @@ looks inside the blast (including tower guns below you).
 If an enemy is close to your aim line and in range, the target ring snaps onto it and turns red:
 the missile is locked on and will follow that enemy.
 
+You carry **3 missiles**, shown as small missile markers around the MSL button. Used missiles refill
+one at a time, 3 seconds each (fire all three and they come back at 3, 6 and 9 seconds). With none
+left, the button dims and won't charge.
+
 Boosting makes you briefly invulnerable, so you can dash through enemy shots.
 
 **Graphics quality:** tap the fps counter at the top to switch between HIGH (with bloom glow) and

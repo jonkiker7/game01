@@ -1,4 +1,4 @@
-import { MAX_ARMOR } from './Ship';
+import { MAX_ARMOR, MISSILE_MAX } from './Ship';
 
 /** On-screen readouts: armor bar, targets remaining, big messages, and the red damage flash. */
 export class Hud {
@@ -6,6 +6,9 @@ export class Hud {
   private readonly targets: HTMLElement;
   private readonly message: HTMLElement;
   private readonly damage: HTMLElement;
+  private readonly pips: { el: HTMLElement; fill: HTMLElement }[] = [];
+  private readonly missileBtn: HTMLElement | null;
+  private lastMissiles = -1;
   private messageTimer = 0;
   private lastArmor = -1;
   private lastTargets = -1;
@@ -22,6 +25,53 @@ export class Hud {
     this.targets = root.querySelector('#targets') as HTMLElement;
     this.message = root.querySelector('#message') as HTMLElement;
     this.damage = root.querySelector('#damage') as HTMLElement;
+
+    // Missile pips: little missile shapes on an arc around the top-left of the MSL button.
+    this.missileBtn = root.querySelector('#btn-missile');
+    const ring = document.createElement('div');
+    ring.id = 'msl-pips';
+    (root.querySelector('#buttons') ?? root).appendChild(ring);
+    for (let i = 0; i < MISSILE_MAX; i++) {
+      const angle = -150 + i * 32; // degrees, sweeping over the top of the button
+      const el = document.createElement('div');
+      el.className = 'pip';
+      el.style.transform = `rotate(${angle}deg) translateX(40px) rotate(90deg)`;
+      const fill = document.createElement('div');
+      fill.className = 'pip-fill';
+      el.appendChild(fill);
+      ring.appendChild(el);
+      this.pips.push({ el, fill });
+    }
+  }
+
+  /** @param ready missiles ready; @param progress 0..1 on the next one recharging. */
+  setMissiles(ready: number, progress: number): void {
+    this.pips.forEach((p, i) => {
+      const isReady = i < ready;
+      const charging = i === ready;
+      p.el.classList.toggle('ready', isReady);
+      p.fill.style.transform = `scaleY(${isReady ? 1 : charging ? progress : 0})`;
+    });
+    if (ready !== this.lastMissiles) {
+      // A little pop when a missile comes back.
+      if (ready > this.lastMissiles && this.lastMissiles >= 0) {
+        const p = this.pips[ready - 1];
+        p.el.classList.remove('pop');
+        void p.el.offsetWidth;
+        p.el.classList.add('pop');
+      }
+      this.lastMissiles = ready;
+      this.missileBtn?.classList.toggle('empty', ready === 0);
+    }
+  }
+
+  /** Shake the MSL button when it's pressed with no missiles. */
+  missileEmpty(): void {
+    const b = this.missileBtn;
+    if (!b) return;
+    b.classList.remove('denied');
+    void b.offsetWidth;
+    b.classList.add('denied');
   }
 
   setArmor(armor: number): void {
