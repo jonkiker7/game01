@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import { missileRange } from './Missiles';
 import type { Hittable } from './Projectiles';
 import type { Ship } from './Ship';
-import type { World } from './World';
 
 const CHARGING = new THREE.Color('#6ff7ff');
 const FULL = new THREE.Color('#ffd36b');
@@ -47,7 +46,7 @@ export class AimIndicator {
     scene.add(this.group);
   }
 
-  update(dt: number, ship: Ship, world: World, lock: Hittable | null): void {
+  update(dt: number, ship: Ship, lock: Hittable | null): void {
     this.time += dt;
     if (!ship.isCharging) {
       this.group.visible = false;
@@ -64,14 +63,14 @@ export class AimIndicator {
       range = Math.hypot(dx, dz);
       heading = Math.atan2(-dx, -dz);
     }
-    // Target ring on the ground where the missile will land (or on the locked enemy).
+    // Target ring at the ship's altitude where the missile will burst (or on the locked enemy).
     const tx = p.x - Math.sin(heading) * range;
     const tz = p.z - Math.cos(heading) * range;
-    this.target.set(tx, world.heightAt(tx, tz) + 0.4, tz);
-    if (lock) this.target.y = Math.max(this.target.y, lock.root.position.y + lock.aimHeight);
+    this.target.set(tx, p.y - 1, tz);
+    if (lock) this.target.y = lock.root.position.y + lock.aimHeight;
     this.reticle.position.copy(this.target);
 
-    // Beam from the ship (high in the air) down to the target ring.
+    // Beam from the ship to the target ring.
     this.beam.position.set(p.x, p.y - 1, p.z);
     this.beam.lookAt(this.target);
     this.beam.scale.set(1.1 + ship.charge * 0.6, 1, this.beam.position.distanceTo(this.target));

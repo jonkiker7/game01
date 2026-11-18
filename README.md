@@ -20,7 +20,9 @@ strafe. Bullets bend slightly toward enemies near your line of fire (aim assist)
 Missiles work like a charged bow shot: hold **MSL** and an aim line grows across the ground
 (cyan while charging, gold at full power). Drag your thumb away from the button to aim; the ship
 turns to face that way and slows down while charging. Let go to fire. A quick tap drops a missile
-just in front of the ship. Missiles do splash damage and explode on the first enemy they fly into.
+just in front of the ship. Unlocked missiles fly level along the aim line and burst at its end.
+Missiles explode on the first enemy they pass over on screen, and splash damage covers anything that
+looks inside the blast (including tower guns below you).
 If an enemy is close to your aim line and in range, the target ring snaps onto it and turns red:
 the missile is locked on and will follow that enemy.
 
@@ -28,7 +30,8 @@ Boosting makes you briefly invulnerable, so you can dash through enemy shots.
 
 **Graphics quality:** tap the fps counter at the top to switch between HIGH (with bloom glow) and
 LOW (faster, for older phones). The game drops to LOW automatically if HIGH runs below 45 fps.
-You can also force it with `?quality=low` or `?quality=high` in the URL.
+You can also force it with `?quality=low` or `?quality=high` in the URL. Adding `?debug` exposes
+`window.__game` (ship, enemies, missiles) for tinkering and automated tests.
 
 Play in landscape.
 On iPhone, use Share → **Add to Home Screen** for full-screen play.
