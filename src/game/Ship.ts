@@ -74,7 +74,7 @@ export class Ship {
   private respawnTimer = 0;
   private muzzleFlash = 0;
 
-  constructor(scene: THREE.Scene, design: ShipDesignId = 'a') {
+  constructor(scene: THREE.Scene, design: ShipDesignId = 'b') {
     this.root.add(this.tilt);
     this.parts = buildShipDesign(design, this.tilt, this.engineMat);
     addOutlines(this.tilt);

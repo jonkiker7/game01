@@ -72,9 +72,9 @@ scene.add(rim);
 // ---------- Game objects ----------
 const world = new World(scene);
 const effects = new Effects(scene, (x, z) => world.heightAt(x, z));
-// Pick the ship design with ?ship=a|b|c|d (see designs.html); defaults to A.
+// Pick the ship design with ?ship=a|b|c|d (see designs.html); defaults to the Manta.
 const shipParam = new URLSearchParams(location.search).get('ship');
-const ship = new Ship(scene, isShipDesign(shipParam) ? shipParam : 'a');
+const ship = new Ship(scene, isShipDesign(shipParam) ? shipParam : 'b');
 ship.root.position.set(0, world.heightAt(0, 0) + HOVER_HEIGHT, 0);
 const missiles = new MissileSystem(scene, world, effects);
 const aim = new AimIndicator(scene);

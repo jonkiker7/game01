@@ -10,7 +10,7 @@ export type ShipDesignId = 'a' | 'b' | 'c' | 'd';
 
 export const SHIP_DESIGNS: { id: ShipDesignId; name: string; blurb: string }[] = [
   { id: 'a', name: 'Valkyrie', blurb: 'Armored wedge gunship with ducted fans on the wingtips' },
-  { id: 'b', name: 'Manta', blurb: 'Flying-wing delta with fans set into the wings' },
+  { id: 'b', name: 'Manta', blurb: 'Flying-wing delta with big wing-mounted fans and a tail boom' },
   { id: 'c', name: 'Kestrel', blurb: 'Slim dart with open rotors on wingtip nacelles' },
   { id: 'd', name: 'Atlas', blurb: 'Heavy lifter with big fan pods and a belly turret' },
 ];
@@ -93,31 +93,31 @@ function valkyrie(t: THREE.Group, k: Kit): void {
 // ---------------------------------------------------------------- design B
 
 function manta(t: THREE.Group, k: Kit): void {
-  // One wide flying-wing body with circular openings for the fans.
-  const fanX = 2.2;
-  const fanY = -0.7; // shape coordinates (y = forward)
-  const fanR = 0.74;
+  // One wide flying-wing body. The fans are large ducted rings mounted on top of the wing,
+  // overhanging its edges a little, so they can be big without making the wing bigger.
   add(
     t,
-    flat(
-      [[0, 3.4], [0.7, 2.3], [1.4, 0.9], [3.8, -1.0], [3.9, -1.7], [2.6, -1.9], [1.2, -1.5], [0.5, -2.4], [0, -2.2]],
-      0.45,
-      [{ x: fanX, y: fanY, r: fanR }, { x: -fanX, y: fanY, r: fanR }],
-    ),
+    flat([[0, 3.4], [0.7, 2.3], [1.4, 0.9], [3.8, -1.0], [3.9, -1.7], [2.6, -1.9], [1.2, -1.5], [0.5, -2.4], [0, -2.2]], 0.45),
     k.hull,
   );
   add(t, flat([[0, 2.95], [0.62, 2.05], [0.62, 1.6], [0, 2.4]], 0.12), k.accent, 0, 0.3);
   add(t, sphere(0.85, 0.45, 1.8), k.hull, 0, 0.22, -0.2);
   add(t, sphere(0.46, 0.32, 0.72), k.canopy, 0, 0.5, -1.35);
-  // Swept dorsal fin.
-  const fin = add(t, new THREE.BoxGeometry(0.12, 0.85, 1.3), k.accent, 0, 0.62, 1.45);
-  fin.rotation.x = -0.35;
   // Blue trailing-edge bands across the wings.
   add(t, flat([[1.3, -1.35], [2.6, -1.72], [3.85, -1.55], [3.85, -1.75], [2.6, -1.92], [1.25, -1.55]], 0.08, [], 0.02), k.accent, 0, 0.26);
+
+  // Tail: a slim boom with a swept tailplane and a vertical fin at the end.
+  add(t, flat([[0, -1.6], [0.32, -1.9], [0.24, -4.3], [0, -4.45]], 0.36), k.hull, 0, 0.08);
+  add(t, flat([[0, -1.9], [0.1, -2.0], [0.1, -4.1], [0, -4.2]], 0.06, [], 0.02), k.accent, 0, 0.3);
+  add(t, flat([[0.2, -3.45], [1.45, -3.95], [1.5, -4.3], [0.2, -4.2]], 0.14), k.panel, 0, 0.1);
+  for (const s of [-1, 1]) add(t, new THREE.BoxGeometry(0.22, 0.18, 0.4), k.accent, s * 1.45, 0.1, 4.1);
+  const fin = add(t, new THREE.BoxGeometry(0.12, 1.0, 1.05), k.accent, 0, 0.62, 4.0);
+  fin.rotation.x = -0.4;
+
   for (const s of [-1, 1]) {
-    duct(t, k, s * fanX, 0, -fanY, fanR + 0.06, s, 0.12);
+    duct(t, k, s * 2.3, 0.45, 0.7, 1.22, s, 0.2, true);
     gun(t, k, s * 0.95, -0.3, -1.3);
-    engine(t, k, s * 0.42, 0.05, 2.25, 0.24);
+    engine(t, k, s * 0.5, 0.05, 2.2, 0.22);
   }
 }
 
@@ -171,7 +171,24 @@ function atlas(t: THREE.Group, k: Kit): void {
 // ---------------------------------------------------------------- parts
 
 /** A ducted fan: a ring around spinning blades, with a glowing inner rim. */
-function duct(t: THREE.Group, k: Kit, x: number, y: number, z: number, r: number, dir: number, tube = 0.2): void {
+function duct(
+  t: THREE.Group,
+  k: Kit,
+  x: number,
+  y: number,
+  z: number,
+  r: number,
+  dir: number,
+  tube = 0.2,
+  intake = false,
+): void {
+  if (intake) {
+    // Dark recessed floor inside the ring, so a fan mounted on a wing reads as an opening.
+    const floor = new THREE.Mesh(new THREE.CylinderGeometry(r - tube * 0.5, r - tube * 0.5, 0.1, 32), k.dark);
+    floor.position.set(x, y - 0.12, z);
+    floor.userData.noOutline = true;
+    t.add(floor);
+  }
   const ring = new THREE.Mesh(new THREE.TorusGeometry(r, tube, 10, 36), k.hull);
   ring.rotation.x = Math.PI / 2;
   ring.position.set(x, y, z);
@@ -196,7 +213,8 @@ function duct(t: THREE.Group, k: Kit, x: number, y: number, z: number, r: number
   disc.rotation.x = -Math.PI / 2;
   disc.position.set(x, y - 0.05, z);
   k.parts.pulses.push(discMat);
-  t.add(ring, inner, hub, fan, disc);
+  t.add(ring, inner, hub, fan);
+  if (!intake) t.add(disc); // a wing-mounted fan shows its dark opening instead
   k.parts.spinners.push({ obj: fan, dir });
 }
 
