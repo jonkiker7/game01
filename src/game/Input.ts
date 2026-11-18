@@ -4,10 +4,14 @@ interface InputElements {
   stickZone: HTMLElement;
   stickBase: HTMLElement;
   stickKnob: HTMLElement;
+  aimRing: HTMLElement;
+  aimKnob: HTMLElement;
   buttons: Record<ButtonName, HTMLElement>;
 }
 
 const DEADZONE = 0.12;
+const AIM_RADIUS = 70; // px: how far the thumb can drag from the MSL button
+const AIM_DEADZONE = 14; // px: drags shorter than this keep aiming straight ahead
 
 const KEY_BUTTONS: Record<string, ButtonName> = {
   KeyJ: 'gun',
@@ -20,6 +24,7 @@ const KEY_BUTTONS: Record<string, ButtonName> = {
  * Touch + keyboard input.
  * - Left half of the screen: a floating stick that appears under your thumb.
  * - Right side: buttons (each tracked by its own finger, so you can hold GUN while tapping BOOST).
+ *   MSL doubles as an aiming stick: hold it and drag your thumb toward where you want to shoot.
  * - Keyboard for testing on a computer: WASD/arrows, J gun, K missile, L/Space boost.
  */
 export class Input {
@@ -33,6 +38,9 @@ export class Input {
   private readonly touchHeld: Record<ButtonName, boolean> = { gun: false, missile: false, boost: false };
   private readonly keys = new Set<string>();
   private readonly pressed = new Set<ButtonName>();
+  private readonly released = new Set<ButtonName>();
+  private aimX = 0;
+  private aimY = 0;
 
   constructor(private readonly el: InputElements) {
     this.bindStick();
@@ -68,9 +76,23 @@ export class Input {
     return this.pressed.delete(name);
   }
 
+  /** True once when a held button/key is let go. */
+  consumeRelease(name: ButtonName): boolean {
+    return this.released.delete(name);
+  }
+
+  /**
+   * Missile aim direction while dragging from the MSL button (x = right, y = up on screen).
+   * Returns {0, 0} when the thumb hasn't been dragged, meaning "aim straight ahead".
+   */
+  getAim(): { x: number; y: number } {
+    return { x: this.aimX, y: this.aimY };
+  }
+
   /** Call at the end of every frame so unused taps don't linger. */
   endFrame(): void {
     this.pressed.clear();
+    this.released.clear();
   }
 
   vibrate(ms: number): void {
@@ -141,6 +163,10 @@ export class Input {
 
   private bindButton(name: ButtonName, el: HTMLElement): void {
     let pointer: number | null = null;
+    let centerX = 0;
+    let centerY = 0;
+    const isAimStick = name === 'missile';
+    const { aimRing, aimKnob } = this.el;
 
     el.addEventListener('pointerdown', (e) => {
       e.preventDefault();
@@ -151,17 +177,54 @@ export class Input {
       this.pressed.add(name);
       el.classList.add('pressed');
       this.vibrate(8);
+
+      if (isAimStick) {
+        const r = el.getBoundingClientRect();
+        centerX = r.left + r.width / 2;
+        centerY = r.top + r.height / 2;
+        aimRing.style.left = `${centerX}px`;
+        aimRing.style.top = `${centerY}px`;
+        aimRing.classList.add('active');
+        this.updateAim(e.clientX - centerX, e.clientY - centerY);
+      }
     });
+
+    if (isAimStick) {
+      el.addEventListener('pointermove', (e) => {
+        if (e.pointerId !== pointer) return;
+        this.updateAim(e.clientX - centerX, e.clientY - centerY);
+      });
+    }
 
     const release = (e: PointerEvent) => {
       if (e.pointerId !== pointer) return;
       pointer = null;
       this.touchHeld[name] = false;
+      this.released.add(name);
       el.classList.remove('pressed');
+      if (isAimStick) {
+        aimRing.classList.remove('active');
+        aimKnob.style.transform = '';
+        this.aimX = 0;
+        this.aimY = 0;
+      }
     };
     el.addEventListener('pointerup', release);
     el.addEventListener('pointercancel', release);
     el.addEventListener('lostpointercapture', release);
+  }
+
+  private updateAim(dx: number, dy: number): void {
+    const dist = Math.hypot(dx, dy);
+    const k = dist > AIM_RADIUS ? AIM_RADIUS / dist : 1;
+    this.el.aimKnob.style.transform = `translate(${dx * k}px, ${dy * k}px)`;
+    if (dist < AIM_DEADZONE) {
+      this.aimX = 0;
+      this.aimY = 0;
+    } else {
+      this.aimX = dx / dist;
+      this.aimY = -dy / dist;
+    }
   }
 
   private bindKeyboard(): void {
@@ -170,7 +233,11 @@ export class Input {
       if (!e.repeat && KEY_BUTTONS[e.code]) this.pressed.add(KEY_BUTTONS[e.code]);
       this.keys.add(e.code);
     });
-    window.addEventListener('keyup', (e) => this.keys.delete(e.code));
+    window.addEventListener('keyup', (e) => {
+      this.keys.delete(e.code);
+      const btn = KEY_BUTTONS[e.code];
+      if (btn && !this.isHeld(btn)) this.released.add(btn);
+    });
     window.addEventListener('blur', () => this.keys.clear());
   }
 }

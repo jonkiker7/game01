@@ -12,7 +12,13 @@ const TURN_RATE_FIRING = 1.3; // much slower turning while GUN is held, so you c
 const BOOST_SPEED = 44;
 const BOOST_TIME = 0.28; // seconds of dash
 export const BOOST_COOLDOWN = 1.4;
-const HOVER_HEIGHT = 3.6;
+const HOVER_HEIGHT = 6.5;
+
+// ---- Missile charge (hold MSL, like drawing a bow) ----
+const CHARGE_TIME = 0.75; // seconds to reach full power
+const MIN_CHARGE = 0.2; // a quick tap still fires a short-range missile
+const AIM_TURN_RATE = 12; // the ship snaps quickly toward where you're aiming
+const CHARGING_SPEED = 0.5; // fly at half speed while charging
 
 /**
  * The player's space helicopter. Built from simple shapes for now; it can be
@@ -25,7 +31,14 @@ export class Ship {
   readonly velocity = new THREE.Vector2(); // (x, z) world units/second
   heading = 0;
   boostCooldown = 0;
+  /** Missile charge 0..1 while MSL is held. */
+  charge = 0;
+  isCharging = false;
+  /** Direction the missile will fire (same convention as `heading`). */
+  aimHeading = 0;
   onBoost?: () => void;
+  onFullCharge?: () => void;
+  onMissile?: (charge: number, heading: number) => void;
 
   private readonly tilt = new THREE.Group(); // pitch + bank
   private readonly rotor = new THREE.Group();
@@ -75,18 +88,41 @@ export class Ship {
       this.onBoost?.();
     }
 
+    // --- Missile: hold to charge, drag from the button to aim, release to fire ---
+    if (input.consumePress('missile') && !this.isCharging) {
+      this.isCharging = true;
+      this.charge = MIN_CHARGE;
+      this.aimHeading = this.heading;
+    }
+    if (this.isCharging) {
+      const before = this.charge;
+      this.charge = Math.min(1, this.charge + dt / CHARGE_TIME);
+      if (before < 1 && this.charge >= 1) this.onFullCharge?.();
+      const aim = input.getAim();
+      if (aim.x !== 0 || aim.y !== 0) this.aimHeading = Math.atan2(-aim.x, aim.y);
+    }
+    if (input.consumeRelease('missile') && this.isCharging) {
+      this.onMissile?.(this.charge, this.aimHeading);
+      this.isCharging = false;
+      this.charge = 0;
+    }
+    const speedScale = this.isCharging ? CHARGING_SPEED : 1;
+
     // --- Velocity: ease toward where the stick is pointing (gives helicopter momentum) ---
     if (this.boostTimer > 0) {
       this.boostTimer -= dt;
       this.velocity.multiplyScalar(Math.exp(-1.5 * dt));
     } else {
       const k = 1 - Math.exp(-ACCEL * dt);
-      this.velocity.x += (dirX * MAX_SPEED - this.velocity.x) * k;
-      this.velocity.y += (dirZ * MAX_SPEED - this.velocity.y) * k;
+      this.velocity.x += (dirX * MAX_SPEED * speedScale - this.velocity.x) * k;
+      this.velocity.y += (dirZ * MAX_SPEED * speedScale - this.velocity.y) * k;
     }
 
-    // --- Heading: turn to face the stick; turn slowly while firing so you can strafe ---
-    if (mag > 0.15) {
+    // --- Heading: face the missile aim while charging, otherwise face the stick ---
+    // (turning is slow while GUN is held so you can strafe)
+    if (this.isCharging) {
+      this.heading = approachAngle(this.heading, this.aimHeading, AIM_TURN_RATE * dt);
+    } else if (mag > 0.15) {
       const target = Math.atan2(-dirX, -dirZ);
       this.heading = approachAngle(this.heading, target, (firing ? TURN_RATE_FIRING : TURN_RATE) * dt);
     }
@@ -220,7 +256,7 @@ export class Ship {
     c.width = c.height = 64;
     const g = c.getContext('2d')!;
     const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-    grad.addColorStop(0, 'rgba(10,0,15,0.75)');
+    grad.addColorStop(0, 'rgba(10,0,15,0.55)');
     grad.addColorStop(1, 'rgba(10,0,15,0)');
     g.fillStyle = grad;
     g.fillRect(0, 0, 64, 64);
@@ -230,7 +266,7 @@ export class Ship {
       new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false }),
     );
     mesh.geometry.rotateX(-Math.PI / 2);
-    mesh.scale.set(4, 1, 5.5);
+    mesh.scale.set(5, 1, 6.5);
     mesh.renderOrder = 1;
     return mesh;
   }
