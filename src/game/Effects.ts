@@ -215,7 +215,7 @@ export class Effects {
     this.blasts = new EffectPool(scene, sphere, 32);
     this.rings = new EffectPool(scene, new THREE.RingGeometry(0.8, 1, 32), 16, true);
     this.sparks = new EffectPool(scene, new THREE.SphereGeometry(1, 6, 4), 60);
-    this.trails = new EffectPool(scene, new THREE.SphereGeometry(1, 6, 4), 80);
+    this.trails = new EffectPool(scene, new THREE.SphereGeometry(1, 6, 4), 140);
     this.embers = new Particles(
       scene,
       new THREE.OctahedronGeometry(1, 0),
@@ -229,7 +229,14 @@ export class Effects {
 
   /** Glowing streak behind the engines while boosting. */
   trail(pos: THREE.Vector3): void {
-    this.trails.spawn(pos, '#6ff7ff', 0.3, 0.45, 0.1, 0.8);
+    this.trails.spawn(pos, '#6ff7ff', 0.5, 0.7, 0.12, 0.9);
+  }
+
+  /** Cyan shockwave ring and a flash when the ship kicks into a boost. */
+  boostBurst(pos: THREE.Vector3): void {
+    this.rings.spawn(pos, '#6ff7ff', 0.4, 1.5, 9, 0.9);
+    this.blasts.spawn(pos, '#bffcff', 0.18, 1.2, 3.2, 0.6);
+    this.embersBurst(pos, 10, 10, 0.14);
   }
 
   /** A burst of glowing embers flung outward and upward. */

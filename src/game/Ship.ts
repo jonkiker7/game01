@@ -6,15 +6,15 @@ import { buildShipDesign, type ShipDesignId, type ShipParts } from './ShipDesign
 import type { World } from './World';
 
 // ---- Handling (tweak these to change how the ship feels) ----
-const MAX_SPEED = 17; // units per second at full stick
-const ACCEL = 3.2; // how quickly the ship reaches the stick's speed (higher = snappier)
+const MAX_SPEED = 26; // units per second at full stick
+const ACCEL = 3.6; // how quickly the ship reaches the stick's speed (higher = snappier)
 const TURN_RATE = 6.5; // radians/second when turning to face the stick direction
 const TURN_RATE_FIRING = 1.3; // slow turning while firing without aiming, so you can strafe
 const AIM_TURN_RATE = 12; // the ship snaps quickly toward where you're aiming
-const BOOST_SPEED = 44;
-const BOOST_TIME = 0.28; // seconds of dash
-export const BOOST_COOLDOWN = 1.4;
-const BOOST_INVULNERABLE = 0.35; // dodge through enemy shots while dashing
+const BOOST_SPEED = 80;
+const BOOST_TIME = 0.38; // seconds of dash
+export const BOOST_COOLDOWN = 1.3;
+const BOOST_INVULNERABLE = 0.45; // dodge through enemy shots while dashing
 export const HOVER_HEIGHT = 32.5; // well above the jungle canopy
 
 // ---- Weapons ----
