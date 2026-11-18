@@ -10,6 +10,7 @@ import { Effects } from './game/Effects';
 import { EnemyManager } from './game/Enemies';
 import { Hud } from './game/Hud';
 import { Input } from './game/Input';
+import { DROP_CHANCE, Pickups } from './game/Pickups';
 import { type Blip, Radar } from './game/Radar';
 import {
   MISSILE_LOCK_ANGLE,
@@ -83,6 +84,8 @@ const bullets = new Bullets(scene, effects);
 const enemyShots = new EnemyShots(scene, effects);
 const enemies = new EnemyManager(scene, world, effects);
 const hud = new Hud($('hud'));
+const pickups = new Pickups(scene, effects);
+const pickupTarget = new THREE.Vector3();
 const radar = new Radar($('hud'));
 
 // ---------- Mission ----------
@@ -116,7 +119,7 @@ function updateMission(): void {
 
 // ?debug in the URL exposes game objects for automated tests and console tinkering.
 if (new URLSearchParams(location.search).has('debug')) {
-  Object.assign(window, { __game: { ship, enemies, missiles } });
+  Object.assign(window, { __game: { ship, enemies, missiles, pickups } });
 }
 
 const rig = new CameraRig(window.innerWidth / window.innerHeight);
@@ -181,6 +184,11 @@ ship.onDeath = () => {
   hud.show('SHIP DOWN');
 };
 ship.onRespawn = () => hud.show('BACK IN THE FIGHT', 1.5);
+pickups.onCollect = (heal) => {
+  ship.heal(heal);
+  hud.flashHeal();
+  input.vibrate(25);
+};
 
 missiles.onExplode = (pos, power) => {
   freeze(0.03 + power * 0.04);
@@ -188,7 +196,12 @@ missiles.onExplode = (pos, power) => {
   rig.kick(0, 0.5 + power * 0.9);
   input.vibrate(25 + Math.round(power * 30));
 };
-enemies.onKill = (kind) => {
+enemies.onKill = (kind, pos) => {
+  // Sometimes a wreck drops a healing orb that floats up to flying height.
+  if (Math.random() < DROP_CHANCE[kind]) {
+    enemies.projectToPlane(pos, pickupTarget);
+    pickups.drop(pos, pickupTarget);
+  }
   freeze(kind === 'turret' ? 0.08 : 0.05);
   rig.kick(0, kind === 'turret' ? 1 : 0.6);
   input.vibrate(30);
@@ -311,6 +324,7 @@ renderer.setAnimationLoop((now: number) => {
   enemies.update(dt, ship, enemyShots, rig.camera);
   bullets.update(dt, enemies.enemies, (x, z) => world.heightAt(x, z), cameraPos.setFromMatrixPosition(rig.camera.matrixWorld));
   enemyShots.update(dt, ship);
+  pickups.update(dt, ship);
   missiles.update(dt, enemies.enemies, cameraPos.setFromMatrixPosition(rig.camera.matrixWorld));
   if (ship.isBoosting && ship.alive) {
     for (let i = 0; i < 2; i++) effects.trail(ship.getEngine(i, enginePos));

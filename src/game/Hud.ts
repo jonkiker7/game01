@@ -97,8 +97,15 @@ export class Hud {
     this.messageTimer = seconds;
   }
 
+  /** Brief green glow at the screen edges when armor is restored. */
+  flashHeal(): void {
+    this.damage.classList.remove('hit', 'heal');
+    void this.damage.offsetWidth;
+    this.damage.classList.add('heal');
+  }
+
   flashDamage(): void {
-    this.damage.classList.remove('hit');
+    this.damage.classList.remove('hit', 'heal');
     void this.damage.offsetWidth; // restart the CSS animation
     this.damage.classList.add('hit');
   }

@@ -232,6 +232,13 @@ export class Effects {
     this.trails.spawn(pos, '#6ff7ff', 0.5, 0.7, 0.12, 0.9);
   }
 
+  /** Green flash and ring when a healing orb is collected. */
+  pickupBurst(pos: THREE.Vector3): void {
+    this.rings.spawn(pos, '#5dff8a', 0.45, 1, 7, 0.9);
+    this.blasts.spawn(pos, '#b8ffc6', 0.25, 1, 3.5, 0.8);
+    this.sparks.spawn(pos, '#8dff9e', 0.3, 0.5, 2.5, 1);
+  }
+
   /** Cyan shockwave ring and a flash when the ship kicks into a boost. */
   boostBurst(pos: THREE.Vector3): void {
     this.rings.spawn(pos, '#6ff7ff', 0.4, 1.5, 9, 0.9);

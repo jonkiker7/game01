@@ -352,7 +352,7 @@ export class EnemyManager {
   }
 
   /** Slide a point along the camera's line of sight up to the ship's altitude. */
-  private projectToPlane(point: THREE.Vector3, out: THREE.Vector3): THREE.Vector3 {
+  projectToPlane(point: THREE.Vector3, out: THREE.Vector3): THREE.Vector3 {
     out.copy(point);
     const c = this.camPos;
     if (out.y >= this.planeY - 0.01 || c.y <= this.planeY) return out;
