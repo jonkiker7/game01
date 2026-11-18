@@ -20,6 +20,7 @@ import {
 } from './game/Missiles';
 import { Bullets, EnemyShots } from './game/Projectiles';
 import { BOOST_COOLDOWN, HOVER_HEIGHT, Ship } from './game/Ship';
+import { isShipDesign } from './game/ShipDesigns';
 import { JUNGLE, World } from './game/World';
 
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
@@ -71,7 +72,9 @@ scene.add(rim);
 // ---------- Game objects ----------
 const world = new World(scene);
 const effects = new Effects(scene, (x, z) => world.heightAt(x, z));
-const ship = new Ship(scene);
+// Pick the ship design with ?ship=a|b|c|d (see designs.html); defaults to A.
+const shipParam = new URLSearchParams(location.search).get('ship');
+const ship = new Ship(scene, isShipDesign(shipParam) ? shipParam : 'a');
 ship.root.position.set(0, world.heightAt(0, 0) + HOVER_HEIGHT, 0);
 const missiles = new MissileSystem(scene, world, effects);
 const aim = new AimIndicator(scene);
@@ -94,8 +97,8 @@ const composer = new EffectComposer(
   new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 }),
 );
 composer.addPass(new RenderPass(scene, rig.camera));
-// Only colours brighter than 1.0 (glows) bloom, so the ground and models stay crisp.
-const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.75, 0.45, 1.0);
+// Only colours brighter than 1.2 (glows; not even sunlit white hulls) bloom, so the ground and models stay crisp.
+const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.75, 0.45, 1.2);
 composer.addPass(bloom);
 composer.addPass(new OutputPass());
 
