@@ -6,7 +6,14 @@ import { Effects } from './game/Effects';
 import { EnemyManager } from './game/Enemies';
 import { Hud } from './game/Hud';
 import { Input } from './game/Input';
-import { missileBlastRadius, missileDamage, MissileSystem, missileRange } from './game/Missiles';
+import {
+  MISSILE_LOCK_ANGLE,
+  MISSILE_LOCK_REACH,
+  missileBlastRadius,
+  missileDamage,
+  MissileSystem,
+  missileRange,
+} from './game/Missiles';
 import { Bullets, EnemyShots } from './game/Projectiles';
 import { BOOST_COOLDOWN, HOVER_HEIGHT, Ship } from './game/Ship';
 import { CRIMSON_DUNES, World } from './game/World';
@@ -68,8 +75,14 @@ ship.onBoost = () => {
   input.vibrate(20);
 };
 ship.onFullCharge = () => input.vibrate(15);
+/** The enemy a missile would lock onto right now (closest one near the aim line, within range). */
+function missileLock(charge: number, heading: number) {
+  const p = ship.root.position;
+  return enemies.findInCone(p.x, p.z, heading, missileRange(charge) + MISSILE_LOCK_REACH, MISSILE_LOCK_ANGLE);
+}
+
 ship.onMissile = (charge, heading) => {
-  missiles.fire(ship.root.position, heading, charge);
+  missiles.fire(ship.root.position, heading, charge, missileLock(charge, heading));
   rig.kick(1 + charge * 2, 0.15);
 };
 ship.onHit = () => {
@@ -168,9 +181,9 @@ renderer.setAnimationLoop((now: number) => {
   enemies.update(dt, ship, enemyShots);
   bullets.update(dt, enemies.enemies);
   enemyShots.update(dt, ship);
-  missiles.update(dt);
+  missiles.update(dt, enemies.enemies);
   effects.update(dt);
-  aim.update(dt, ship, world);
+  aim.update(dt, ship, world, ship.isCharging ? missileLock(ship.charge, ship.aimHeading) : null);
   world.update(dt);
 
   // While charging a missile, lean the camera toward the target so it stays on screen.
