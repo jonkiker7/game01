@@ -3,6 +3,8 @@ import { damp } from './math';
 
 const BASE_FOV = 40;
 const LOOK_AHEAD = 0.45; // seconds of velocity to lead the camera by
+const CAM_HEIGHT = 40; // camera height above the ship's focus point
+const CAM_BACK = 28; // and how far behind (south of) it
 
 /**
  * Angled top-down camera (a 3/4 view) that follows the ship, leads slightly in
@@ -11,12 +13,12 @@ const LOOK_AHEAD = 0.45; // seconds of velocity to lead the camera by
 export class CameraRig {
   readonly camera: THREE.PerspectiveCamera;
   private readonly focus = new THREE.Vector3();
-  private readonly offset = new THREE.Vector3(0, 26, 18);
+  private readonly offset = new THREE.Vector3(0, CAM_HEIGHT, CAM_BACK);
   private fovKick = 0;
   private shake = 0;
 
   constructor(aspect: number) {
-    this.camera = new THREE.PerspectiveCamera(BASE_FOV, aspect, 0.5, 400);
+    this.camera = new THREE.PerspectiveCamera(BASE_FOV, aspect, 1, 500);
   }
 
   snapTo(target: THREE.Vector3): void {
@@ -29,7 +31,7 @@ export class CameraRig {
     this.camera.aspect = aspect;
     // Pull back on tall screens so you can still see enough around the ship.
     const k = aspect < 1 ? 1.6 : 1;
-    this.offset.set(0, 26 * k, 18 * k);
+    this.offset.set(0, CAM_HEIGHT * k, CAM_BACK * k);
     this.camera.updateProjectionMatrix();
   }
 
@@ -39,9 +41,14 @@ export class CameraRig {
     this.shake = Math.max(this.shake, shake);
   }
 
-  update(dt: number, target: THREE.Vector3, velocity: THREE.Vector2): void {
-    this.focus.x = damp(this.focus.x, target.x + velocity.x * LOOK_AHEAD, 4, dt);
-    this.focus.z = damp(this.focus.z, target.z + velocity.y * LOOK_AHEAD, 4, dt);
+  /**
+   * @param lead extra offset (x, z) to look toward, e.g. the missile target while aiming
+   */
+  update(dt: number, target: THREE.Vector3, velocity: THREE.Vector2, lead?: THREE.Vector2): void {
+    const lx = lead?.x ?? 0;
+    const lz = lead?.y ?? 0;
+    this.focus.x = damp(this.focus.x, target.x + velocity.x * LOOK_AHEAD + lx, 4, dt);
+    this.focus.z = damp(this.focus.z, target.z + velocity.y * LOOK_AHEAD + lz, 4, dt);
     this.focus.y = damp(this.focus.y, target.y * 0.5, 4, dt);
 
     this.camera.position.copy(this.focus).add(this.offset);

@@ -10,10 +10,16 @@ classic 16-bit isometric helicopter shooters, with a painterly toon look.
 | --- | --- | --- |
 | Fly | Left thumb anywhere on the left half (floating stick) | WASD / arrow keys |
 | Machine gun (hold) | **GUN** button | J |
-| Missile | **MSL** button | K |
+| Missile (hold to charge, drag to aim, release to fire) | **MSL** button, used as an aiming stick | K (fires straight ahead) |
 | Boost (dash) | **BOOST** button | L / Space |
 
-Holding GUN slows turning so you can strafe around targets. Play in landscape.
+Holding GUN slows turning so you can strafe around targets.
+
+Missiles work like a charged bow shot: hold **MSL** and an aim line grows across the ground
+(cyan while charging, gold at full power). Drag your thumb away from the button to aim; the ship
+turns to face that way and slows down while charging. Let go to fire. A quick tap fires a short shot.
+
+Play in landscape.
 On iPhone, use Share → **Add to Home Screen** for full-screen play.
 
 ## Development
@@ -29,7 +35,9 @@ npm run preview   # serve the production build
 
 - `src/main.ts`: renderer, lights, and the main loop
 - `src/game/Ship.ts`: ship model and flight handling (tuning constants at the top)
-- `src/game/Input.ts`: touch stick, buttons, and keyboard
+- `src/game/Input.ts`: touch stick, buttons (MSL doubles as an aim stick), and keyboard
+- `src/game/Missiles.ts`: missile flight, smoke trail, and explosions (pooled)
+- `src/game/AimIndicator.ts`: the charging aim line and target ring
 - `src/game/CameraRig.ts`: follow camera with look-ahead, FOV kick, and shake
 - `src/game/World.ts`: test planet (terrain, rocks, crystals, map edge)
 - `src/game/materials.ts`: toon and glow materials
