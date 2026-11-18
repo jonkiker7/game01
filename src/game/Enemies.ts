@@ -274,7 +274,6 @@ export class EnemyManager {
   onAreaCleared?: () => void;
 
   private droneTimer = 4;
-  private respawnTimer = -1;
   private readonly rand = mulberry32(99);
   private readonly tmp = new THREE.Vector3();
   private readonly tmp2 = new THREE.Vector3();
@@ -333,11 +332,6 @@ export class EnemyManager {
       if (drones < MAX_DRONES) this.spawnDrone(ship);
     }
 
-    // When the area is cleared, bring the outposts back after a pause.
-    if (this.respawnTimer > 0) {
-      this.respawnTimer -= dt;
-      if (this.respawnTimer <= 0) this.spawnOutposts();
-    }
   }
 
   /**
@@ -414,14 +408,14 @@ export class EnemyManager {
       this.onKill?.(dead.kind, pos);
       if (dead.kind === 'turret' && this.turretsLeft === 0) {
         this.onAreaCleared?.();
-        this.respawnTimer = 8;
       }
     };
     this.enemies.push(e);
     this.scene.add(e.root);
   }
 
-  private spawnOutposts(): void {
+  /** Fill every outpost with turret towers (a new wave). */
+  spawnOutposts(): void {
     for (const [ox, oz] of OUTPOSTS) {
       const count = 2 + Math.floor(this.rand() * 2);
       for (let i = 0; i < count; i++) {

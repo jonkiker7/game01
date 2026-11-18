@@ -10,6 +10,7 @@ import { Effects } from './game/Effects';
 import { EnemyManager } from './game/Enemies';
 import { Hud } from './game/Hud';
 import { Input } from './game/Input';
+import { type Blip, Radar } from './game/Radar';
 import {
   MISSILE_LOCK_ANGLE,
   MISSILE_LOCK_REACH,
@@ -21,7 +22,7 @@ import {
 import { Bullets, EnemyShots } from './game/Projectiles';
 import { BOOST_COOLDOWN, HOVER_HEIGHT, Ship } from './game/Ship';
 import { isShipDesign } from './game/ShipDesigns';
-import { JUNGLE, World } from './game/World';
+import { JUNGLE, LANDING_PAD, World } from './game/World';
 
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
 
@@ -82,6 +83,36 @@ const bullets = new Bullets(scene, effects);
 const enemyShots = new EnemyShots(scene, effects);
 const enemies = new EnemyManager(scene, world, effects);
 const hud = new Hud($('hud'));
+const radar = new Radar($('hud'));
+
+// ---------- Mission ----------
+// Destroy every tower, then return to the landing zone to start the next wave.
+type Mission = 'destroy' | 'return';
+let mission: Mission = 'destroy';
+let wave = 1;
+const blips: Blip[] = [];
+
+function updateMission(): void {
+  const p = ship.root.position;
+  if (mission === 'return' && ship.alive && Math.hypot(p.x - LANDING_PAD.x, p.z - LANDING_PAD.z) < LANDING_PAD.radius) {
+    wave++;
+    mission = 'destroy';
+    enemies.spawnOutposts();
+    hud.show(`MISSION COMPLETE · WAVE ${wave}`, 3);
+    input.vibrate(60);
+  }
+
+  blips.length = 0;
+  if (mission === 'destroy') {
+    for (const e of enemies.enemies) {
+      if (e.alive && e.kind === 'turret') blips.push({ x: e.root.position.x, z: e.root.position.z, kind: 'target' });
+    }
+    hud.setObjective(`DESTROY THE TOWERS · ${enemies.turretsLeft} LEFT`);
+  } else {
+    blips.push({ x: LANDING_PAD.x, z: LANDING_PAD.z, kind: 'home' });
+    hud.setObjective('RETURN TO THE LANDING ZONE');
+  }
+}
 
 // ?debug in the URL exposes game objects for automated tests and console tinkering.
 if (new URLSearchParams(location.search).has('debug')) {
@@ -162,7 +193,10 @@ enemies.onKill = (kind) => {
   rig.kick(0, kind === 'turret' ? 1 : 0.6);
   input.vibrate(30);
 };
-enemies.onAreaCleared = () => hud.show('AREA CLEARED', 3);
+enemies.onAreaCleared = () => {
+  mission = 'return';
+  hud.show('AREA CLEARED', 3);
+};
 
 // ---------- Machine gun ----------
 let gunTimer = 0;
@@ -297,7 +331,8 @@ renderer.setAnimationLoop((now: number) => {
   boostBtn.style.setProperty('--cd', String(ship.boostCooldown / BOOST_COOLDOWN));
   hud.setArmor(ship.armor);
   hud.setMissiles(ship.missiles, ship.missileRecharge);
-  hud.setTargets(enemies.turretsLeft);
+  updateMission();
+  radar.draw(ship.root.position.x, ship.root.position.z, ship.heading, blips, elapsed);
   hud.update(dt);
 
   if (quality === 'high') composer.render(realDt);

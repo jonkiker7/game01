@@ -41,6 +41,15 @@ You can also force it with `?quality=low` or `?quality=high` in the URL. Adding 
 Play in landscape.
 On iPhone, use Share → **Add to Home Screen** for full-screen play.
 
+## Missions and radar
+
+The radar (top right, north up) marks whatever the current mission is about:
+
+1. **Destroy the towers:** red dots mark the remaining turret towers; the nearest ones beyond the
+   radar's range show as arrows on the rim.
+2. **Return to the landing zone:** after the area is cleared, a cyan diamond (or rim arrow) marks the pad.
+3. Fly over the pad to complete the mission; the next wave of towers appears.
+
 ## Ship designs
 
 Four twin-rotor ship designs live in `src/game/ShipDesigns.ts`. See them side by side at

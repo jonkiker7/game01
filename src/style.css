@@ -258,16 +258,33 @@ body {
   }
 }
 
-#targets {
+#objective {
   font-family: var(--display);
   position: absolute;
-  top: calc(12px + env(safe-area-inset-top));
-  right: calc(16px + env(safe-area-inset-right));
-  font-size: 12px;
+  top: calc(140px + env(safe-area-inset-top));
+  right: calc(10px + env(safe-area-inset-right));
+  width: 140px;
+  box-sizing: border-box;
+  padding: 4px 8px;
+  border-radius: 10px;
+  background: rgba(10, 16, 26, 0.6);
+  border: 1px solid rgba(242, 196, 109, 0.3);
+  text-align: center;
+  font-size: 10px;
   font-weight: 800;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
+  line-height: 1.3;
   color: var(--gold);
-  text-shadow: 0 1px 2px #000;
+  text-shadow: 0 1px 2px #000, 0 0 6px rgba(0, 0, 0, 0.6);
+}
+
+/* Radar in the top-right corner. */
+#radar {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top));
+  right: calc(21px + env(safe-area-inset-right));
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.35), 0 4px 14px rgba(0, 0, 0, 0.4);
 }
 
 #message {
@@ -377,7 +394,7 @@ body {
   }
 }
 
-/* Out of missiles: a dull, greyed button (but the countdown stays bright). */
+/* Out of missiles: a dull, greyed button. */
 #btn-missile.empty {
   color: rgba(242, 196, 109, 0.4);
   border-color: rgba(242, 196, 109, 0.3);
@@ -401,25 +418,7 @@ body {
   }
 }
 
-/* Seconds-left readout on the MSL button. */
-#btn-missile {
-  flex-direction: column;
-  line-height: 1.1;
-}
 
-#btn-missile .countdown {
-  font-family: system-ui, sans-serif;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0;
-  color: #bffcff;
-  font-variant-numeric: tabular-nums;
-}
-
-#btn-missile.empty .countdown {
-  font-size: 13px;
-  color: #ffffff;
-}
 
 /* The missile that's recharging glows and pulses so its fill is easy to follow. */
 #msl-pips .pip.charging {
