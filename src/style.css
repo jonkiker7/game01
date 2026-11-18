@@ -401,32 +401,7 @@ body {
   }
 }
 
-/* Recharge clock around the MSL button, and the seconds-left readout on it. */
-#msl-pips .recharge {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 80px;
-  height: 80px;
-  margin: -40px 0 0 -40px;
-  overflow: visible;
-}
-
-#msl-pips .recharge circle {
-  fill: none;
-  stroke-width: 4;
-}
-
-#msl-pips .recharge .track {
-  stroke: rgba(20, 5, 25, 0.55);
-}
-
-#msl-pips .recharge .arc {
-  stroke: #6ff7ff;
-  stroke-linecap: round;
-  filter: drop-shadow(0 0 3px rgba(111, 247, 255, 0.8));
-}
-
+/* Seconds-left readout on the MSL button. */
 #btn-missile {
   flex-direction: column;
   line-height: 1.1;
@@ -444,4 +419,24 @@ body {
 #btn-missile.empty .countdown {
   font-size: 13px;
   color: #ffffff;
+}
+
+/* The missile that's recharging glows and pulses so its fill is easy to follow. */
+#msl-pips .pip.charging {
+  border-color: #6ff7ff;
+  animation: pip-charging 0.9s ease-in-out infinite alternate;
+}
+
+#msl-pips .pip.charging .pip-fill {
+  background: linear-gradient(#e6feff, #6ff7ff 60%, #2aa7c9);
+  opacity: 1;
+}
+
+@keyframes pip-charging {
+  from {
+    box-shadow: 0 0 2px rgba(111, 247, 255, 0.4);
+  }
+  to {
+    box-shadow: 0 0 9px rgba(111, 247, 255, 0.95);
+  }
 }
