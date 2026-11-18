@@ -319,3 +319,81 @@ body {
   pointer-events: none;
   background: radial-gradient(ellipse at center, rgba(10, 18, 34, 0) 55%, rgba(10, 18, 34, 0.55) 100%);
 }
+
+/* ---------- Missile ammo pips around the MSL button ---------- */
+#msl-pips {
+  position: absolute;
+  right: 124px;
+  bottom: 30px;
+  width: 58px;
+  height: 58px;
+  pointer-events: none;
+}
+
+#msl-pips .pip {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 9px;
+  height: 18px;
+  margin: -9px 0 0 -4.5px;
+  border-radius: 5px 5px 2px 2px; /* rounded nose, flat tail: a tiny missile */
+  border: 1.5px solid rgba(242, 196, 109, 0.55);
+  background: rgba(20, 5, 25, 0.75);
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+}
+
+/* Fills from the tail up while recharging; solid gold when ready. */
+#msl-pips .pip-fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: bottom center;
+  transform: scaleY(0);
+  background: linear-gradient(#bffcff, #4fb8d6);
+  opacity: 0.8;
+}
+
+#msl-pips .pip.ready {
+  border-color: var(--gold);
+  box-shadow: 0 0 8px rgba(242, 196, 109, 0.7);
+}
+
+#msl-pips .pip.ready .pip-fill {
+  background: linear-gradient(#fff1c9, var(--gold) 55%, #b07a26);
+  opacity: 1;
+}
+
+#msl-pips .pip.pop {
+  animation: pip-pop 0.35s ease-out;
+}
+
+@keyframes pip-pop {
+  0% {
+    filter: brightness(2.5);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+
+#btn-missile.empty {
+  filter: grayscale(0.7) brightness(0.65);
+}
+
+#btn-missile.denied {
+  animation: denied 0.3s ease-in-out;
+}
+
+@keyframes denied {
+  0%,
+  100% {
+    translate: 0;
+  }
+  25% {
+    translate: -4px 0;
+  }
+  75% {
+    translate: 4px 0;
+  }
+}

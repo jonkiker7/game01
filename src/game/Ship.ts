@@ -21,6 +21,8 @@ export const HOVER_HEIGHT = 32.5; // well above the jungle canopy
 const GUN_SPEED = 0.85; // fly slightly slower while shooting
 const CHARGE_TIME = 0.75; // seconds for a missile to reach full power
 const CHARGING_SPEED = 0.5; // fly at half speed while charging a missile
+export const MISSILE_MAX = 3; // missiles you can hold
+export const MISSILE_RECHARGE = 3; // seconds to get one missile back (they refill one at a time)
 
 // ---- Armor ----
 export const MAX_ARMOR = 100;
@@ -58,6 +60,12 @@ export class Ship {
   onBoost?: () => void;
   onFullCharge?: () => void;
   onMissile?: (charge: number, heading: number) => void;
+  /** Pressed MSL with no missiles left. */
+  onMissileEmpty?: () => void;
+
+  /** Missiles ready to fire (0..MISSILE_MAX), and progress (0..1) on the next one recharging. */
+  missiles = MISSILE_MAX;
+  missileRecharge = 0;
   onHit?: (damage: number) => void;
   onDeath?: () => void;
   onRespawn?: () => void;
@@ -155,11 +163,24 @@ export class Ship {
       this.onBoost?.();
     }
 
+    // --- Missile ammo: refills one at a time, each taking MISSILE_RECHARGE seconds ---
+    if (this.missiles < MISSILE_MAX) {
+      this.missileRecharge += dt / MISSILE_RECHARGE;
+      if (this.missileRecharge >= 1) {
+        this.missiles++;
+        this.missileRecharge = this.missiles < MISSILE_MAX ? this.missileRecharge - 1 : 0;
+      }
+    }
+
     // --- Missile: hold to charge, drag from the button to aim, release to fire ---
     if (input.consumePress('missile') && !this.isCharging) {
-      this.isCharging = true;
-      this.charge = 0;
-      this.aimHeading = this.heading;
+      if (this.missiles > 0) {
+        this.isCharging = true;
+        this.charge = 0;
+        this.aimHeading = this.heading;
+      } else {
+        this.onMissileEmpty?.();
+      }
     }
     if (this.isCharging) {
       const before = this.charge;
@@ -169,6 +190,7 @@ export class Ship {
       if (aim.x !== 0 || aim.y !== 0) this.aimHeading = Math.atan2(-aim.x, aim.y);
     }
     if (input.consumeRelease('missile') && this.isCharging) {
+      this.missiles--;
       this.onMissile?.(this.charge, this.aimHeading);
       this.isCharging = false;
       this.charge = 0;
@@ -232,6 +254,8 @@ export class Ship {
   private respawn(world: World): void {
     this.alive = true;
     this.armor = MAX_ARMOR;
+    this.missiles = MISSILE_MAX;
+    this.missileRecharge = 0;
     this.invulnerable = RESPAWN_INVULNERABLE;
     this.velocity.set(0, 0);
     this.heading = 0;

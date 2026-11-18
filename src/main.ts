@@ -121,6 +121,10 @@ ship.onBoost = () => {
   effects.boostBurst(ship.root.position);
 };
 ship.onFullCharge = () => input.vibrate(15);
+ship.onMissileEmpty = () => {
+  hud.missileEmpty();
+  input.vibrate(8);
+};
 /** The enemy a missile would lock onto right now (closest one near the aim line, within range). */
 function missileLock(charge: number, heading: number) {
   const p = ship.root.position;
@@ -292,6 +296,7 @@ renderer.setAnimationLoop((now: number) => {
 
   boostBtn.style.setProperty('--cd', String(ship.boostCooldown / BOOST_COOLDOWN));
   hud.setArmor(ship.armor);
+  hud.setMissiles(ship.missiles, ship.missileRecharge);
   hud.setTargets(enemies.turretsLeft);
   hud.update(dt);
 
