@@ -89,11 +89,41 @@ class ShotPool {
   }
 }
 
+/**
+ * Shortest distance between a ray (origin `o`, unit direction `d`) and a vertical segment at
+ * (x, z) from height y0 to y1. Writes the closest point on the segment into `out`.
+ */
+function rayToVerticalSegment(
+  o: THREE.Vector3,
+  d: THREE.Vector3,
+  x: number,
+  z: number,
+  y0: number,
+  y1: number,
+  out: THREE.Vector3,
+): number {
+  // Closest approach between the ray's line and the segment's (vertical) line.
+  const wx = o.x - x;
+  const wz = o.z - z;
+  const horiz = d.x * d.x + d.z * d.z; // 1 - d.y², how far from vertical the ray is
+  let t = horiz > 1e-6 ? -(d.x * wx + d.z * wz) / horiz : 0;
+  if (t < 0) t = 0;
+  let y = o.y + d.y * t;
+  y = Math.min(y1, Math.max(y0, y));
+  // With the segment point clamped, find the ray point closest to it.
+  t = Math.max(0, d.x * (x - o.x) + d.y * (y - o.y) + d.z * (z - o.z));
+  out.set(x, y, z);
+  const px = o.x + d.x * t - x;
+  const py = o.y + d.y * t - y;
+  const pz = o.z + d.z * t - z;
+  return Math.sqrt(px * px + py * py + pz * pz);
+}
+
 /** Anything bullets can hit. */
 export interface Hittable {
   readonly root: THREE.Object3D;
   readonly radius: number;
-  /** Vertical extent that can be hit, relative to root.position.y (e.g. a whole tower). */
+  /** Vertical extent bullets can hit, relative to root.position.y (e.g. a tower's gun and platform). */
   readonly hitBottom: number;
   readonly hitTop: number;
   /** Where weapons aim, relative to root.position.y (e.g. a tower's turret head). */
@@ -103,13 +133,15 @@ export interface Hittable {
 }
 
 const BULLET_SPEED = 80;
-const BULLET_LIFE = 0.8; // → 64 units: enough to reach targets ~38 units away from 32 units up
+const BULLET_LIFE = 0.55; // → 44 units of range (about what fits on screen)
 const BULLET_DAMAGE = 7;
 
 /** The player's machine-gun rounds. */
 export class Bullets {
   private readonly pool: ShotPool;
   private readonly tmp = new THREE.Vector3();
+  private readonly ray = new THREE.Vector3();
+  private readonly closest = new THREE.Vector3();
 
   constructor(
     scene: THREE.Scene,
@@ -136,17 +168,26 @@ export class Bullets {
     });
   }
 
-  update(dt: number, targets: readonly Hittable[], groundY: (x: number, z: number) => number): void {
+  /**
+   * Hits are judged by what the player sees: a bullet hits an enemy when, on screen, it
+   * passes over any part of it (a tower's gun or pillar, a drone). In 3D terms: the line from
+   * the camera through the bullet comes within the enemy's radius of its vertical hit segment.
+   */
+  update(
+    dt: number,
+    targets: readonly Hittable[],
+    groundY: (x: number, z: number) => number,
+    camera: THREE.Vector3,
+  ): void {
     this.pool.update(dt, (s) => {
+      this.ray.set(s.x - camera.x, s.y - camera.y, s.z - camera.z).normalize();
       for (const t of targets) {
         if (!t.alive) continue;
         const tp = t.root.position;
-        const dx = tp.x - s.x;
-        const dz = tp.z - s.z;
-        // Generous hit box: the enemy's footprint, over its whole height.
-        if (dx * dx + dz * dz < t.radius * t.radius && s.y > tp.y + t.hitBottom && s.y < tp.y + t.hitTop) {
+        const hit = rayToVerticalSegment(camera, this.ray, tp.x, tp.z, tp.y + t.hitBottom, tp.y + t.hitTop, this.closest);
+        if (hit < t.radius) {
           t.damage(BULLET_DAMAGE);
-          this.effects.spark(this.tmp.set(s.x, s.y, s.z));
+          this.effects.spark(this.closest);
           return true;
         }
       }
