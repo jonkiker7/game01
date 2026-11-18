@@ -377,8 +377,11 @@ body {
   }
 }
 
+/* Out of missiles: a dull, greyed button (but the countdown stays bright). */
 #btn-missile.empty {
-  filter: grayscale(0.7) brightness(0.65);
+  color: rgba(242, 196, 109, 0.4);
+  border-color: rgba(242, 196, 109, 0.3);
+  background: radial-gradient(circle at 50% 35%, rgba(80, 60, 70, 0.8), rgba(25, 15, 22, 0.8));
 }
 
 #btn-missile.denied {
@@ -396,4 +399,49 @@ body {
   75% {
     translate: 4px 0;
   }
+}
+
+/* Recharge clock around the MSL button, and the seconds-left readout on it. */
+#msl-pips .recharge {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 80px;
+  height: 80px;
+  margin: -40px 0 0 -40px;
+  overflow: visible;
+}
+
+#msl-pips .recharge circle {
+  fill: none;
+  stroke-width: 4;
+}
+
+#msl-pips .recharge .track {
+  stroke: rgba(20, 5, 25, 0.55);
+}
+
+#msl-pips .recharge .arc {
+  stroke: #6ff7ff;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 3px rgba(111, 247, 255, 0.8));
+}
+
+#btn-missile {
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+#btn-missile .countdown {
+  font-family: system-ui, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: #bffcff;
+  font-variant-numeric: tabular-nums;
+}
+
+#btn-missile.empty .countdown {
+  font-size: 13px;
+  color: #ffffff;
 }

@@ -1,4 +1,4 @@
-import { MAX_ARMOR, MISSILE_MAX } from './Ship';
+import { MAX_ARMOR, MISSILE_MAX, MISSILE_RECHARGE } from './Ship';
 
 /** On-screen readouts: armor bar, targets remaining, big messages, and the red damage flash. */
 export class Hud {
@@ -8,6 +8,9 @@ export class Hud {
   private readonly damage: HTMLElement;
   private readonly pips: { el: HTMLElement; fill: HTMLElement }[] = [];
   private readonly missileBtn: HTMLElement | null;
+  private readonly rechargeArc: SVGCircleElement;
+  private readonly countdown: HTMLElement;
+  private lastCountdown = '';
   private lastMissiles = -1;
   private messageTimer = 0;
   private lastArmor = -1;
@@ -31,11 +34,26 @@ export class Hud {
     const ring = document.createElement('div');
     ring.id = 'msl-pips';
     (root.querySelector('#buttons') ?? root).appendChild(ring);
+
+    // Recharge clock: a ring around the button that sweeps as the next missile charges.
+    const r = 33;
+    ring.insertAdjacentHTML(
+      'beforeend',
+      `<svg class="recharge" viewBox="-40 -40 80 80" aria-hidden="true">
+         <circle class="track" r="${r}" />
+         <circle class="arc" r="${r}" pathLength="100" stroke-dasharray="0 100" transform="rotate(-90)" />
+       </svg>`,
+    );
+    this.rechargeArc = ring.querySelector('.arc') as SVGCircleElement;
+    // Seconds until the next missile, under the MSL label.
+    this.countdown = document.createElement('span');
+    this.countdown.className = 'countdown';
+    this.missileBtn?.appendChild(this.countdown);
     for (let i = 0; i < MISSILE_MAX; i++) {
       const angle = -150 + i * 32; // degrees, sweeping over the top of the button
       const el = document.createElement('div');
       el.className = 'pip';
-      el.style.transform = `rotate(${angle}deg) translateX(40px) rotate(90deg)`;
+      el.style.transform = `rotate(${angle}deg) translateX(46px) rotate(90deg)`;
       const fill = document.createElement('div');
       fill.className = 'pip-fill';
       el.appendChild(fill);
@@ -46,6 +64,14 @@ export class Hud {
 
   /** @param ready missiles ready; @param progress 0..1 on the next one recharging. */
   setMissiles(ready: number, progress: number): void {
+    const recharging = ready < MISSILE_MAX;
+    this.rechargeArc.setAttribute('stroke-dasharray', `${recharging ? progress * 100 : 0} 100`);
+    this.rechargeArc.style.visibility = recharging ? 'visible' : 'hidden';
+    const text = recharging ? `${((1 - progress) * MISSILE_RECHARGE).toFixed(1)}s` : '';
+    if (text !== this.lastCountdown) {
+      this.countdown.textContent = text;
+      this.lastCountdown = text;
+    }
     this.pips.forEach((p, i) => {
       const isReady = i < ready;
       const charging = i === ready;
