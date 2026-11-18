@@ -54,7 +54,7 @@ npm run preview   # serve the production build
 - `src/game/Hud.ts`: armor bar, targets counter, messages, and damage flash
 - `src/game/AimIndicator.ts`: the charging aim line and target ring
 - `src/game/CameraRig.ts`: follow camera with look-ahead, FOV kick, and shake
-- `src/game/World.ts`: test planet (terrain, rocks, crystals, map edge)
+- `src/game/World.ts`: the alien jungle planet: palette, terrain, trees, plants, relics, outposts, map edge
 - `src/game/materials.ts`: toon shading, rim light, HDR glow, and ink outlines
 - `src/game/math.ts`: helpers, seeded random numbers, noise
 

@@ -20,7 +20,7 @@ import {
 } from './game/Missiles';
 import { Bullets, EnemyShots } from './game/Projectiles';
 import { BOOST_COOLDOWN, HOVER_HEIGHT, Ship } from './game/Ship';
-import { CRIMSON_DUNES, World } from './game/World';
+import { JUNGLE, World } from './game/World';
 
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
 
@@ -57,11 +57,11 @@ let qualityChosen = savedQuality() !== null; // if the player picked one, don't 
 
 // ---------- Scene & lighting ----------
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(CRIMSON_DUNES.sky);
-scene.fog = new THREE.Fog(CRIMSON_DUNES.sky, 95, 230);
+scene.background = new THREE.Color(JUNGLE.sky);
+scene.fog = new THREE.Fog(JUNGLE.sky, 95, 230);
 
-scene.add(new THREE.HemisphereLight('#ffc6e0', '#2b0c38', 1.1));
-const sun = new THREE.DirectionalLight('#ffe0b8', 2.4);
+scene.add(new THREE.HemisphereLight(JUNGLE.hemiSky, JUNGLE.hemiGround, 1.1));
+const sun = new THREE.DirectionalLight('#fff1d6', 2.3);
 sun.position.set(-40, 60, 25);
 scene.add(sun);
 const rim = new THREE.DirectionalLight('#5fd8ff', 0.9); // cool back light for colour contrast
