@@ -24,6 +24,9 @@ export const JUNGLE = {
   relicDark: '#5b5226',
 };
 
+/** The landing zone: home base and respawn point. */
+export const LANDING_PAD = { x: 0, z: 0, radius: 7 };
+
 /** Groups of enemy turrets. Coordinates are (x, z); the landing pad is at 0, 0. */
 export const OUTPOSTS: [number, number][] = [
   [0, -48],

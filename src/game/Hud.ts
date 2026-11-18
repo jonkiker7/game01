@@ -1,30 +1,28 @@
-import { MAX_ARMOR, MISSILE_MAX, MISSILE_RECHARGE } from './Ship';
+import { MAX_ARMOR, MISSILE_MAX } from './Ship';
 
-/** On-screen readouts: armor bar, targets remaining, big messages, and the red damage flash. */
+/** On-screen readouts: armor bar, mission objective, big messages, missile pips, and the red damage flash. */
 export class Hud {
   private readonly armorFill: HTMLElement;
-  private readonly targets: HTMLElement;
+  private readonly objective: HTMLElement;
   private readonly message: HTMLElement;
   private readonly damage: HTMLElement;
   private readonly pips: { el: HTMLElement; fill: HTMLElement }[] = [];
   private readonly missileBtn: HTMLElement | null;
-  private readonly countdown: HTMLElement;
-  private lastCountdown = '';
   private lastMissiles = -1;
   private messageTimer = 0;
   private lastArmor = -1;
-  private lastTargets = -1;
+  private lastObjective = '';
 
   constructor(root: HTMLElement) {
     root.insertAdjacentHTML(
       'beforeend',
       `<div id="armor"><span class="label">ARMOR</span><div class="bar"><div class="fill"></div></div></div>
-       <div id="targets"></div>
+       <div id="objective"></div>
        <div id="message"></div>
        <div id="damage"></div>`,
     );
     this.armorFill = root.querySelector('#armor .fill') as HTMLElement;
-    this.targets = root.querySelector('#targets') as HTMLElement;
+    this.objective = root.querySelector('#objective') as HTMLElement;
     this.message = root.querySelector('#message') as HTMLElement;
     this.damage = root.querySelector('#damage') as HTMLElement;
 
@@ -34,10 +32,6 @@ export class Hud {
     ring.id = 'msl-pips';
     (root.querySelector('#buttons') ?? root).appendChild(ring);
 
-    // Seconds until the next missile, under the MSL label.
-    this.countdown = document.createElement('span');
-    this.countdown.className = 'countdown';
-    this.missileBtn?.appendChild(this.countdown);
     for (let i = 0; i < MISSILE_MAX; i++) {
       const angle = -150 + i * 32; // degrees, sweeping over the top of the button
       const el = document.createElement('div');
@@ -53,12 +47,6 @@ export class Hud {
 
   /** @param ready missiles ready; @param progress 0..1 on the next one recharging. */
   setMissiles(ready: number, progress: number): void {
-    const recharging = ready < MISSILE_MAX;
-    const text = recharging ? `${((1 - progress) * MISSILE_RECHARGE).toFixed(1)}s` : '';
-    if (text !== this.lastCountdown) {
-      this.countdown.textContent = text;
-      this.lastCountdown = text;
-    }
     this.pips.forEach((p, i) => {
       const isReady = i < ready;
       const charging = i === ready;
@@ -96,10 +84,11 @@ export class Hud {
     this.armorFill.classList.toggle('low', k <= 0.3);
   }
 
-  setTargets(n: number): void {
-    if (n === this.lastTargets) return;
-    this.lastTargets = n;
-    this.targets.textContent = `TARGETS ${n}`;
+  /** The current mission objective, shown under the radar. */
+  setObjective(text: string): void {
+    if (text === this.lastObjective) return;
+    this.lastObjective = text;
+    this.objective.textContent = text;
   }
 
   show(text: string, seconds = 2.2): void {
