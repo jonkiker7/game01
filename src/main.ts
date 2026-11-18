@@ -28,7 +28,8 @@ const $ = (id: string) => document.getElementById(id) as HTMLElement;
 const GUN_RATE = 11; // bullets per second (alternating barrels)
 const AIM_ASSIST_ANGLE = 0.2; // radians either side of the nose where bullets bend toward an enemy
 const AIM_ASSIST_RANGE = 38;
-const GROUND_AIM_DISTANCE = 30; // with nothing targeted, bullets strike the ground this far ahead
+const FREE_AIM_DISTANCE = 30; // with nothing targeted, bullets aim at tower-head height this far ahead
+const FREE_AIM_DROP = 4.5; // how far below the ship that is
 const GUN_SPREAD = 0.03;
 
 // ---------- Renderer ----------
@@ -170,16 +171,19 @@ function updateGun(dt: number): void {
   barrel = 1 - barrel;
   ship.flashMuzzle();
 
-  // Aim at an enemy near the line of fire (aim assist); otherwise at the ground ahead.
+  // Aim at an enemy near the line of fire (aim assist); otherwise straight ahead.
   const p = ship.root.position;
   const target = enemies.findInCone(p.x, p.z, ship.heading, AIM_ASSIST_RANGE, AIM_ASSIST_ANGLE);
   if (target) {
     aimPoint.copy(target.root.position);
-    if (target.kind === 'turret') aimPoint.y += 1.8;
+    aimPoint.y += target.aimHeight;
   } else {
-    const ax = p.x - Math.sin(ship.heading) * GROUND_AIM_DISTANCE;
-    const az = p.z - Math.cos(ship.heading) * GROUND_AIM_DISTANCE;
-    aimPoint.set(ax, world.heightAt(ax, az), az);
+    // Nearly level, angled just down to where tower turrets sit.
+    aimPoint.set(
+      p.x - Math.sin(ship.heading) * FREE_AIM_DISTANCE,
+      p.y - FREE_AIM_DROP,
+      p.z - Math.cos(ship.heading) * FREE_AIM_DISTANCE,
+    );
   }
   bulletDir.subVectors(aimPoint, muzzlePos).normalize();
   // A little random spread sideways.
@@ -269,7 +273,7 @@ renderer.setAnimationLoop((now: number) => {
 
   ship.update(dt, input, world);
   updateGun(dt);
-  enemies.update(dt, ship, enemyShots);
+  enemies.update(dt, ship, enemyShots, rig.camera);
   bullets.update(dt, enemies.enemies, (x, z) => world.heightAt(x, z));
   enemyShots.update(dt, ship);
   missiles.update(dt, enemies.enemies);

@@ -39,6 +39,9 @@ export class Ship {
   boostCooldown = 0;
 
   readonly radius = 1.7;
+  readonly hitBottom = -2;
+  readonly hitTop = 2;
+  readonly aimHeight = 0;
   armor = MAX_ARMOR;
   alive = true;
   invulnerable = 0;

@@ -68,7 +68,7 @@ export class AimIndicator {
     const tx = p.x - Math.sin(heading) * range;
     const tz = p.z - Math.cos(heading) * range;
     this.target.set(tx, world.heightAt(tx, tz) + 0.4, tz);
-    if (lock) this.target.y = Math.max(this.target.y, lock.root.position.y + 0.4);
+    if (lock) this.target.y = Math.max(this.target.y, lock.root.position.y + lock.aimHeight);
     this.reticle.position.copy(this.target);
 
     // Beam from the ship (high in the air) down to the target ring.
