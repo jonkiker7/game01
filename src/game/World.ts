@@ -61,6 +61,7 @@ export class World {
     this.bulbMat = glow(this.palette.bulb);
     this.buildGround();
     this.buildTrees(this.placer(4, 12, 1.8));
+    this.buildGiantTrees(this.placer(10, 16, 0.8));
     this.buildPinkFans(this.placer(1, 9, 1.2));
     this.buildBulbStalks(this.placer(2, 9, 1));
     this.buildFerns(this.placer(0, 7, 0.6));
@@ -212,6 +213,28 @@ export class World {
       ],
       matrices,
       32,
+    );
+  }
+
+  /**
+   * Giant trees scattered through the play area: canopies far below the ship and the tower
+   * guns (top out around 20 units), so they add depth without hiding anything that matters.
+   */
+  private buildGiantTrees(place: Placer, count = 70): void {
+    const rand = mulberry32(81);
+    const matrices: THREE.Matrix4[] = [];
+    for (let i = 0; i < count; i++) {
+      const { x, z } = place(rand);
+      const s = 2.6 + rand() * 1.4;
+      matrices.push(this.matrix(x, this.heightAt(x, z) - 0.5, z, rand() * Math.PI * 2, s, s * (0.95 + rand() * 0.2), s, (rand() - 0.5) * 0.1));
+    }
+    this.instanced(
+      [
+        { geo: treeTrunk(), mat: toon('#ffffff'), colors: this.palette.trunk },
+        { geo: treeCanopy(), mat: toon('#ffffff'), colors: this.palette.leaves },
+      ],
+      matrices,
+      82,
     );
   }
 

@@ -117,7 +117,7 @@ export class MissileSystem {
       // Homing: keep the end of the flight path on the locked target.
       if (m.target?.alive) {
         const tp = m.target.root.position;
-        m.end.set(tp.x, Math.max(tp.y + 1, this.world.heightAt(tp.x, tp.z) + 0.3), tp.z);
+        m.end.set(tp.x, Math.max(tp.y + m.target.aimHeight, this.world.heightAt(tp.x, tp.z) + 0.3), tp.z);
       }
       m.t += dt;
       const u = Math.min(1, m.t / m.duration);
@@ -142,8 +142,8 @@ export class MissileSystem {
           const ex = e.root.position.x - p.x;
           const ez = e.root.position.z - p.z;
           const ey = p.y - e.root.position.y;
-          // Only when the missile has actually come down (or across) to the enemy's height.
-          if (ex * ex + ez * ez < r * r && ey > -2.5 && ey < 5) {
+          // Only when the missile is actually at the enemy's height (a tower counts along its full height).
+          if (ex * ex + ez * ez < r * r && ey > e.hitBottom && ey < e.hitTop) {
             this.detonate(m, p);
             break;
           }

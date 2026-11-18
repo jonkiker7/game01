@@ -9,6 +9,7 @@ import { OUTPOSTS, type World } from './World';
 const ENEMY_BODY = '#3b1d4a';
 const ENEMY_ARMOR = '#6a2f63';
 const ENEMY_GLOW = '#ff2e63';
+const TOWER_STONE = '#4a2f5e';
 /** Enemies only attack inside this distance, which roughly matches what's visible on screen. */
 const ATTACK_RANGE = 36;
 
@@ -17,11 +18,16 @@ interface Ctx {
   shots: EnemyShots;
   world: World;
   dt: number;
+  /** True if this enemy's gun is on screen. Enemies only shoot when you can see them. */
+  onScreen: (e: Enemy) => boolean;
 }
 
 abstract class Enemy implements Hittable {
   readonly root = new THREE.Group();
   abstract readonly radius: number;
+  abstract readonly hitBottom: number;
+  abstract readonly hitTop: number;
+  abstract readonly aimHeight: number;
   abstract readonly kind: 'turret' | 'drone';
   alive = true;
   protected hp: number;
@@ -56,9 +62,10 @@ abstract class Enemy implements Hittable {
 
   protected abstract think(ctx: Ctx): void;
 
-  protected mat(color: string): THREE.MeshToonMaterial {
+  /** @param flashes whether this part flashes white when hit (towers only flash their gun). */
+  protected mat(color: string, flashes = true): THREE.MeshToonMaterial {
     const m = rimToon(color, ENEMY_GLOW, 0.75);
-    this.mats.push(m);
+    if (flashes) this.mats.push(m);
     return m;
   }
 
@@ -69,10 +76,18 @@ abstract class Enemy implements Hittable {
   }
 }
 
-/** Ground turret: turns to track you and fires a fan of three orbs. */
+/**
+ * Turret tower: a tall stone pillar with the gun on top, so the gun sits at the same
+ * height below the ship that ground turrets used to. Tracks you and fires a fan of three orbs.
+ */
+const TOWER_HEIGHT = HOVER_HEIGHT - 6.5; // platform top; the gun head sits just above it
+
 class Turret extends Enemy {
-  readonly radius = 2.4;
+  readonly radius = 2.6;
   readonly kind = 'turret';
+  readonly hitBottom = 0;
+  readonly hitTop = TOWER_HEIGHT + 6;
+  readonly aimHeight = TOWER_HEIGHT + 2.6;
   private readonly head = new THREE.Group();
   private readonly eye: THREE.MeshBasicMaterial;
   private cooldown = 1 + Math.random() * 2;
@@ -81,12 +96,39 @@ class Turret extends Enemy {
 
   constructor() {
     super(70);
-    const base = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.6, 1.2, 6), this.mat(ENEMY_BODY));
-    base.position.y = 0.6;
-    const collar = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.9, 0.6, 6), this.mat(ENEMY_ARMOR));
-    collar.position.y = 1.45;
+    const H = TOWER_HEIGHT;
+    const stone = this.mat(TOWER_STONE, false);
+    const armor = this.mat(ENEMY_ARMOR, false);
 
-    this.head.position.y = 1.9;
+    // Flared foot, tapering pillar, and buttress fins up the sides.
+    const foot = new THREE.Mesh(new THREE.CylinderGeometry(3.0, 3.8, 2.2, 6), stone);
+    foot.position.y = 1.1;
+    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 2.4, H - 2.2, 6), stone);
+    pillar.position.y = 2.2 + (H - 2.2) / 2;
+    const parts: THREE.Object3D[] = [foot, pillar];
+    for (let i = 0; i < 3; i++) {
+      const fin = new THREE.Mesh(new THREE.BoxGeometry(0.5, H * 0.55, 1.6), armor);
+      const a = (i / 3) * Math.PI * 2 + Math.PI / 6;
+      fin.position.set(Math.cos(a) * 2.1, H * 0.3, Math.sin(a) * 2.1);
+      fin.rotation.y = -a;
+      parts.push(fin);
+    }
+    // Glowing red rune bands that pulse with the eye.
+    for (const k of [0.3, 0.62, 0.9]) {
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(2.45 - k * 0.95, 2.5 - k * 0.95, 0.35, 6), this.bandMat);
+      band.position.y = H * k;
+      parts.push(band);
+    }
+    // Platform the gun sits on.
+    const platform = new THREE.Mesh(new THREE.CylinderGeometry(2.8, 1.8, 1.3, 6), this.mat(ENEMY_ARMOR));
+    platform.position.y = H + 0.1;
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 2.3, 0.8, 6), this.mat(ENEMY_BODY));
+    base.position.y = H + 1.1;
+    const collar = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.9, 0.6, 6), this.mat(ENEMY_ARMOR));
+    collar.position.y = H + 1.75;
+    parts.push(platform, base, collar);
+
+    this.head.position.y = H + 2.2;
     const dome = new THREE.Mesh(new THREE.SphereGeometry(1.35, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), this.mat(ENEMY_ARMOR));
     const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.32, 2.2, 8), this.mat(ENEMY_BODY));
     barrel.rotation.x = Math.PI / 2;
@@ -96,19 +138,22 @@ class Turret extends Enemy {
     eye.position.set(0, 0.75, -0.95);
     this.muzzle.position.set(0, 0.5, -2.7);
     this.head.add(dome, barrel, eye, this.muzzle);
-    this.root.add(base, collar, this.head);
+    this.root.add(...parts, this.head);
     addOutlines(this.root);
   }
 
-  protected think({ ship, shots, dt }: Ctx): void {
+  private readonly bandMat = glow(ENEMY_GLOW);
+
+  protected think({ ship, shots, dt, onScreen }: Ctx): void {
     const { dx, dz, dist } = this.distanceTo(ship);
-    const awake = ship.alive && dist < ATTACK_RANGE;
+    const awake = ship.alive && dist < ATTACK_RANGE && onScreen(this);
     if (awake) {
       this.head.rotation.y = approachAngle(this.head.rotation.y, Math.atan2(-dx, -dz), 2.2 * dt);
     }
     // Eye glows brighter as the next volley gets close.
     const warn = awake ? Math.max(0, 1 - this.cooldown / 0.6) : 0;
     this.eye.color.set(ENEMY_GLOW).multiplyScalar(GLOW * (0.6 + warn * 0.9));
+    this.bandMat.color.set(ENEMY_GLOW).multiplyScalar(GLOW * (0.35 + warn * 0.5));
 
     this.cooldown -= dt;
     if (this.cooldown <= 0) {
@@ -128,6 +173,9 @@ class Turret extends Enemy {
 class Drone extends Enemy {
   readonly radius = 1.9;
   readonly kind = 'drone';
+  readonly hitBottom = -2.5;
+  readonly hitTop = 3;
+  readonly aimHeight = 0;
   private readonly body = new THREE.Group();
   private readonly ring: THREE.Mesh;
   private readonly velocity = new THREE.Vector2();
@@ -161,7 +209,7 @@ class Drone extends Enemy {
     addOutlines(this.root);
   }
 
-  protected think({ ship, shots, world, dt }: Ctx): void {
+  protected think({ ship, shots, world, dt, onScreen }: Ctx): void {
     const p = this.root.position;
     const { dx, dz, dist } = this.distanceTo(ship);
     const nx = dist > 0.001 ? dx / dist : 0;
@@ -193,7 +241,7 @@ class Drone extends Enemy {
 
     // Fire a 3-shot burst at the player every few seconds.
     this.cooldown -= dt;
-    if (this.cooldown <= 0 && ship.alive && dist < ATTACK_RANGE - 4) {
+    if (this.cooldown <= 0 && ship.alive && dist < ATTACK_RANGE - 4 && onScreen(this)) {
       this.cooldown = 2.4 + Math.random();
       this.burst = 3;
       this.burstTimer = 0;
@@ -228,6 +276,10 @@ export class EnemyManager {
   private respawnTimer = -1;
   private readonly rand = mulberry32(99);
   private readonly tmp = new THREE.Vector3();
+  private readonly tmp2 = new THREE.Vector3();
+  private readonly frustum = new THREE.Frustum();
+  private readonly viewProj = new THREE.Matrix4();
+  private readonly probe = new THREE.Vector3();
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -243,8 +295,15 @@ export class EnemyManager {
     return n;
   }
 
-  update(dt: number, ship: Ship, shots: EnemyShots): void {
-    const ctx: Ctx = { ship, shots, world: this.world, dt };
+  update(dt: number, ship: Ship, shots: EnemyShots, camera: THREE.Camera): void {
+    this.viewProj.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    this.frustum.setFromProjectionMatrix(this.viewProj);
+    const onScreen = (e: Enemy) => {
+      this.probe.copy(e.root.position);
+      this.probe.y += e.aimHeight;
+      return this.frustum.containsPoint(this.probe);
+    };
+    const ctx: Ctx = { ship, shots, world: this.world, dt, onScreen };
     const sp = ship.root.position;
     for (const e of this.enemies) {
       const far = Math.hypot(e.root.position.x - sp.x, e.root.position.z - sp.z) > CULL_DISTANCE;
@@ -312,8 +371,13 @@ export class EnemyManager {
     e.root.position.set(x, this.world.heightAt(x, z), z);
     e.onKilled = (dead) => {
       const pos = this.tmp.copy(dead.root.position);
-      pos.y += dead.kind === 'turret' ? 1.5 : 0;
-      this.effects.explosion(pos, dead.kind === 'turret' ? 5 : 3.5, this.world.heightAt(pos.x, pos.z));
+      const ground = this.world.heightAt(pos.x, pos.z);
+      if (dead.kind === 'turret') {
+        // Blow the gun off the top, then the base of the tower.
+        this.effects.explosion(this.tmp2.set(pos.x, ground + 2, pos.z), 6, ground);
+        pos.y += dead.aimHeight;
+      }
+      this.effects.explosion(pos, dead.kind === 'turret' ? 5 : 3.5, ground);
       this.onKill?.(dead.kind, pos);
       if (dead.kind === 'turret' && this.turretsLeft === 0) {
         this.onAreaCleared?.();

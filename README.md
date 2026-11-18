@@ -49,7 +49,7 @@ npm run preview   # serve the production build
 - `src/game/Input.ts`: touch stick, buttons (MSL doubles as an aim stick), and keyboard
 - `src/game/Missiles.ts`: missile flight, range, and splash damage
 - `src/game/Projectiles.ts`: player bullets and enemy orbs (instanced, one draw call each)
-- `src/game/Enemies.ts`: turrets, drones, outposts, and spawning
+- `src/game/Enemies.ts`: turret towers, drones, and spawning (enemies only fire while on screen)
 - `src/game/Effects.ts`: pooled smoke, explosions, shockwaves, sparks, embers, debris, and floating motes
 - `src/game/Hud.ts`: armor bar, targets counter, messages, and damage flash
 - `src/game/AimIndicator.ts`: the charging aim line and target ring

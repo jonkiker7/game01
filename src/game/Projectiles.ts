@@ -93,6 +93,11 @@ class ShotPool {
 export interface Hittable {
   readonly root: THREE.Object3D;
   readonly radius: number;
+  /** Vertical extent that can be hit, relative to root.position.y (e.g. a whole tower). */
+  readonly hitBottom: number;
+  readonly hitTop: number;
+  /** Where weapons aim, relative to root.position.y (e.g. a tower's turret head). */
+  readonly aimHeight: number;
   alive: boolean;
   damage(amount: number): void;
 }
@@ -138,8 +143,8 @@ export class Bullets {
         const tp = t.root.position;
         const dx = tp.x - s.x;
         const dz = tp.z - s.z;
-        // Generous hit box: the enemy's footprint, from just below it to a few units above.
-        if (dx * dx + dz * dz < t.radius * t.radius && s.y > tp.y - 2.5 && s.y < tp.y + 5) {
+        // Generous hit box: the enemy's footprint, over its whole height.
+        if (dx * dx + dz * dz < t.radius * t.radius && s.y > tp.y + t.hitBottom && s.y < tp.y + t.hitTop) {
           t.damage(BULLET_DAMAGE);
           this.effects.spark(this.tmp.set(s.x, s.y, s.z));
           return true;
