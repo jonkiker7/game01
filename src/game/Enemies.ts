@@ -4,7 +4,7 @@ import { addOutlines, GLOW, glow, rimToon } from './materials';
 import { approachAngle, mulberry32, wrapAngle } from './math';
 import type { EnemyShots, Hittable } from './Projectiles';
 import { HOVER_HEIGHT, type Ship } from './Ship';
-import type { World } from './World';
+import { OUTPOSTS, type World } from './World';
 
 const ENEMY_BODY = '#3b1d4a';
 const ENEMY_ARMOR = '#6a2f63';
@@ -209,22 +209,6 @@ class Drone extends Enemy {
     }
   }
 }
-
-/** Groups of turrets placed around the map. Coordinates are (x, z); the landing pad is at 0, 0. */
-const OUTPOSTS: [number, number][] = [
-  [0, -48],
-  [45, -78],
-  [-55, -62],
-  [75, 12],
-  [-78, 20],
-  [12, 85],
-  [-40, 120],
-  [95, -125],
-  [-120, -110],
-  [130, 95],
-  [-150, 40],
-  [150, -40],
-];
 
 const MAX_DRONES = 4;
 const DRONE_SPAWN_TIME = 7;

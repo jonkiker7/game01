@@ -75,7 +75,7 @@ export function glow(
 // Thickness scales with distance, so lines look the same width on screen.
 // ---------------------------------------------------------------------------
 
-const INK = new THREE.Color('#1a0716');
+const INK = new THREE.Color('#1b1233'); // deep indigo, softer than pure black
 let outlineMat: THREE.ShaderMaterial | null = null;
 
 export function outlineMaterial(): THREE.ShaderMaterial {

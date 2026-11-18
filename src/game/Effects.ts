@@ -156,7 +156,7 @@ class Motes {
     scene: THREE.Scene,
     private readonly count = 80,
   ) {
-    const mat = glow('#ffd6a8', { transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending });
+    const mat = glow('#e9ffa0', { transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending });
     this.mesh = new THREE.InstancedMesh(new THREE.SphereGeometry(0.12, 6, 4), mat, count);
     this.mesh.frustumCulled = false;
     const rand = mulberry32(5);
