@@ -109,7 +109,7 @@ export class MissileSystem {
     m.end.set(ex, origin.y - 0.8, ez);
     // Travel time from the full 3D distance (the ship is high above the ground).
     const dist3 = Math.hypot(range, m.start.y - m.end.y);
-    m.duration = Math.max(0.25, dist3 / (45 + 25 * charge));
+    m.duration = Math.max(0.2, dist3 / (90 + 50 * charge)); // faster than the ship at full speed
     m.arc = 0.3 + range * 0.03;
     m.power = charge;
     m.t = 0;

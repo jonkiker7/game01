@@ -4,7 +4,8 @@ import { damp } from './math';
 const BASE_FOV = 50;
 /** Look at a point slightly behind (south of) the ship so the view is balanced in every direction. */
 const FOCUS_BEHIND = 7;
-const LOOK_AHEAD = 0.45; // seconds of velocity to lead the camera by
+const LOOK_AHEAD = 0.3; // seconds of velocity to lead the camera by
+const FOLLOW = 5; // how tightly the camera follows (higher = less lag); balanced with LOOK_AHEAD so the ship stays near centre
 const CAM_HEIGHT = 44; // camera height above the ship's focus point
 const CAM_BACK = 30; // and how far behind (south of) it
 
@@ -55,8 +56,8 @@ export class CameraRig {
   update(dt: number, target: THREE.Vector3, velocity: THREE.Vector2, lead?: THREE.Vector2): void {
     const lx = lead?.x ?? 0;
     const lz = lead?.y ?? 0;
-    this.focus.x = damp(this.focus.x, target.x + velocity.x * LOOK_AHEAD + lx, 4, dt);
-    this.focus.z = damp(this.focus.z, target.z + velocity.y * LOOK_AHEAD + lz + FOCUS_BEHIND, 4, dt);
+    this.focus.x = damp(this.focus.x, target.x + velocity.x * LOOK_AHEAD + lx, FOLLOW, dt);
+    this.focus.z = damp(this.focus.z, target.z + velocity.y * LOOK_AHEAD + lz + FOCUS_BEHIND, FOLLOW, dt);
     this.focus.y = damp(this.focus.y, target.y, 4, dt); // keep the ship centred at any altitude
 
     this.camera.position.copy(this.focus).add(this.offset);
