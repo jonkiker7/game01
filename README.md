@@ -26,6 +26,10 @@ the missile is locked on and will follow that enemy.
 
 Boosting makes you briefly invulnerable, so you can dash through enemy shots.
 
+**Graphics quality:** tap the fps counter at the top to switch between HIGH (with bloom glow) and
+LOW (faster, for older phones). The game drops to LOW automatically if HIGH runs below 45 fps.
+You can also force it with `?quality=low` or `?quality=high` in the URL.
+
 Play in landscape.
 On iPhone, use Share → **Add to Home Screen** for full-screen play.
 
@@ -46,12 +50,12 @@ npm run preview   # serve the production build
 - `src/game/Missiles.ts`: missile flight, range, and splash damage
 - `src/game/Projectiles.ts`: player bullets and enemy orbs (instanced, one draw call each)
 - `src/game/Enemies.ts`: turrets, drones, outposts, and spawning
-- `src/game/Effects.ts`: pooled smoke, explosions, shockwaves, and hit sparks
+- `src/game/Effects.ts`: pooled smoke, explosions, shockwaves, sparks, embers, debris, and floating motes
 - `src/game/Hud.ts`: armor bar, targets counter, messages, and damage flash
 - `src/game/AimIndicator.ts`: the charging aim line and target ring
 - `src/game/CameraRig.ts`: follow camera with look-ahead, FOV kick, and shake
 - `src/game/World.ts`: test planet (terrain, rocks, crystals, map edge)
-- `src/game/materials.ts`: toon and glow materials
+- `src/game/materials.ts`: toon shading, rim light, HDR glow, and ink outlines
 - `src/game/math.ts`: helpers, seeded random numbers, noise
 
 ## Deploying
@@ -63,7 +67,7 @@ One-time setup: **Settings → Pages → Source: GitHub Actions**.
 
 1. ✅ Flying prototype: stick flight, camera, buttons, Pages deploy
 2. ✅ Combat: twin-stick gun and missiles, turrets, drones, armor, explosions
-3. Art pass: outlines, rim light, bloom, particles, screen shake
+3. ✅ Art pass: ink outlines, rim light, bloom, painted ground, particles, hit-stop
 4. Game loop: fuel, armor, ammo, pickups, objectives, minimap, HUD
 5. Content: more planets, enemies, bosses
 6. Polish: audio, menus, saves, offline play

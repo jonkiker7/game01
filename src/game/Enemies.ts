@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { Effects } from './Effects';
-import { glow, toon } from './materials';
+import { addOutlines, GLOW, glow, rimToon } from './materials';
 import { approachAngle, mulberry32, wrapAngle } from './math';
 import type { EnemyShots, Hittable } from './Projectiles';
 import { HOVER_HEIGHT, type Ship } from './Ship';
@@ -57,7 +57,7 @@ abstract class Enemy implements Hittable {
   protected abstract think(ctx: Ctx): void;
 
   protected mat(color: string): THREE.MeshToonMaterial {
-    const m = toon(color);
+    const m = rimToon(color, ENEMY_GLOW, 0.75);
     this.mats.push(m);
     return m;
   }
@@ -97,6 +97,7 @@ class Turret extends Enemy {
     this.muzzle.position.set(0, 0.5, -2.7);
     this.head.add(dome, barrel, eye, this.muzzle);
     this.root.add(base, collar, this.head);
+    addOutlines(this.root);
   }
 
   protected think({ ship, shots, dt }: Ctx): void {
@@ -107,7 +108,7 @@ class Turret extends Enemy {
     }
     // Eye glows brighter as the next volley gets close.
     const warn = awake ? Math.max(0, 1 - this.cooldown / 0.6) : 0;
-    this.eye.color.set(ENEMY_GLOW).multiplyScalar(0.6 + warn * 0.9);
+    this.eye.color.set(ENEMY_GLOW).multiplyScalar(GLOW * (0.6 + warn * 0.9));
 
     this.cooldown -= dt;
     if (this.cooldown <= 0) {
@@ -157,6 +158,7 @@ class Drone extends Enemy {
     this.ring.rotation.x = Math.PI / 2;
     this.body.add(core, eye);
     this.root.add(this.body, this.ring);
+    addOutlines(this.root);
   }
 
   protected think({ ship, shots, world, dt }: Ctx): void {
