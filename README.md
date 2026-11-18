@@ -40,10 +40,10 @@ On iPhone, use Share → **Add to Home Screen** for full-screen play.
 
 Four twin-rotor ship designs live in `src/game/ShipDesigns.ts`. See them side by side at
 `designs.html` (e.g. `https://jonkiker7.github.io/game01/designs.html`), and fly one with
-`?ship=a`, `?ship=b`, `?ship=c` or `?ship=d` on the game URL (A is the default):
+`?ship=a`, `?ship=b`, `?ship=c` or `?ship=d` on the game URL (B, the Manta, is the default):
 
 - **A · Valkyrie:** armored wedge gunship with ducted fans on the wingtips
-- **B · Manta:** flying-wing delta with fans set into the wings
+- **B · Manta (default):** flying-wing delta with big wing-mounted fans and a tail boom
 - **C · Kestrel:** slim dart with open rotors on wingtip nacelles
 - **D · Atlas:** heavy lifter with big fan pods and a belly turret
 
