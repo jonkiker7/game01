@@ -1,6 +1,4 @@
-import { MAX_ARMOR, MISSILE_MAX } from './Ship';
-
-/** On-screen readouts: armor bar, mission objective, big messages, missile pips, and the red damage flash. */
+/** On-screen readouts: armor bar, salvage, mission objective, big messages, missile pips, and the red damage flash. */
 export class Hud {
   private readonly armorFill: HTMLElement;
   private readonly objective: HTMLElement;
@@ -8,15 +6,20 @@ export class Hud {
   private readonly damage: HTMLElement;
   private readonly pips: { el: HTMLElement; fill: HTMLElement }[] = [];
   private readonly missileBtn: HTMLElement | null;
+  private readonly pipRing: HTMLElement;
+  private readonly salvage: HTMLElement;
+  private lastSalvage = -1;
   private lastMissiles = -1;
   private messageTimer = 0;
   private lastArmor = -1;
+  private lastMaxArmor = -1;
   private lastObjective = '';
 
   constructor(root: HTMLElement) {
     root.insertAdjacentHTML(
       'beforeend',
       `<div id="armor"><span class="label">ARMOR</span><div class="bar"><div class="fill"></div></div></div>
+       <div id="salvage"></div>
        <div id="objective"></div>
        <div id="message"></div>
        <div id="damage"></div>`,
@@ -25,28 +28,43 @@ export class Hud {
     this.objective = root.querySelector('#objective') as HTMLElement;
     this.message = root.querySelector('#message') as HTMLElement;
     this.damage = root.querySelector('#damage') as HTMLElement;
+    this.salvage = root.querySelector('#salvage') as HTMLElement;
 
     // Missile pips: little missile shapes on an arc around the top-left of the MSL button.
     this.missileBtn = root.querySelector('#btn-missile');
     const ring = document.createElement('div');
     ring.id = 'msl-pips';
     (root.querySelector('#buttons') ?? root).appendChild(ring);
+    this.pipRing = ring;
+    this.buildPips(3);
+  }
 
-    for (let i = 0; i < MISSILE_MAX; i++) {
-      const angle = -150 + i * 32; // degrees, sweeping over the top of the button
+  /** One pip per missile slot, on an arc over the top-left of the MSL button. */
+  private buildPips(count: number): void {
+    this.pipRing.replaceChildren();
+    this.pips.length = 0;
+    const step = count > 3 ? 26 : 32;
+    for (let i = 0; i < count; i++) {
+      const angle = -150 + i * step; // degrees, sweeping over the top of the button
       const el = document.createElement('div');
       el.className = 'pip';
       el.style.transform = `rotate(${angle}deg) translateX(40px) rotate(90deg)`;
       const fill = document.createElement('div');
       fill.className = 'pip-fill';
       el.appendChild(fill);
-      ring.appendChild(el);
+      this.pipRing.appendChild(el);
       this.pips.push({ el, fill });
     }
+    this.lastMissiles = -1;
   }
 
-  /** @param ready missiles ready; @param progress 0..1 on the next one recharging. */
-  setMissiles(ready: number, progress: number): void {
+  /**
+   * @param ready missiles ready; @param progress 0..1 on the next one recharging;
+   * @param max missile capacity (upgrades can raise it).
+   */
+  setMissiles(ready: number, progress: number, max: number): void {
+    if (max !== this.pips.length) this.buildPips(max);
+    const MISSILE_MAX = max;
     this.pips.forEach((p, i) => {
       const isReady = i < ready;
       const charging = i === ready;
@@ -76,12 +94,19 @@ export class Hud {
     b.classList.add('denied');
   }
 
-  setArmor(armor: number): void {
-    if (armor === this.lastArmor) return;
+  setArmor(armor: number, max: number): void {
+    if (armor === this.lastArmor && max === this.lastMaxArmor) return;
     this.lastArmor = armor;
-    const k = armor / MAX_ARMOR;
+    this.lastMaxArmor = max;
+    const k = armor / max;
     this.armorFill.style.transform = `scaleX(${k})`;
     this.armorFill.classList.toggle('low', k <= 0.3);
+  }
+
+  setSalvage(amount: number): void {
+    if (amount === this.lastSalvage) return;
+    this.lastSalvage = amount;
+    this.salvage.textContent = `⬢ ${amount}`;
   }
 
   /** The current mission objective, shown under the radar. */

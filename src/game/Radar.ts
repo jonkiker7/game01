@@ -2,7 +2,16 @@
 export interface Blip {
   x: number;
   z: number;
-  kind: 'target' | 'home';
+  kind: 'target' | 'home' | 'reward';
+  /** CSS colour for 'reward' blips (matches the reward's colour). */
+  color?: string;
+}
+
+/** The arena outline drawn on the radar. */
+export interface RadarArena {
+  x: number;
+  z: number;
+  r: number;
 }
 
 const RANGE = 110; // world units from the ship to the radar's edge (about 2-3 screens)
@@ -28,7 +37,7 @@ export class Radar {
     this.ctx = this.canvas.getContext('2d')!;
   }
 
-  draw(shipX: number, shipZ: number, heading: number, blips: readonly Blip[], time: number): void {
+  draw(shipX: number, shipZ: number, heading: number, blips: readonly Blip[], time: number, arena?: RadarArena): void {
     const g = this.ctx;
     const c = SIZE / 2;
     const R = c - 3;
@@ -67,6 +76,16 @@ export class Radar {
       g.fillStyle = wedge;
       g.fillRect(0, 0, SIZE, SIZE);
     }
+    // Arena wall.
+    if (arena) {
+      g.strokeStyle = 'rgba(111, 247, 255, 0.55)';
+      g.lineWidth = 1.5;
+      g.setLineDash([4, 3]);
+      g.beginPath();
+      g.arc(c + ((arena.x - shipX) / RANGE) * R, c + ((arena.z - shipZ) / RANGE) * R, (arena.r / RANGE) * R, 0, Math.PI * 2);
+      g.stroke();
+      g.setLineDash([]);
+    }
     g.restore();
 
     // Blips. World -Z is north (up), +X is east (right), matching the camera.
@@ -76,7 +95,7 @@ export class Radar {
       .sort((p, q) => p.dist - q.dist);
     let arrows = 0;
     for (const { b, dx, dz, dist } of sorted) {
-      const color = b.kind === 'home' ? '111, 247, 255' : '255, 61, 110';
+      const color = b.kind === 'target' ? '255, 61, 110' : b.color ? hexToRgb(b.color) : '111, 247, 255';
       if (dist > RANGE * 0.9) {
         if (arrows++ >= MAX_EDGE_ARROWS) continue;
         // Off the radar: an arrow on the rim pointing toward it.
@@ -102,7 +121,7 @@ export class Radar {
       g.shadowBlur = 6;
       g.fillStyle = `rgba(${color}, ${0.7 + pulse * 0.3})`;
       g.beginPath();
-      if (b.kind === 'home') {
+      if (b.kind !== 'target') {
         // Landing zone: a diamond.
         const s = 5 + pulse * 1.5;
         g.moveTo(px, py - s);
@@ -145,4 +164,9 @@ export class Radar {
     g.textAlign = 'center';
     g.fillText('N', c, 11);
   }
+}
+
+function hexToRgb(hex: string): string {
+  const n = parseInt(hex.slice(1), 16);
+  return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
 }

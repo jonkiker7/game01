@@ -2,18 +2,18 @@ import * as THREE from 'three';
 import type { Input } from './Input';
 import { addOutlines, GLOW, glow } from './materials';
 import { approachAngle, clamp, damp } from './math';
+import { defaultStats, type Stats } from './run/Upgrades';
 import { buildShipDesign, type ShipDesignId, type ShipParts } from './ShipDesigns';
 import type { World } from './World';
 
 // ---- Handling (tweak these to change how the ship feels) ----
-const MAX_SPEED = 52; // units per second at full stick
+const MAX_SPEED = 52; // units per second at full stick (scaled by stats.speedMul)
 const ACCEL = 3.6; // how quickly the ship reaches the stick's speed (higher = snappier)
 const TURN_RATE = 6.5; // radians/second when turning to face the stick direction
 const TURN_RATE_FIRING = 1.3; // slow turning while firing without aiming, so you can strafe
 const AIM_TURN_RATE = 12; // the ship snaps quickly toward where you're aiming
 const BOOST_SPEED = 160;
 const BOOST_TIME = 0.38; // seconds of dash
-export const BOOST_COOLDOWN = 1.3;
 const BOOST_INVULNERABLE = 0.45; // dodge through enemy shots while dashing
 export const HOVER_HEIGHT = 32.5; // well above the jungle canopy
 
@@ -21,13 +21,10 @@ export const HOVER_HEIGHT = 32.5; // well above the jungle canopy
 const GUN_SPEED = 0.85; // fly slightly slower while shooting
 const CHARGE_TIME = 0.75; // seconds for a missile to reach full power
 const CHARGING_SPEED = 0.5; // fly at half speed while charging a missile
-export const MISSILE_MAX = 3; // missiles you can hold
-export const MISSILE_RECHARGE = 5; // seconds to get one missile back (they refill one at a time)
+// Missile capacity and recharge time come from the run's stats (see run/Upgrades.ts).
 
 // ---- Armor ----
-export const MAX_ARMOR = 100;
-const RESPAWN_TIME = 2.5;
-const RESPAWN_INVULNERABLE = 2;
+const SPAWN_INVULNERABLE = 2;
 
 /**
  * The player's space helicopter. Built from simple shapes for now; it can be
@@ -45,7 +42,9 @@ export class Ship {
   readonly hitBottom = -2;
   readonly hitTop = 2;
   readonly aimHeight = 0;
-  armor = MAX_ARMOR;
+  /** Current run stats (upgrades change these). */
+  stats: Stats = defaultStats();
+  armor = 100;
   alive = true;
   invulnerable = 0;
 
@@ -63,12 +62,11 @@ export class Ship {
   /** Pressed MSL with no missiles left. */
   onMissileEmpty?: () => void;
 
-  /** Missiles ready to fire (0..MISSILE_MAX), and progress (0..1) on the next one recharging. */
-  missiles = MISSILE_MAX;
+  /** Missiles ready to fire (0..stats.missileMax), and progress (0..1) on the next one recharging. */
+  missiles = 3;
   missileRecharge = 0;
   onHit?: (damage: number) => void;
   onDeath?: () => void;
-  onRespawn?: () => void;
 
   private readonly tilt = new THREE.Group(); // pitch + bank
   private readonly parts: ShipParts;
@@ -79,7 +77,6 @@ export class Ship {
   private time = 0;
   private boostTimer = 0;
   private hitFlash = 0;
-  private respawnTimer = 0;
   private muzzleFlash = 0;
 
   constructor(scene: THREE.Scene, design: ShipDesignId = 'b') {
@@ -113,7 +110,7 @@ export class Ship {
   /** Restore armor (healing pickups). */
   heal(amount: number): void {
     if (!this.alive) return;
-    this.armor = Math.min(MAX_ARMOR, this.armor + amount);
+    this.armor = Math.min(this.stats.maxArmor, this.armor + amount);
   }
 
   damage(amount: number): void {
@@ -129,7 +126,6 @@ export class Ship {
       this.root.visible = false;
       this.shadow.visible = false;
       this.velocity.set(0, 0);
-      this.respawnTimer = RESPAWN_TIME;
       this.onDeath?.();
     }
   }
@@ -139,11 +135,9 @@ export class Ship {
     this.invulnerable = Math.max(0, this.invulnerable - dt);
 
     if (!this.alive) {
-      // Drain button events so nothing fires the instant we respawn.
+      // Drain button events while the wreck burns (the run decides what happens next).
       input.consumePress('missile');
       input.consumePress('boost');
-      this.respawnTimer -= dt;
-      if (this.respawnTimer <= 0) this.respawn(world);
       return;
     }
 
@@ -164,17 +158,18 @@ export class Ship {
       }
       this.velocity.set(bx * BOOST_SPEED, bz * BOOST_SPEED);
       this.boostTimer = BOOST_TIME;
-      this.boostCooldown = BOOST_COOLDOWN;
+      this.boostCooldown = this.stats.boostCooldown;
       this.invulnerable = Math.max(this.invulnerable, BOOST_INVULNERABLE);
       this.onBoost?.();
     }
 
-    // --- Missile ammo: refills one at a time, each taking MISSILE_RECHARGE seconds ---
-    if (this.missiles < MISSILE_MAX) {
-      this.missileRecharge += dt / MISSILE_RECHARGE;
+    // --- Missile ammo: refills one at a time, each taking stats.missileRecharge seconds ---
+    const missileMax = this.stats.missileMax;
+    if (this.missiles < missileMax) {
+      this.missileRecharge += dt / this.stats.missileRecharge;
       if (this.missileRecharge >= 1) {
         this.missiles++;
-        this.missileRecharge = this.missiles < MISSILE_MAX ? this.missileRecharge - 1 : 0;
+        this.missileRecharge = this.missiles < missileMax ? this.missileRecharge - 1 : 0;
       }
     }
 
@@ -214,8 +209,9 @@ export class Ship {
       this.velocity.multiplyScalar(Math.exp(-1.5 * dt));
     } else {
       const k = 1 - Math.exp(-ACCEL * dt);
-      this.velocity.x += (dirX * MAX_SPEED * speedScale - this.velocity.x) * k;
-      this.velocity.y += (dirZ * MAX_SPEED * speedScale - this.velocity.y) * k;
+      const top = MAX_SPEED * this.stats.speedMul * speedScale;
+      this.velocity.x += (dirX * top - this.velocity.x) * k;
+      this.velocity.y += (dirZ * top - this.velocity.y) * k;
     }
 
     // --- Heading: missile aim > gun aim > stick direction ---
@@ -257,18 +253,45 @@ export class Ship {
     this.updateVisuals(dt, ground);
   }
 
-  private respawn(world: World): void {
+  /** Start fresh for a new run: full armor and missiles, at (x, z), facing north. */
+  reset(world: World, x: number, z: number, stats: Stats): void {
+    this.stats = stats;
     this.alive = true;
-    this.armor = MAX_ARMOR;
-    this.missiles = MISSILE_MAX;
+    this.armor = stats.maxArmor;
+    this.missiles = stats.missileMax;
     this.missileRecharge = 0;
-    this.invulnerable = RESPAWN_INVULNERABLE;
-    this.velocity.set(0, 0);
-    this.heading = 0;
-    this.root.position.set(0, world.heightAt(0, 0) + HOVER_HEIGHT, 0);
+    this.boostCooldown = 0;
+    this.isCharging = false;
+    this.charge = 0;
+    this.invulnerable = SPAWN_INVULNERABLE;
+    this.teleport(world, x, z);
     this.root.visible = true;
     this.shadow.visible = true;
-    this.onRespawn?.();
+  }
+
+  /** Move instantly (between arenas), stopped and facing north. */
+  teleport(world: World, x: number, z: number): void {
+    this.velocity.set(0, 0);
+    this.heading = 0;
+    this.root.position.set(x, world.heightAt(x, z) + HOVER_HEIGHT, z);
+  }
+
+  /** Keep the ship inside a circular arena (soft wall). */
+  confine(cx: number, cz: number, r: number): void {
+    const p = this.root.position;
+    const dx = p.x - cx;
+    const dz = p.z - cz;
+    const d = Math.hypot(dx, dz);
+    if (d <= r) return;
+    const nx = dx / d;
+    const nz = dz / d;
+    p.x = cx + nx * r;
+    p.z = cz + nz * r;
+    const out = this.velocity.x * nx + this.velocity.y * nz;
+    if (out > 0) {
+      this.velocity.x -= nx * out;
+      this.velocity.y -= nz * out;
+    }
   }
 
   private updateVisuals(dt: number, ground: number): void {
@@ -284,7 +307,7 @@ export class Ship {
     this.muzzleFlash -= dt;
     for (const m of this.parts.muzzles) m.visible = this.muzzleFlash > 0;
 
-    // Red flash when hit; blink while invulnerable after respawning.
+    // Red flash when hit; blink while invulnerable after spawning.
     this.hitFlash = Math.max(0, this.hitFlash - dt);
     const f = this.hitFlash / 0.18;
     for (const m of this.parts.flashMats) m.emissive.setRGB(f * 0.9, f * 0.1, f * 0.15);

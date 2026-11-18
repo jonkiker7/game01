@@ -4,7 +4,7 @@ import { addOutlines, GLOW, glow, rimToon } from './materials';
 import { approachAngle, mulberry32, wrapAngle } from './math';
 import type { EnemyShots, Hittable } from './Projectiles';
 import { HOVER_HEIGHT, type Ship } from './Ship';
-import { OUTPOSTS, type World } from './World';
+import type { World } from './World';
 
 const ENEMY_BODY = '#3b1d4a';
 const ENEMY_ARMOR = '#6a2f63';
@@ -95,8 +95,8 @@ class Turret extends Enemy {
   private readonly muzzle = new THREE.Object3D();
   private readonly tmp = new THREE.Vector3();
 
-  constructor() {
-    super(70);
+  constructor(hpMul = 1) {
+    super(70 * hpMul);
     const H = TOWER_HEIGHT;
     const stone = this.mat(TOWER_STONE, false);
     const armor = this.mat(ENEMY_ARMOR, false);
@@ -187,8 +187,8 @@ class Drone extends Enemy {
   private burstTimer = 0;
   private readonly tmp = new THREE.Vector3();
 
-  constructor() {
-    super(30);
+  constructor(hpMul = 1) {
+    super(30 * hpMul);
     const core = new THREE.Mesh(new THREE.IcosahedronGeometry(1.1, 0), this.mat(ENEMY_ARMOR));
     const eye = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 8), glow(ENEMY_GLOW));
     eye.position.z = -0.75;
@@ -259,21 +259,34 @@ class Drone extends Enemy {
   }
 }
 
-const MAX_DRONES = 4;
-const DRONE_SPAWN_TIME = 7;
 const CULL_DISTANCE = 130;
 
+/** How drones arrive during an encounter. */
+export interface DroneWaves {
+  max: number; // most drones alive at once
+  interval: number; // seconds between arrivals
+}
+
+/** A circular arena the fight is confined to. */
+export interface ArenaBounds {
+  x: number;
+  z: number;
+  r: number;
+}
+
 /**
- * Spawns, updates and tracks all enemies.
- * Turrets sit in outposts; when every turret is destroyed the area is cleared and they return.
- * Drones keep arriving from off-screen, a few at a time.
+ * Spawns, updates and tracks all enemies. The current encounter (see run/Run.ts) decides
+ * what to spawn: turret towers placed in the arena, and drones that keep arriving from its edge.
  */
 export class EnemyManager {
   readonly enemies: Enemy[] = [];
   onKill?: (kind: 'turret' | 'drone', pos: THREE.Vector3) => void;
-  onAreaCleared?: () => void;
 
-  private droneTimer = 4;
+  /** Enemy health multiplier (later sectors are tougher). */
+  hpMul = 1;
+  private drones: DroneWaves | null = null;
+  private arena: ArenaBounds = { x: 0, z: 0, r: 100 };
+  private droneTimer = 2;
   private readonly rand = mulberry32(99);
   private readonly tmp = new THREE.Vector3();
   private readonly tmp2 = new THREE.Vector3();
@@ -288,14 +301,59 @@ export class EnemyManager {
     private readonly scene: THREE.Scene,
     private readonly world: World,
     private readonly effects: Effects,
-  ) {
-    this.spawnOutposts();
-  }
+  ) {}
 
   get turretsLeft(): number {
     let n = 0;
     for (const e of this.enemies) if (e.alive && e.kind === 'turret') n++;
     return n;
+  }
+
+  get aliveCount(): number {
+    let n = 0;
+    for (const e of this.enemies) if (e.alive) n++;
+    return n;
+  }
+
+  /** Set up a new encounter: where the arena is, how tough enemies are, and drone waves (or none). */
+  configure(arena: ArenaBounds, hpMul: number, drones: DroneWaves | null): void {
+    this.arena = arena;
+    this.hpMul = hpMul;
+    this.drones = drones;
+    this.droneTimer = 2.5;
+  }
+
+  /** Stop drone arrivals (e.g. once an encounter is won). */
+  stopDrones(): void {
+    this.drones = null;
+  }
+
+  /** Remove every enemy instantly, with no effects (between arenas / new run). */
+  reset(): void {
+    for (const e of this.enemies) this.scene.remove(e.root);
+    this.enemies.length = 0;
+    this.drones = null;
+  }
+
+  /** Blow up every remaining enemy (no drops), e.g. when an encounter ends. */
+  destroyAll(): void {
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+      e.alive = false;
+      const p = e.root.position;
+      const ground = this.world.heightAt(p.x, p.z);
+      this.effects.explosion(this.tmp.set(p.x, p.y + e.aimHeight, p.z), 3.5, ground);
+    }
+  }
+
+  /** Place `count` turret towers in a loose ring around (cx, cz). */
+  spawnTurrets(cx: number, cz: number, count: number, minR: number, maxR: number): void {
+    const start = this.rand() * Math.PI * 2;
+    for (let i = 0; i < count; i++) {
+      const a = start + (i / count) * Math.PI * 2 + (this.rand() - 0.5) * 0.5;
+      const r = count === 1 ? 0 : minR + this.rand() * (maxR - minR);
+      this.register(new Turret(this.hpMul), cx + Math.cos(a) * r, cz + Math.sin(a) * r);
+    }
   }
 
   update(dt: number, ship: Ship, shots: EnemyShots, camera: THREE.Camera): void {
@@ -324,14 +382,15 @@ export class EnemyManager {
       }
     }
 
-    // Keep drones coming.
-    this.droneTimer -= dt;
-    const drones = this.enemies.filter((e) => e.kind === 'drone').length;
-    if (this.droneTimer <= 0 && ship.alive) {
-      this.droneTimer = DRONE_SPAWN_TIME;
-      if (drones < MAX_DRONES) this.spawnDrone(ship);
+    // Drone waves arrive from the arena's edge.
+    if (this.drones && ship.alive) {
+      this.droneTimer -= dt;
+      if (this.droneTimer <= 0) {
+        this.droneTimer = this.drones.interval;
+        const alive = this.enemies.filter((e) => e.kind === 'drone').length;
+        if (alive < this.drones.max) this.spawnDrone();
+      }
     }
-
   }
 
   /**
@@ -348,6 +407,16 @@ export class EnemyManager {
       const dx = v.x - b.x;
       const dz = v.z - b.z;
       if (dx * dx + dz * dz < r * r) e.damage(amount);
+    }
+  }
+
+  /** Every living enemy whose on-screen position is within `radius` of (x, z) at ship altitude. */
+  forEachNear(x: number, z: number, radius: number, fn: (e: Hittable) => void): void {
+    for (const e of this.enemies) {
+      if (!e.alive) continue;
+      const v = this.visualPosition(e, this.probe2);
+      const r = radius + e.radius;
+      if ((v.x - x) ** 2 + (v.z - z) ** 2 < r * r) fn(e);
     }
   }
 
@@ -406,31 +475,15 @@ export class EnemyManager {
       }
       this.effects.explosion(pos, dead.kind === 'turret' ? 5 : 3.5, ground);
       this.onKill?.(dead.kind, pos);
-      if (dead.kind === 'turret' && this.turretsLeft === 0) {
-        this.onAreaCleared?.();
-      }
     };
     this.enemies.push(e);
     this.scene.add(e.root);
   }
 
-  /** Fill every outpost with turret towers (a new wave). */
-  spawnOutposts(): void {
-    for (const [ox, oz] of OUTPOSTS) {
-      const count = 2 + Math.floor(this.rand() * 2);
-      for (let i = 0; i < count; i++) {
-        const a = (i / count) * Math.PI * 2 + this.rand();
-        const r = count === 1 ? 0 : 5 + this.rand() * 3;
-        this.register(new Turret(), ox + Math.cos(a) * r, oz + Math.sin(a) * r);
-      }
-    }
-  }
-
-  private spawnDrone(ship: Ship): void {
-    const limit = this.world.halfSize - 10;
+  /** A drone arriving from a random point on the arena's edge. */
+  private spawnDrone(): void {
     const a = this.rand() * Math.PI * 2;
-    const x = Math.max(-limit, Math.min(limit, ship.root.position.x + Math.cos(a) * 55));
-    const z = Math.max(-limit, Math.min(limit, ship.root.position.z + Math.sin(a) * 55));
-    this.register(new Drone(), x, z);
+    const r = this.arena.r - 4;
+    this.register(new Drone(this.hpMul), this.arena.x + Math.cos(a) * r, this.arena.z + Math.sin(a) * r);
   }
 }

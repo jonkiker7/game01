@@ -44,14 +44,28 @@ You can also force it with `?quality=low` or `?quality=high` in the URL. Adding 
 Play in landscape.
 On iPhone, use Share → **Add to Home Screen** for full-screen play.
 
-## Missions and radar
+## Sorties (roguelite runs)
 
-The radar (top right, north up) marks whatever the current mission is about:
+Each run is a **sortie** of 7 sectors. Every sector is an arena around a jungle outpost, fenced
+in by a glowing energy wall:
 
-1. **Destroy the towers:** red dots mark the remaining turret towers; the nearest ones beyond the
-   radar's range show as arrows on the rim.
-2. **Return to the landing zone:** after the area is cleared, a cyan diamond (or rim arrow) marks the pad.
-3. Fly over the pad to complete the mission; the next wave of towers appears.
+- **Destroy the outpost:** take out every turret tower while drones keep arriving.
+- **Survive the swarm:** hold out for 40 seconds against heavy drone waves.
+- **Final assault (sector 7):** a big stronghold. Destroy it to complete the sortie.
+
+Clearing a sector drops a **reward orb** in the middle of the arena. Fly into it:
+
+- **Upgrade:** pick 1 of 3 upgrades (faster gun, split shot, extra missile, bigger blasts, more
+  armor, ramming boost, and more; see `src/game/run/Upgrades.ts`).
+- **Repair:** restore 40% armor.
+- **Salvage:** currency for home base (coming in a later milestone). Kills earn salvage too.
+
+Then two **gates** open on the far side of the arena, each labelled with the reward waiting at the
+end of the next sector. Fly through the one you want. Enemies get tougher every sector. If you're
+shot down the run ends; the summary screen shows your progress and banks your salvage.
+
+The radar marks whatever the current step is about (towers, drones, the reward, or the gates) and
+shows the arena wall as a dashed circle.
 
 ## Ship designs
 
@@ -84,7 +98,9 @@ npm run preview   # serve the production build
 - `src/game/Projectiles.ts`: player bullets and enemy orbs (instanced, one draw call each)
 - `src/game/Enemies.ts`: turret towers, drones, and spawning (enemies only fire while on screen)
 - `src/game/Effects.ts`: pooled smoke, explosions, shockwaves, sparks, embers, debris, and floating motes
-- `src/game/Hud.ts`: armor bar, targets counter, messages, and damage flash
+- `src/game/Hud.ts`: armor bar, salvage, objective, missile pips, messages, and damage/heal flashes
+- `src/game/run/`: the roguelite run: `Run.ts` (sectors and flow), `Upgrades.ts` (stats and upgrade pool), `Arena.ts` (wall, reward orb, gates), `RunUI.ts` (upgrade cards and summary)
+- `src/game/Radar.ts`: the radar
 - `src/game/AimIndicator.ts`: the charging aim line and target ring
 - `src/game/CameraRig.ts`: follow camera with look-ahead, FOV kick, and shake
 - `src/game/World.ts`: the alien jungle planet: palette, terrain, trees, plants, relics, outposts, map edge
@@ -101,6 +117,9 @@ One-time setup: **Settings → Pages → Source: GitHub Actions**.
 1. ✅ Flying prototype: stick flight, camera, buttons, Pages deploy
 2. ✅ Combat: twin-stick gun and missiles, turrets, drones, armor, explosions
 3. ✅ Art pass: ink outlines, rim light, bloom, painted ground, particles, hit-stop
-4. Game loop: fuel, armor, ammo, pickups, objectives, minimap, HUD
-5. Content: more planets, enemies, bosses
-6. Polish: audio, menus, saves, offline play
+4. ✅ Run structure: sectors, arenas, rewards, upgrade choices, gates, run summary, salvage
+5. Upgrades and weapons: new weapon types per slot, upgrade families, a special ability
+6. Home base: walkable hub, NPCs and dialogue, permanent upgrades
+7. Contracts: NPC missions that appear as special arenas in a sortie
+8. Bosses and new enemies
+9. Polish: audio, menus, saves, offline play
