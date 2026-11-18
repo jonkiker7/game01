@@ -116,9 +116,9 @@ const input = new Input({
 
 // ---------- Events ----------
 ship.onBoost = () => {
-  rig.kick(6, 0.35);
-  input.vibrate(20);
-  effects.embersBurst(ship.root.position, 6, 6, 0.12);
+  rig.kick(12, 0.6);
+  input.vibrate(30);
+  effects.boostBurst(ship.root.position);
 };
 ship.onFullCharge = () => input.vibrate(15);
 /** The enemy a missile would lock onto right now (closest one near the aim line, within range). */
@@ -188,7 +188,7 @@ function updateGun(dt: number): void {
     angle = Math.atan2(-(v.x - muzzlePos.x), -(v.z - muzzlePos.z));
   }
   angle += (Math.random() - 0.5) * GUN_SPREAD * 2;
-  bullets.fire(muzzlePos, bulletDir.set(-Math.sin(angle), 0, -Math.cos(angle)));
+  bullets.fire(muzzlePos, bulletDir.set(-Math.sin(angle), 0, -Math.cos(angle)), ship.velocity);
 }
 
 // ---------- Resize & fullscreen ----------

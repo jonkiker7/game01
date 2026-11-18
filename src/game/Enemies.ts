@@ -225,7 +225,7 @@ class Drone extends Enemy {
       tz = nz * radial + nx * this.orbitDir * 8;
     }
     const len = Math.hypot(tx, tz);
-    const maxSpeed = 10;
+    const maxSpeed = 15; // keeps up with the (faster) player
     if (len > maxSpeed) {
       tx = (tx / len) * maxSpeed;
       tz = (tz / len) * maxSpeed;

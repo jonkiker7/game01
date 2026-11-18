@@ -155,14 +155,15 @@ export class Bullets {
   }
 
   /** `dir` is a normalized 3D direction (bullets usually angle down from the ship). */
-  fire(from: THREE.Vector3, dir: THREE.Vector3): void {
+  /** `carry` is the ship's (x, z) velocity, added so bullets don't lag behind a fast ship. */
+  fire(from: THREE.Vector3, dir: THREE.Vector3, carry?: THREE.Vector2): void {
     this.pool.add({
       x: from.x,
       y: from.y,
       z: from.z,
-      vx: dir.x * BULLET_SPEED,
+      vx: dir.x * BULLET_SPEED + (carry?.x ?? 0),
       vy: dir.y * BULLET_SPEED,
-      vz: dir.z * BULLET_SPEED,
+      vz: dir.z * BULLET_SPEED + (carry?.y ?? 0),
       ceiling: Infinity,
       life: BULLET_LIFE,
     });
