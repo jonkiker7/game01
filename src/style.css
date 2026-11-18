@@ -3,6 +3,7 @@
   --gold-dim: rgba(242, 196, 109, 0.55);
   --crimson: #7a1328;
   --bg: #1c0a24;
+  --display: 'Cinzel', 'Trajan Pro', Georgia, serif;
 }
 
 html,
@@ -93,6 +94,7 @@ body {
 }
 
 .btn {
+  font-family: var(--display);
   position: absolute;
   pointer-events: auto;
   width: 58px;
@@ -178,6 +180,8 @@ body {
 }
 
 #fps {
+  pointer-events: auto;
+  padding: 4px 10px;
   position: absolute;
   top: calc(6px + env(safe-area-inset-top));
   left: 50%;
@@ -213,6 +217,7 @@ body {
 
 /* ---------- HUD readouts ---------- */
 #armor {
+  font-family: var(--display);
   position: absolute;
   top: calc(12px + env(safe-area-inset-top));
   left: calc(16px + env(safe-area-inset-left));
@@ -254,6 +259,7 @@ body {
 }
 
 #targets {
+  font-family: var(--display);
   position: absolute;
   top: calc(12px + env(safe-area-inset-top));
   right: calc(16px + env(safe-area-inset-right));
@@ -265,6 +271,7 @@ body {
 }
 
 #message {
+  font-family: var(--display);
   position: absolute;
   top: 28%;
   left: 0;
@@ -303,4 +310,12 @@ body {
   to {
     opacity: 0;
   }
+}
+
+/* Dark, slightly purple edges frame the action (painted-game look). */
+#vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(20, 0, 25, 0) 55%, rgba(20, 0, 25, 0.55) 100%);
 }

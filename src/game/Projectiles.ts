@@ -170,7 +170,7 @@ export class EnemyShots {
           }),
           scale: 2,
         },
-        { material: glow('#2a0014', { side: THREE.BackSide }), scale: 1.4 },
+        { material: glow('#2a0014', { side: THREE.BackSide }, 1), scale: 1.4 },
         { material: glow('#fff4f7'), scale: 1 },
       ],
       0.12,

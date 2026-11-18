@@ -1,4 +1,8 @@
 import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import './style.css';
 import { AimIndicator } from './game/AimIndicator';
 import { CameraRig } from './game/CameraRig';
@@ -28,10 +32,28 @@ const GUN_SPREAD = 0.03;
 
 // ---------- Renderer ----------
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-// Phones have very dense screens; capping the pixel ratio keeps the frame rate up.
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 $('app').appendChild(renderer.domElement);
+
+/**
+ * Quality levels. HIGH adds bloom (the soft glow around bright things).
+ * LOW skips it and renders at a lower resolution for slower phones.
+ * Tap the fps counter to switch; the game also drops to LOW by itself if it runs slowly.
+ */
+type Quality = 'high' | 'low';
+const QUALITY_KEY = 'star-rotor-quality';
+function savedQuality(): Quality | null {
+  const fromUrl = new URLSearchParams(location.search).get('quality');
+  if (fromUrl === 'high' || fromUrl === 'low') return fromUrl;
+  try {
+    const v = localStorage.getItem(QUALITY_KEY);
+    return v === 'high' || v === 'low' ? v : null;
+  } catch {
+    return null;
+  }
+}
+let quality: Quality = savedQuality() ?? 'high';
+let qualityChosen = savedQuality() !== null; // if the player picked one, don't auto-switch
 
 // ---------- Scene & lighting ----------
 const scene = new THREE.Scene();
@@ -48,7 +70,7 @@ scene.add(rim);
 
 // ---------- Game objects ----------
 const world = new World(scene);
-const effects = new Effects(scene);
+const effects = new Effects(scene, (x, z) => world.heightAt(x, z));
 const ship = new Ship(scene);
 ship.root.position.set(0, world.heightAt(0, 0) + HOVER_HEIGHT, 0);
 const missiles = new MissileSystem(scene, world, effects);
@@ -60,6 +82,21 @@ const hud = new Hud($('hud'));
 
 const rig = new CameraRig(window.innerWidth / window.innerHeight);
 rig.snapTo(ship.root.position);
+
+// ---------- Post-processing (HIGH quality) ----------
+const composer = new EffectComposer(
+  renderer,
+  new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 }),
+);
+composer.addPass(new RenderPass(scene, rig.camera));
+// Only colours brighter than 1.0 (glows) bloom, so the ground and models stay crisp.
+const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.75, 0.45, 1.0);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+// ---------- Hit-stop: freeze for a split second on big impacts (Hades does this a lot) ----------
+let hitStop = 0;
+const freeze = (seconds: number) => (hitStop = Math.max(hitStop, seconds));
 
 const input = new Input({
   hud: $('hud'),
@@ -73,6 +110,7 @@ const input = new Input({
 ship.onBoost = () => {
   rig.kick(6, 0.35);
   input.vibrate(20);
+  effects.embersBurst(ship.root.position, 6, 6, 0.12);
 };
 ship.onFullCharge = () => input.vibrate(15);
 /** The enemy a missile would lock onto right now (closest one near the aim line, within range). */
@@ -86,11 +124,13 @@ ship.onMissile = (charge, heading) => {
   rig.kick(1 + charge * 2, 0.15);
 };
 ship.onHit = () => {
+  freeze(0.05);
   hud.flashDamage();
   rig.kick(0, 0.6);
   input.vibrate(40);
 };
 ship.onDeath = () => {
+  freeze(0.18);
   const p = ship.root.position;
   effects.explosion(p, 7, world.heightAt(p.x, p.z));
   rig.kick(4, 2);
@@ -100,11 +140,13 @@ ship.onDeath = () => {
 ship.onRespawn = () => hud.show('BACK IN THE FIGHT', 1.5);
 
 missiles.onExplode = (pos, power) => {
+  freeze(0.03 + power * 0.04);
   enemies.damageCircle(pos.x, pos.z, missileBlastRadius(power), missileDamage(power));
   rig.kick(0, 0.5 + power * 0.9);
   input.vibrate(25 + Math.round(power * 30));
 };
 enemies.onKill = (kind) => {
+  freeze(kind === 'turret' ? 0.08 : 0.05);
   rig.kick(0, kind === 'turret' ? 1 : 0.6);
   input.vibrate(30);
 };
@@ -138,8 +180,28 @@ function updateGun(dt: number): void {
 
 // ---------- Resize & fullscreen ----------
 function resize(): void {
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  rig.setAspect(window.innerWidth / window.innerHeight);
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  // Phones have very dense screens; capping the pixel ratio keeps the frame rate up.
+  const ratio = Math.min(window.devicePixelRatio, quality === 'high' ? 1.75 : 1.25);
+  renderer.setPixelRatio(ratio);
+  renderer.setSize(w, h);
+  composer.setPixelRatio(ratio);
+  composer.setSize(w, h);
+  rig.setAspect(w / h);
+}
+
+function setQuality(q: Quality, remember: boolean): void {
+  quality = q;
+  if (remember) {
+    qualityChosen = true;
+    try {
+      localStorage.setItem(QUALITY_KEY, q);
+    } catch {
+      /* private mode — fine */
+    }
+  }
+  resize();
 }
 window.addEventListener('resize', resize);
 resize();
@@ -166,6 +228,15 @@ if (window.matchMedia('(pointer: coarse)').matches) {
 
 // ---------- Main loop ----------
 const fpsEl = $('fps');
+fpsEl.addEventListener('pointerdown', (e) => {
+  e.stopPropagation();
+  setQuality(quality === 'high' ? 'low' : 'high', true);
+  hud.show(quality === 'high' ? 'QUALITY: HIGH' : 'QUALITY: LOW', 1.2);
+});
+const enginePos = new THREE.Vector3();
+let perfTime = 0;
+let perfFrames = 0;
+let elapsed = 0;
 const boostBtn = $('btn-boost');
 const aimLead = new THREE.Vector2();
 let frames = 0;
@@ -173,8 +244,16 @@ let fpsTimer = 0;
 let last = performance.now();
 
 renderer.setAnimationLoop((now: number) => {
-  const dt = Math.min((now - last) / 1000, 1 / 20); // clamp so a hiccup doesn't teleport the ship
+  const realDt = Math.min((now - last) / 1000, 1 / 20); // clamp so a hiccup doesn't teleport the ship
   last = now;
+  elapsed += realDt;
+
+  // Hit-stop: the world pauses for a moment, but the screen keeps rendering.
+  let dt = realDt;
+  if (hitStop > 0) {
+    hitStop -= realDt;
+    dt = realDt * 0.05;
+  }
 
   ship.update(dt, input, world);
   updateGun(dt);
@@ -182,7 +261,10 @@ renderer.setAnimationLoop((now: number) => {
   bullets.update(dt, enemies.enemies);
   enemyShots.update(dt, ship);
   missiles.update(dt, enemies.enemies);
-  effects.update(dt);
+  if (ship.isBoosting && ship.alive) {
+    for (let i = 0; i < 2; i++) effects.trail(ship.getEngine(i, enginePos));
+  }
+  effects.update(dt, rig.lookTarget);
   aim.update(dt, ship, world, ship.isCharging ? missileLock(ship.charge, ship.aimHeading) : null);
   world.update(dt);
 
@@ -200,14 +282,25 @@ renderer.setAnimationLoop((now: number) => {
   hud.setTargets(enemies.turretsLeft);
   hud.update(dt);
 
-  renderer.render(scene, rig.camera);
+  if (quality === 'high') composer.render(realDt);
+  else renderer.render(scene, rig.camera);
   input.endFrame();
 
   frames++;
-  fpsTimer += dt;
+  fpsTimer += realDt;
   if (fpsTimer >= 0.5) {
-    fpsEl.textContent = `${Math.round(frames / fpsTimer)} fps`;
+    fpsEl.textContent = `${Math.round(frames / fpsTimer)} fps · ${quality.toUpperCase()}`;
     frames = 0;
     fpsTimer = 0;
+  }
+
+  // Auto quality: after a few seconds of warm-up, if HIGH averages under 45 fps, drop to LOW.
+  if (!qualityChosen && quality === 'high' && elapsed > 3) {
+    perfTime += realDt;
+    perfFrames++;
+    if (perfTime >= 3) {
+      if (perfFrames / perfTime < 45) setQuality('low', false);
+      qualityChosen = true;
+    }
   }
 });

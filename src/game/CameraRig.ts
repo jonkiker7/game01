@@ -21,6 +21,11 @@ export class CameraRig {
     this.camera = new THREE.PerspectiveCamera(BASE_FOV, aspect, 1, 500);
   }
 
+  /** The point on the ground the camera is looking at. */
+  get lookTarget(): THREE.Vector3 {
+    return this.focus;
+  }
+
   snapTo(target: THREE.Vector3): void {
     this.focus.copy(target);
     this.camera.position.copy(this.focus).add(this.offset);

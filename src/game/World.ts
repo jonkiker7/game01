@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { glow, toon } from './materials';
+import { GLOW, glow, outlineInstanced, toon } from './materials';
 import { clamp, fbm, mulberry32, smoothstep, valueNoise } from './math';
 
 /** Colors for one planet. Each new planet later becomes a different palette + props. */
@@ -48,7 +48,7 @@ export class World {
   update(dt: number): void {
     this.time += dt;
     const pulse = 0.75 + Math.sin(this.time * 2.2) * 0.25;
-    this.crystalMat.color.set(this.palette.crystal).multiplyScalar(pulse);
+    this.crystalMat.color.set(this.palette.crystal).multiplyScalar(GLOW * pulse);
     (this.padRing.material as THREE.MeshBasicMaterial).opacity = 0.45 + Math.sin(this.time * 3) * 0.25;
   }
 
@@ -72,14 +72,15 @@ export class World {
       pos.setY(i, h);
 
       c.copy(low).lerp(high, clamp((h + 2.5) / 5, 0, 1));
-      if (fbm(x * 0.045 + 50, z * 0.045 - 20, 2) > 0.6) c.lerp(accent, 0.45);
-      c.multiplyScalar(0.85 + valueNoise(x * 0.3, z * 0.3) * 0.3);
+      // Soft-edged patches of a warmer colour (a hard cut-off looked blocky on the vertex grid).
+      c.lerp(accent, 0.5 * smoothstep(0.52, 0.66, fbm(x * 0.045 + 50, z * 0.045 - 20, 2)));
+      c.multiplyScalar((0.85 + valueNoise(x * 0.3, z * 0.3) * 0.3) * 1.15);
       c.toArray(colors, i * 3);
     }
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geo.computeVertexNormals();
 
-    const ground = new THREE.Mesh(geo, toon('#ffffff', { vertexColors: true }));
+    const ground = new THREE.Mesh(geo, toon('#ffffff', { vertexColors: true, map: paintedTexture() }));
     this.group.add(ground);
   }
 
@@ -112,7 +113,7 @@ export class World {
       mesh.setMatrixAt(i, m.compose(p, q, s));
       mesh.setColorAt(i, color.set(this.palette.rock[i % this.palette.rock.length]));
     }
-    this.group.add(mesh);
+    this.group.add(mesh, outlineInstanced(mesh));
   }
 
   private buildCrystals(): void {
@@ -141,7 +142,7 @@ export class World {
         mesh.setMatrixAt(i++, m.compose(p, q, s));
       }
     }
-    this.group.add(mesh);
+    this.group.add(mesh, outlineInstanced(mesh));
   }
 
   private buildSpores(): void {
@@ -160,7 +161,7 @@ export class World {
       p.set(x, this.heightAt(x, z) + size * 0.4, z);
       mesh.setMatrixAt(i, m.compose(p, q, s));
     }
-    this.group.add(mesh);
+    this.group.add(mesh, outlineInstanced(mesh));
   }
 
   /** Tall rock spires around the border: they mark the edge you can't fly past. */
@@ -195,7 +196,9 @@ export class World {
       }
     }
     mesh.count = i;
-    this.group.add(mesh);
+    const outline = outlineInstanced(mesh);
+    outline.count = i;
+    this.group.add(mesh, outline);
   }
 
   private buildLandingPad(): THREE.Mesh {
@@ -209,7 +212,52 @@ export class World {
     );
     ring.rotation.x = -Math.PI / 2;
     ring.position.y = 0.66;
-    this.group.add(pad, inner, ring);
+    this.group.add(pad, outlineSingle(pad), inner, ring);
     return ring;
   }
+}
+
+/** Outline for a single (non-instanced) mesh placed directly in the world. */
+function outlineSingle(mesh: THREE.Mesh): THREE.Object3D {
+  const holder = new THREE.InstancedMesh(mesh.geometry, mesh.material as THREE.Material, 1);
+  mesh.updateMatrix();
+  holder.setMatrixAt(0, mesh.matrix);
+  return outlineInstanced(holder);
+}
+
+/**
+ * A hand-painted look for the ground: hundreds of soft, overlapping brush dabs in light and
+ * dark values. The texture tiles and multiplies the terrain's colours.
+ */
+function paintedTexture(): THREE.CanvasTexture {
+  const size = 512;
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const g = c.getContext('2d')!;
+  g.fillStyle = 'rgb(205,205,205)';
+  g.fillRect(0, 0, size, size);
+  const rand = mulberry32(7);
+  for (let i = 0; i < 1800; i++) {
+    const x = rand() * size;
+    const y = rand() * size;
+    const w = 8 + rand() * 34;
+    const h = w * (0.25 + rand() * 0.3);
+    const v = Math.round(130 + rand() * 125);
+    g.fillStyle = `rgba(${v},${v},${v},${0.25 + rand() * 0.3})`;
+    const rot = -0.5 + rand() * 0.4; // strokes roughly share a direction, like a painter's hand
+    // Draw wrapped copies so the texture tiles without seams.
+    for (const ox of [-size, 0, size]) {
+      for (const oy of [-size, 0, size]) {
+        g.beginPath();
+        g.ellipse(x + ox, y + oy, w, h, rot, 0, Math.PI * 2);
+        g.fill();
+      }
+    }
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.NoColorSpace; // treat as plain brightness values
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(22, 22);
+  tex.anisotropy = 4;
+  return tex;
 }

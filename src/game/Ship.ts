@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { Input } from './Input';
-import { glow, toon } from './materials';
+import { addOutlines, GLOW, glow, rimToon } from './materials';
 import { approachAngle, clamp, damp } from './math';
 import type { World } from './World';
 
@@ -77,6 +77,7 @@ export class Ship {
   constructor(scene: THREE.Scene) {
     this.root.add(this.tilt);
     this.rotorRing = this.buildModel();
+    addOutlines(this.tilt);
     this.root.scale.setScalar(0.85);
     this.shadow = this.buildShadow();
     scene.add(this.root, this.shadow);
@@ -84,6 +85,11 @@ export class Ship {
 
   get isBoosting(): boolean {
     return this.boostTimer > 0;
+  }
+
+  /** World position of engine 0 or 1 (for the boost trail). */
+  getEngine(index: number, out: THREE.Vector3): THREE.Vector3 {
+    return this.engines[index].getWorldPosition(out);
   }
 
   /** World position of gun barrel 0 or 1. */
@@ -242,7 +248,7 @@ export class Ship {
     (this.rotorRing.material as THREE.MeshBasicMaterial).opacity = 0.25 + Math.sin(this.time * 6) * 0.08;
 
     const boostGlow = this.isBoosting ? 1 : 0;
-    this.engineMat.color.setRGB(0.44 + boostGlow * 0.56, 0.97, 1);
+    this.engineMat.color.setRGB(0.44 + boostGlow * 0.56, 0.97, 1).multiplyScalar(GLOW * (1 + boostGlow * 0.6));
     for (const e of this.engines) e.scale.setScalar(damp(e.scale.x, 1 + boostGlow * 0.9, 12, dt));
 
     this.muzzleFlash -= dt;
@@ -259,9 +265,10 @@ export class Ship {
   }
 
   private buildModel(): THREE.Mesh {
-    const hull = toon('#efe2c4');
-    const accent = toon('#b8233a');
-    const dark = toon('#3a2a3f');
+    // Warm gold rim light on the hero ship, like Hades' character lighting.
+    const hull = rimToon('#efe2c4', '#ffd38a', 0.55);
+    const accent = rimToon('#b8233a', '#ffb070', 0.6);
+    const dark = rimToon('#3a2a3f', '#ffb070', 0.5);
     this.flashMats.push(hull, accent, dark);
     const t = this.tilt;
 
@@ -323,6 +330,7 @@ export class Ship {
       const arm = new THREE.Group();
       arm.rotation.y = (i / 3) * Math.PI * 2;
       const blade = new THREE.Mesh(bladeGeo, hull);
+      blade.userData.noOutline = true; // spinning blades look cleaner without ink
       const tip = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6), tipMat);
       tip.position.z = 3.3;
       arm.add(blade, tip);

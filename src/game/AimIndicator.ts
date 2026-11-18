@@ -71,15 +71,15 @@ export class AimIndicator {
     const full = ship.charge >= 1;
     const pulse = full ? 0.75 + Math.sin(this.time * 18) * 0.25 : 1;
     this.color.copy(CHARGING).lerp(FULL, full ? 1 : 0);
-    this.beamMat.color.copy(this.color).multiplyScalar(pulse);
+    this.beamMat.color.copy(this.color).multiplyScalar(pulse * 1.4);
     if (lock) {
       // Locked: a bigger red ring that wraps the target.
-      this.reticleMat.color.copy(LOCKED).multiplyScalar(0.8 + Math.sin(this.time * 18) * 0.2);
+      this.reticleMat.color.copy(LOCKED).multiplyScalar(1.4 * (0.8 + Math.sin(this.time * 18) * 0.2));
       this.reticle.scale.setScalar(lock.radius * 0.75 + 0.6);
       this.reticle.rotation.y += dt * 4;
       return;
     }
-    this.reticleMat.color.copy(this.color).multiplyScalar(pulse);
+    this.reticleMat.color.copy(this.color).multiplyScalar(pulse * 1.4);
     this.reticle.scale.setScalar(full ? 1.15 + Math.sin(this.time * 18) * 0.08 : 0.8 + ship.charge * 0.3);
   }
 
