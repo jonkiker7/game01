@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import type { Input } from './Input';
-import { addOutlines, GLOW, glow, rimToon } from './materials';
+import { addOutlines, GLOW, glow } from './materials';
 import { approachAngle, clamp, damp } from './math';
+import { buildShipDesign, type ShipDesignId, type ShipParts } from './ShipDesigns';
 import type { World } from './World';
 
 // ---- Handling (tweak these to change how the ship feels) ----
@@ -62,12 +63,8 @@ export class Ship {
   onRespawn?: () => void;
 
   private readonly tilt = new THREE.Group(); // pitch + bank
-  private readonly rotor = new THREE.Group();
-  private readonly rotorRing: THREE.Mesh;
+  private readonly parts: ShipParts;
   private readonly engineMat = glow('#6ff7ff');
-  private readonly engines: THREE.Mesh[] = [];
-  private readonly muzzles: THREE.Mesh[] = [];
-  private readonly flashMats: THREE.MeshToonMaterial[] = [];
   private readonly shadow: THREE.Mesh;
   private pitch = 0;
   private roll = 0;
@@ -77,9 +74,9 @@ export class Ship {
   private respawnTimer = 0;
   private muzzleFlash = 0;
 
-  constructor(scene: THREE.Scene) {
+  constructor(scene: THREE.Scene, design: ShipDesignId = 'a') {
     this.root.add(this.tilt);
-    this.rotorRing = this.buildModel();
+    this.parts = buildShipDesign(design, this.tilt, this.engineMat);
     addOutlines(this.tilt);
     this.root.scale.setScalar(0.85);
     this.shadow = this.buildShadow();
@@ -92,12 +89,12 @@ export class Ship {
 
   /** World position of engine 0 or 1 (for the boost trail). */
   getEngine(index: number, out: THREE.Vector3): THREE.Vector3 {
-    return this.engines[index].getWorldPosition(out);
+    return this.parts.engines[index].getWorldPosition(out);
   }
 
   /** World position of gun barrel 0 or 1. */
   getMuzzle(index: number, out: THREE.Vector3): THREE.Vector3 {
-    return this.muzzles[index].getWorldPosition(out);
+    return this.parts.muzzles[index].getWorldPosition(out);
   }
 
   /** Called by the gun each time a bullet leaves a barrel. */
@@ -247,108 +244,24 @@ export class Ship {
   private updateVisuals(dt: number, ground: number): void {
     const p = this.root.position;
     const speed = this.velocity.length();
-    this.rotor.rotation.y += dt * (16 + speed * 0.5);
-    (this.rotorRing.material as THREE.MeshBasicMaterial).opacity = 0.25 + Math.sin(this.time * 6) * 0.08;
+    for (const s of this.parts.spinners) s.obj.rotation.y += s.dir * dt * (16 + speed * 0.5);
+    for (const m of this.parts.pulses) m.opacity = 0.22 + Math.sin(this.time * 6) * 0.07;
 
     const boostGlow = this.isBoosting ? 1 : 0;
     this.engineMat.color.setRGB(0.44 + boostGlow * 0.56, 0.97, 1).multiplyScalar(GLOW * (1 + boostGlow * 0.6));
-    for (const e of this.engines) e.scale.setScalar(damp(e.scale.x, 1 + boostGlow * 0.9, 12, dt));
+    for (const e of this.parts.engines) e.scale.setScalar(damp(e.scale.x, 1 + boostGlow * 0.9, 12, dt));
 
     this.muzzleFlash -= dt;
-    for (const m of this.muzzles) m.visible = this.muzzleFlash > 0;
+    for (const m of this.parts.muzzles) m.visible = this.muzzleFlash > 0;
 
     // Red flash when hit; blink while invulnerable after respawning.
     this.hitFlash = Math.max(0, this.hitFlash - dt);
     const f = this.hitFlash / 0.18;
-    for (const m of this.flashMats) m.emissive.setRGB(f * 0.9, f * 0.1, f * 0.15);
+    for (const m of this.parts.flashMats) m.emissive.setRGB(f * 0.9, f * 0.1, f * 0.15);
     this.tilt.visible = this.invulnerable > 0.4 ? Math.floor(this.time * 14) % 2 === 0 : true;
 
     this.shadow.position.set(p.x, ground + 0.15, p.z);
     this.shadow.rotation.y = this.heading;
-  }
-
-  private buildModel(): THREE.Mesh {
-    // Warm gold rim light on the hero ship, like Hades' character lighting.
-    const hull = rimToon('#efe2c4', '#ffd38a', 0.55);
-    const accent = rimToon('#b8233a', '#ffb070', 0.6);
-    const dark = rimToon('#3a2a3f', '#ffb070', 0.5);
-    this.flashMats.push(hull, accent, dark);
-    const t = this.tilt;
-
-    // Body
-    const body = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), hull);
-    body.scale.set(0.95, 0.75, 1.7);
-    const spine = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.3, 2.4), accent);
-    spine.position.set(0, 0.62, 0.2);
-    const canopy = new THREE.Mesh(new THREE.SphereGeometry(0.6, 16, 12), glow('#7ff6ff'));
-    canopy.scale.set(0.9, 0.7, 1.1);
-    canopy.position.set(0, 0.28, -1.05);
-    t.add(body, spine, canopy);
-
-    // Tail
-    const boom = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.32, 2.6, 8), hull);
-    boom.rotation.x = Math.PI / 2;
-    boom.position.set(0, 0.2, 2.3);
-    const fin = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.0, 0.8), accent);
-    fin.position.set(0, 0.7, 3.4);
-    const stab = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.1, 0.45), accent);
-    stab.position.set(0, 0.25, 3.3);
-    const tailRing = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.06, 8, 20), glow('#6ff7ff'));
-    tailRing.rotation.y = Math.PI / 2;
-    tailRing.position.set(0, 0.35, 3.75);
-    t.add(boom, fin, stab, tailRing);
-
-    // Side engine pods + guns
-    for (const s of [-1, 1]) {
-      const strut = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.14, 0.55), dark);
-      strut.position.set(s * 0.8, -0.05, 0.3);
-      const pod = new THREE.Mesh(new THREE.CapsuleGeometry(0.32, 1.3, 4, 10), accent);
-      pod.rotation.x = Math.PI / 2;
-      pod.position.set(s * 1.3, -0.1, 0.35);
-      const engine = new THREE.Mesh(new THREE.CircleGeometry(0.26, 14), this.engineMat);
-      engine.position.set(s * 1.3, -0.1, 1.33);
-      this.engines.push(engine);
-
-      const gun = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1.0, 6), dark);
-      gun.rotation.x = Math.PI / 2;
-      gun.position.set(s * 0.38, -0.55, -1.25);
-      const muzzle = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), glow('#ffe27a'));
-      muzzle.scale.set(1, 1, 2.2);
-      muzzle.position.set(s * 0.38, -0.55, -2.0);
-      muzzle.visible = false;
-      this.muzzles.push(muzzle);
-      t.add(strut, pod, engine, gun, muzzle);
-    }
-
-    // Rotor: mast, three spinning blades with glowing tips, and an energy ring
-    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.34, 0.55, 10), dark);
-    mast.position.y = 0.95;
-    t.add(mast);
-
-    this.rotor.position.y = 1.25;
-    const bladeGeo = new THREE.BoxGeometry(0.3, 0.05, 3.3);
-    bladeGeo.translate(0, 0, 1.65);
-    const tipMat = glow('#6ff7ff');
-    for (let i = 0; i < 3; i++) {
-      const arm = new THREE.Group();
-      arm.rotation.y = (i / 3) * Math.PI * 2;
-      const blade = new THREE.Mesh(bladeGeo, hull);
-      blade.userData.noOutline = true; // spinning blades look cleaner without ink
-      const tip = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6), tipMat);
-      tip.position.z = 3.3;
-      arm.add(blade, tip);
-      this.rotor.add(arm);
-    }
-    t.add(this.rotor);
-
-    const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(3.4, 0.05, 6, 48),
-      glow('#6ff7ff', { transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false }),
-    );
-    ring.rotation.x = Math.PI / 2;
-    ring.position.y = 1.25;
-    t.add(ring);
-    return ring;
   }
 
   /** A soft dark blob under the ship (cheap, and it helps you judge position). */

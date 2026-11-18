@@ -36,6 +36,17 @@ You can also force it with `?quality=low` or `?quality=high` in the URL. Adding 
 Play in landscape.
 On iPhone, use Share → **Add to Home Screen** for full-screen play.
 
+## Ship designs
+
+Four twin-rotor ship designs live in `src/game/ShipDesigns.ts`. See them side by side at
+`designs.html` (e.g. `https://jonkiker7.github.io/game01/designs.html`), and fly one with
+`?ship=a`, `?ship=b`, `?ship=c` or `?ship=d` on the game URL (A is the default):
+
+- **A · Valkyrie:** armored wedge gunship with ducted fans on the wingtips
+- **B · Manta:** flying-wing delta with fans set into the wings
+- **C · Kestrel:** slim dart with open rotors on wingtip nacelles
+- **D · Atlas:** heavy lifter with big fan pods and a belly turret
+
 ## Development
 
 ```bash
@@ -48,7 +59,9 @@ npm run preview   # serve the production build
 ## Code layout
 
 - `src/main.ts`: renderer, lights, and the main loop
-- `src/game/Ship.ts`: ship model and flight handling (tuning constants at the top)
+- `src/game/Ship.ts`: flight handling, weapons state, armor (tuning constants at the top)
+- `src/game/ShipDesigns.ts`: the four twin-rotor ship models
+- `designs.html` + `src/designs.ts`: ship design gallery page
 - `src/game/Input.ts`: touch stick, buttons (MSL doubles as an aim stick), and keyboard
 - `src/game/Missiles.ts`: missile flight, range, and splash damage
 - `src/game/Projectiles.ts`: player bullets and enemy orbs (instanced, one draw call each)

@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#1c1233" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&display=swap" rel="stylesheet" />
+    <title>Ship Designs</title>
+    <style>
+      :root {
+        --gold: #f2c46d;
+        --bg: #1c1233;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: var(--bg);
+        color: #fff;
+        font-family: system-ui, -apple-system, sans-serif;
+        overflow: hidden;
+      }
+      canvas {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      #cards {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 1fr 1fr;
+        pointer-events: none;
+      }
+      @media (orientation: portrait) {
+        #cards {
+          grid-template-columns: 1fr;
+          grid-template-rows: repeat(4, 1fr);
+        }
+      }
+      .card {
+        position: relative;
+        border: 1px solid rgba(242, 196, 109, 0.25);
+      }
+      .label {
+        position: absolute;
+        left: 12px;
+        top: 10px;
+        font-family: 'Cinzel', Georgia, serif;
+        color: var(--gold);
+        text-shadow: 0 1px 3px #000;
+      }
+      .label b {
+        font-size: 18px;
+        letter-spacing: 0.08em;
+      }
+      .label span {
+        display: block;
+        font-family: system-ui, sans-serif;
+        font-size: 11px;
+        color: #e9e3f5;
+        margin-top: 2px;
+        max-width: 240px;
+      }
+      .fly {
+        position: absolute;
+        right: 12px;
+        bottom: 10px;
+        pointer-events: auto;
+        font-family: 'Cinzel', Georgia, serif;
+        font-weight: 700;
+        font-size: 12px;
+        letter-spacing: 0.1em;
+        color: var(--gold);
+        text-decoration: none;
+        border: 2px solid rgba(242, 196, 109, 0.6);
+        border-radius: 999px;
+        padding: 6px 12px;
+        background: rgba(122, 19, 40, 0.75);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="cards"></div>
+    <script type="module" src="./src/designs.ts"></script>
+  </body>
+</html>
