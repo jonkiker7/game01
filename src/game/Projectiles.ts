@@ -12,6 +12,7 @@ interface Shot {
   /** Climbing shots stop rising at this height (enemy orbs level off at the ship's altitude). */
   ceiling: number;
   life: number;
+  damage: number;
 }
 
 /** One visual layer of a projectile (e.g. bright core, dark outline, soft halo). */
@@ -50,6 +51,10 @@ class ShotPool {
       scene.add(mesh);
       this.meshes.push({ mesh, scale: layer.scale });
     }
+  }
+
+  clear(): void {
+    this.shots.length = 0;
   }
 
   add(shot: Shot): void {
@@ -134,7 +139,6 @@ export interface Hittable {
 
 const BULLET_SPEED = 80;
 const BULLET_LIFE = 0.55; // → 44 units of range (about what fits on screen)
-const BULLET_DAMAGE = 7;
 
 /** The player's machine-gun rounds. */
 export class Bullets {
@@ -155,8 +159,12 @@ export class Bullets {
   }
 
   /** `dir` is a normalized 3D direction (bullets usually angle down from the ship). */
+  clear(): void {
+    this.pool.clear();
+  }
+
   /** `carry` is the ship's (x, z) velocity, added so bullets don't lag behind a fast ship. */
-  fire(from: THREE.Vector3, dir: THREE.Vector3, carry?: THREE.Vector2): void {
+  fire(from: THREE.Vector3, dir: THREE.Vector3, damage: number, carry?: THREE.Vector2): void {
     this.pool.add({
       x: from.x,
       y: from.y,
@@ -166,6 +174,7 @@ export class Bullets {
       vz: dir.z * BULLET_SPEED + (carry?.y ?? 0),
       ceiling: Infinity,
       life: BULLET_LIFE,
+      damage,
     });
   }
 
@@ -187,7 +196,7 @@ export class Bullets {
         const tp = t.root.position;
         const hit = rayToVerticalSegment(camera, this.ray, tp.x, tp.z, tp.y + t.hitBottom, tp.y + t.hitTop, this.closest);
         if (hit < t.radius) {
-          t.damage(BULLET_DAMAGE);
+          t.damage(s.damage);
           this.effects.spark(this.closest);
           return true;
         }
@@ -238,6 +247,10 @@ export class EnemyShots {
     );
   }
 
+  clear(): void {
+    this.pool.clear();
+  }
+
   /**
    * Fires a shot along (dirX, dirZ). Shots from the ground climb steadily so they reach
    * `targetY` (the ship's altitude) after about `travel` units, then fly level.
@@ -254,6 +267,7 @@ export class EnemyShots {
       vz: dirZ * speed,
       ceiling: Math.max(targetY, from.y),
       life: 4,
+      damage: ORB_DAMAGE,
     });
   }
 
@@ -264,7 +278,7 @@ export class EnemyShots {
       const dx = p.x - s.x;
       const dz = p.z - s.z;
       if (dx * dx + dz * dz < PLAYER_HIT_RADIUS * PLAYER_HIT_RADIUS) {
-        player.damage(ORB_DAMAGE);
+        player.damage(s.damage);
         this.effects.spark(this.tmp.set(s.x, s.y, s.z), '#ff6b8f', 1.5);
         return true;
       }

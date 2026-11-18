@@ -21,17 +21,20 @@ import {
   missileRange,
 } from './game/Missiles';
 import { Bullets, EnemyShots } from './game/Projectiles';
-import { BOOST_COOLDOWN, HOVER_HEIGHT, Ship } from './game/Ship';
+import { ArenaVisual } from './game/run/Arena';
+import { Run } from './game/run/Run';
+import { RunUI } from './game/run/RunUI';
+import { Ship } from './game/Ship';
 import { isShipDesign } from './game/ShipDesigns';
-import { JUNGLE, LANDING_PAD, World } from './game/World';
+import { JUNGLE, World } from './game/World';
 
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
 
-// ---- Gun tuning ----
-const GUN_RATE = 11; // bullets per second (alternating barrels)
+// ---- Gun tuning (fire rate and damage come from the run's stats) ----
 const AIM_ASSIST_ANGLE = 0.2; // radians either side of the nose where bullets bend toward an enemy
 const AIM_ASSIST_RANGE = 38;
 const GUN_SPREAD = 0.03;
+const SIDE_SHOT_ANGLE = 0.14; // radians between Split Shot bullets
 
 // ---------- Renderer ----------
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -77,7 +80,6 @@ const effects = new Effects(scene, (x, z) => world.heightAt(x, z));
 // Pick the ship design with ?ship=a|b|c|d (see designs.html); defaults to the Manta.
 const shipParam = new URLSearchParams(location.search).get('ship');
 const ship = new Ship(scene, isShipDesign(shipParam) ? shipParam : 'b');
-ship.root.position.set(0, world.heightAt(0, 0) + HOVER_HEIGHT, 0);
 const missiles = new MissileSystem(scene, world, effects);
 const aim = new AimIndicator(scene);
 const bullets = new Bullets(scene, effects);
@@ -88,42 +90,33 @@ const pickups = new Pickups(scene, effects);
 const pickupTarget = new THREE.Vector3();
 const radar = new Radar($('hud'));
 
-// ---------- Mission ----------
-// Destroy every tower, then return to the landing zone to start the next wave.
-type Mission = 'destroy' | 'return';
-let mission: Mission = 'destroy';
-let wave = 1;
-const blips: Blip[] = [];
-
-function updateMission(): void {
-  const p = ship.root.position;
-  if (mission === 'return' && ship.alive && Math.hypot(p.x - LANDING_PAD.x, p.z - LANDING_PAD.z) < LANDING_PAD.radius) {
-    wave++;
-    mission = 'destroy';
-    enemies.spawnOutposts();
-    hud.show(`MISSION COMPLETE · WAVE ${wave}`, 3);
-    input.vibrate(60);
-  }
-
-  blips.length = 0;
-  if (mission === 'destroy') {
-    for (const e of enemies.enemies) {
-      if (e.alive && e.kind === 'turret') blips.push({ x: e.root.position.x, z: e.root.position.z, kind: 'target' });
-    }
-    hud.setObjective(`DESTROY THE TOWERS · ${enemies.turretsLeft} LEFT`);
-  } else {
-    blips.push({ x: LANDING_PAD.x, z: LANDING_PAD.z, kind: 'home' });
-    hud.setObjective('RETURN TO THE LANDING ZONE');
-  }
-}
-
 // ?debug in the URL exposes game objects for automated tests and console tinkering.
 if (new URLSearchParams(location.search).has('debug')) {
-  Object.assign(window, { __game: { ship, enemies, missiles, pickups } });
+  Object.assign(window, { __game: { ship, enemies, missiles, pickups, get run() { return run; } } });
 }
 
 const rig = new CameraRig(window.innerWidth / window.innerHeight);
 rig.snapTo(ship.root.position);
+
+// ---------- The run (sortie) ----------
+let paused = false;
+const blips: Blip[] = [];
+const run = new Run({
+  ship,
+  enemies,
+  world,
+  arena: new ArenaVisual(scene),
+  ui: new RunUI($('hud')),
+  hud,
+  clearField: () => {
+    bullets.clear();
+    enemyShots.clear();
+    missiles.clear();
+    pickups.clear();
+  },
+  snapCamera: () => rig.snapTo(ship.root.position),
+  setPaused: (p) => (paused = p),
+});
 
 // ---------- Post-processing (HIGH quality) ----------
 const composer = new EffectComposer(
@@ -149,7 +142,10 @@ const input = new Input({
 });
 
 // ---------- Events ----------
+// Ramjet upgrade: each boost damages every enemy it passes through, once.
+const rammed = new Set<object>();
 ship.onBoost = () => {
+  rammed.clear();
   rig.kick(12, 0.6);
   input.vibrate(30);
   effects.boostBurst(ship.root.position);
@@ -182,8 +178,8 @@ ship.onDeath = () => {
   rig.kick(4, 2);
   input.vibrate(200);
   hud.show('SHIP DOWN');
+  run.onDeath();
 };
-ship.onRespawn = () => hud.show('BACK IN THE FIGHT', 1.5);
 pickups.onCollect = (heal) => {
   ship.heal(heal);
   hud.flashHeal();
@@ -192,23 +188,21 @@ pickups.onCollect = (heal) => {
 
 missiles.onExplode = (pos, power) => {
   freeze(0.03 + power * 0.04);
-  enemies.damageAt(pos, missileBlastRadius(power), missileDamage(power));
+  const st = ship.stats;
+  enemies.damageAt(pos, missileBlastRadius(power) * st.missileRadiusMul, missileDamage(power) * st.missileDamageMul);
   rig.kick(0, 0.5 + power * 0.9);
   input.vibrate(25 + Math.round(power * 30));
 };
 enemies.onKill = (kind, pos) => {
+  run.onKill(kind);
   // Sometimes a wreck drops a healing orb that floats up to flying height.
-  if (Math.random() < DROP_CHANCE[kind]) {
+  if (Math.random() < DROP_CHANCE[kind] + ship.stats.dropBonus) {
     enemies.projectToPlane(pos, pickupTarget);
     pickups.drop(pos, pickupTarget);
   }
   freeze(kind === 'turret' ? 0.08 : 0.05);
   rig.kick(0, kind === 'turret' ? 1 : 0.6);
   input.vibrate(30);
-};
-enemies.onAreaCleared = () => {
-  mission = 'return';
-  hud.show('AREA CLEARED', 3);
 };
 
 // ---------- Machine gun ----------
@@ -222,7 +216,7 @@ const cameraPos = new THREE.Vector3();
 function updateGun(dt: number): void {
   gunTimer -= dt;
   if (!ship.isFiring || gunTimer > 0) return;
-  gunTimer += 1 / GUN_RATE;
+  gunTimer += 1 / ship.stats.gunRate;
   if (gunTimer < 0) gunTimer = 0;
 
   ship.getMuzzle(barrel, muzzlePos);
@@ -239,7 +233,12 @@ function updateGun(dt: number): void {
     angle = Math.atan2(-(v.x - muzzlePos.x), -(v.z - muzzlePos.z));
   }
   angle += (Math.random() - 0.5) * GUN_SPREAD * 2;
-  bullets.fire(muzzlePos, bulletDir.set(-Math.sin(angle), 0, -Math.cos(angle)), ship.velocity);
+  // Split Shot adds bullets fanned out to each side.
+  const side = ship.stats.gunSideShots;
+  for (let i = -side; i <= side; i++) {
+    const a = angle + i * SIDE_SHOT_ANGLE;
+    bullets.fire(muzzlePos, bulletDir.set(-Math.sin(a), 0, -Math.cos(a)), ship.stats.gunDamage, ship.velocity);
+  }
 }
 
 // ---------- Resize & fullscreen ----------
@@ -319,8 +318,25 @@ renderer.setAnimationLoop((now: number) => {
     dt = realDt * 0.05;
   }
 
-  ship.update(dt, input, world);
-  updateGun(dt);
+  if (paused) dt = 0; // upgrade screen is open: the world holds still
+
+  if (!paused) {
+    ship.update(dt, input, world);
+    run.update(dt);
+    updateGun(dt);
+  }
+  // Ramjet: damage enemies the ship boosts through.
+  if (ship.isBoosting && ship.stats.ramDamage > 0) {
+    const p = ship.root.position;
+    enemies.forEachNear(p.x, p.z, 3, (e) => {
+      if (rammed.has(e)) return;
+      rammed.add(e);
+      e.damage(ship.stats.ramDamage);
+      effects.spark(e.root.position, '#6ff7ff', 2);
+    });
+  }
+  missiles.radiusMul = ship.stats.missileRadiusMul;
+  pickups.healMul = ship.stats.healMul;
   enemies.update(dt, ship, enemyShots, rig.camera);
   bullets.update(dt, enemies.enemies, (x, z) => world.heightAt(x, z), cameraPos.setFromMatrixPosition(rig.camera.matrixWorld));
   enemyShots.update(dt, ship);
@@ -342,11 +358,14 @@ renderer.setAnimationLoop((now: number) => {
   }
   rig.update(dt, ship.root.position, ship.velocity, aimLead);
 
-  boostBtn.style.setProperty('--cd', String(ship.boostCooldown / BOOST_COOLDOWN));
-  hud.setArmor(ship.armor);
-  hud.setMissiles(ship.missiles, ship.missileRecharge);
-  updateMission();
-  radar.draw(ship.root.position.x, ship.root.position.z, ship.heading, blips, elapsed);
+  boostBtn.style.setProperty('--cd', String(ship.boostCooldown / ship.stats.boostCooldown));
+  hud.setArmor(ship.armor, ship.stats.maxArmor);
+  hud.setMissiles(ship.missiles, ship.missileRecharge, ship.stats.missileMax);
+  hud.setSalvage(run.salvage);
+  hud.setObjective(run.objective());
+  run.blips(blips);
+  const ac = run.arenaCenter;
+  radar.draw(ship.root.position.x, ship.root.position.z, ship.heading, blips, elapsed, { x: ac.x, z: ac.y, r: run.arenaRadius });
   hud.update(dt);
 
   if (quality === 'high') composer.render(realDt);
@@ -371,3 +390,6 @@ renderer.setAnimationLoop((now: number) => {
     }
   }
 });
+
+// Go!
+run.start();

@@ -258,6 +258,18 @@ body {
   }
 }
 
+#salvage {
+  font-family: var(--display);
+  position: absolute;
+  top: calc(34px + env(safe-area-inset-top));
+  left: calc(16px + env(safe-area-inset-left));
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #9ef3ff;
+  text-shadow: 0 1px 2px #000;
+}
+
 #objective {
   font-family: var(--display);
   position: absolute;
@@ -443,4 +455,198 @@ body {
   to {
     box-shadow: 0 0 9px rgba(111, 247, 255, 0.95);
   }
+}
+
+/* ---------- Run overlays: fade, upgrade cards, end-of-run summary ---------- */
+#fade {
+  position: absolute;
+  inset: 0;
+  background: #07040d;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s;
+}
+
+#fade.on {
+  opacity: 1;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 16px;
+  box-sizing: border-box;
+  background: radial-gradient(ellipse at center, rgba(28, 14, 40, 0.88), rgba(7, 4, 13, 0.95));
+  pointer-events: auto;
+  font-family: var(--display);
+  color: var(--gold);
+  text-align: center;
+}
+
+.overlay.visible {
+  display: flex;
+  animation: overlay-in 0.25s ease-out;
+}
+
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+    transform: scale(1.04);
+  }
+}
+
+.overlay h2 {
+  margin: 0;
+  font-size: 20px;
+  letter-spacing: 0.18em;
+  text-shadow: 0 0 12px rgba(242, 196, 109, 0.5);
+}
+
+.overlay .cards {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.overlay .card {
+  width: 170px;
+  min-height: 190px;
+  padding: 14px 12px;
+  border-radius: 10px;
+  border: 2px solid var(--cat);
+  background: linear-gradient(170deg, rgba(60, 24, 52, 0.95), rgba(18, 8, 26, 0.95));
+  box-shadow: 0 0 18px color-mix(in srgb, var(--cat) 35%, transparent), inset 0 0 20px rgba(0, 0, 0, 0.5);
+  color: #f3e9ff;
+  font-family: var(--display);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.overlay .card:active {
+  transform: scale(0.96);
+}
+
+.card .icon {
+  font-size: 30px;
+  color: var(--cat);
+  text-shadow: 0 0 10px var(--cat);
+}
+
+.card .cat {
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  color: var(--cat);
+}
+
+.card .name {
+  font-size: 16px;
+  font-weight: 900;
+  color: #fff4dc;
+}
+
+.card .text {
+  font-family: system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #ddd2ec;
+  flex: 1;
+}
+
+.card .level {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--cat);
+}
+
+#end-screen h1 {
+  margin: 0;
+  font-size: 34px;
+  letter-spacing: 0.16em;
+}
+
+#end-screen h1.lost {
+  color: #ff6b8f;
+  text-shadow: 0 0 14px rgba(255, 60, 100, 0.5);
+}
+
+#end-screen h1.won {
+  text-shadow: 0 0 14px rgba(242, 196, 109, 0.6);
+}
+
+#end-screen .stats {
+  display: flex;
+  gap: 26px;
+}
+
+#end-screen .stats div {
+  display: flex;
+  flex-direction: column;
+}
+
+#end-screen .stats b {
+  font-size: 24px;
+  color: #fff4dc;
+}
+
+#end-screen .stats span {
+  font-size: 9px;
+  letter-spacing: 0.16em;
+}
+
+#end-screen .upgrades {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  max-width: 520px;
+}
+
+#end-screen .upgrades span {
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(242, 196, 109, 0.5);
+}
+
+#end-screen .upgrades em {
+  font-family: system-ui, sans-serif;
+  font-size: 12px;
+  color: #bfb3d0;
+}
+
+#end-screen .total {
+  font-size: 12px;
+  color: #9ef3ff;
+}
+
+#end-screen .total small {
+  font-family: system-ui, sans-serif;
+  color: #8f86a3;
+}
+
+#end-screen .again {
+  font-family: var(--display);
+  font-weight: 900;
+  font-size: 16px;
+  letter-spacing: 0.14em;
+  color: var(--gold);
+  background: rgba(122, 19, 40, 0.85);
+  border: 2px solid var(--gold);
+  border-radius: 999px;
+  padding: 10px 26px;
+  cursor: pointer;
+}
+
+#objective {
+  white-space: pre-line;
 }

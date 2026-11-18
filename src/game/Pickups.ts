@@ -4,7 +4,7 @@ import { glow } from './materials';
 import type { Ship } from './Ship';
 
 const MAX_PICKUPS = 12;
-const HEAL = 25; // armor restored per orb
+const HEAL = 25; // armor restored per orb (times healMul)
 const LIFETIME = 15; // seconds before an uncollected orb fades away
 const RISE_TIME = 0.7; // seconds to float up from the wreck to flying height
 const COLLECT_RADIUS = 3;
@@ -30,6 +30,8 @@ interface Pickup {
  */
 export class Pickups {
   onCollect?: (heal: number) => void;
+  /** Upgrade multiplier on how much each orb heals. */
+  healMul = 1;
   private readonly items: Pickup[] = [];
   private time = 0;
 
@@ -106,7 +108,7 @@ export class Pickups {
           p.active = false;
           p.obj.visible = false;
           this.effects.pickupBurst(o);
-          this.onCollect?.(HEAL);
+          this.onCollect?.(HEAL * this.healMul);
           continue;
         }
       }

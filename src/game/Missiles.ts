@@ -87,6 +87,18 @@ export class MissileSystem {
   /**
    * @param target optional locked enemy: the missile steers to it, wherever it moves.
    */
+  /** Remove missiles in flight (between arenas). */
+  clear(): void {
+    for (const m of this.missiles) {
+      m.active = false;
+      m.obj.visible = false;
+      m.target = null;
+    }
+  }
+
+  /** Upgrade multiplier on blast size (affects the explosion effect too). */
+  radiusMul = 1;
+
   fire(origin: THREE.Vector3, heading: number, charge: number, target: Hittable | null = null): void {
     const m = this.missiles.find((x) => !x.active);
     if (!m) return;
@@ -195,7 +207,7 @@ export class MissileSystem {
     m.obj.visible = false;
     m.target = null;
     const pos = this.tmp.copy(at);
-    this.effects.explosion(pos, missileBlastRadius(m.power), this.world.heightAt(pos.x, pos.z));
+    this.effects.explosion(pos, missileBlastRadius(m.power) * this.radiusMul, this.world.heightAt(pos.x, pos.z));
     this.onExplode?.(pos, m.power);
   }
 
