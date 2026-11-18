@@ -8,17 +8,23 @@ import type { World } from './World';
 const MAX_SPEED = 17; // units per second at full stick
 const ACCEL = 3.2; // how quickly the ship reaches the stick's speed (higher = snappier)
 const TURN_RATE = 6.5; // radians/second when turning to face the stick direction
-const TURN_RATE_FIRING = 1.3; // much slower turning while GUN is held, so you can strafe
+const TURN_RATE_FIRING = 1.3; // slow turning while firing without aiming, so you can strafe
+const AIM_TURN_RATE = 12; // the ship snaps quickly toward where you're aiming
 const BOOST_SPEED = 44;
 const BOOST_TIME = 0.28; // seconds of dash
 export const BOOST_COOLDOWN = 1.4;
-const HOVER_HEIGHT = 6.5;
+const BOOST_INVULNERABLE = 0.35; // dodge through enemy shots while dashing
+export const HOVER_HEIGHT = 6.5;
 
-// ---- Missile charge (hold MSL, like drawing a bow) ----
-const CHARGE_TIME = 0.75; // seconds to reach full power
-const MIN_CHARGE = 0.2; // a quick tap still fires a short-range missile
-const AIM_TURN_RATE = 12; // the ship snaps quickly toward where you're aiming
-const CHARGING_SPEED = 0.5; // fly at half speed while charging
+// ---- Weapons ----
+const GUN_SPEED = 0.85; // fly slightly slower while shooting
+const CHARGE_TIME = 0.75; // seconds for a missile to reach full power
+const CHARGING_SPEED = 0.5; // fly at half speed while charging a missile
+
+// ---- Armor ----
+export const MAX_ARMOR = 100;
+const RESPAWN_TIME = 2.5;
+const RESPAWN_INVULNERABLE = 2;
 
 /**
  * The player's space helicopter. Built from simple shapes for now; it can be
@@ -31,14 +37,26 @@ export class Ship {
   readonly velocity = new THREE.Vector2(); // (x, z) world units/second
   heading = 0;
   boostCooldown = 0;
+
+  readonly radius = 1.7;
+  armor = MAX_ARMOR;
+  alive = true;
+  invulnerable = 0;
+
+  /** True while GUN is held and the ship is alive. */
+  isFiring = false;
   /** Missile charge 0..1 while MSL is held. */
   charge = 0;
   isCharging = false;
   /** Direction the missile will fire (same convention as `heading`). */
   aimHeading = 0;
+
   onBoost?: () => void;
   onFullCharge?: () => void;
   onMissile?: (charge: number, heading: number) => void;
+  onHit?: (damage: number) => void;
+  onDeath?: () => void;
+  onRespawn?: () => void;
 
   private readonly tilt = new THREE.Group(); // pitch + bank
   private readonly rotor = new THREE.Group();
@@ -46,11 +64,15 @@ export class Ship {
   private readonly engineMat = glow('#6ff7ff');
   private readonly engines: THREE.Mesh[] = [];
   private readonly muzzles: THREE.Mesh[] = [];
+  private readonly flashMats: THREE.MeshToonMaterial[] = [];
   private readonly shadow: THREE.Mesh;
   private pitch = 0;
   private roll = 0;
   private time = 0;
   private boostTimer = 0;
+  private hitFlash = 0;
+  private respawnTimer = 0;
+  private muzzleFlash = 0;
 
   constructor(scene: THREE.Scene) {
     this.root.add(this.tilt);
@@ -64,14 +86,52 @@ export class Ship {
     return this.boostTimer > 0;
   }
 
+  /** World position of gun barrel 0 or 1. */
+  getMuzzle(index: number, out: THREE.Vector3): THREE.Vector3 {
+    return this.muzzles[index].getWorldPosition(out);
+  }
+
+  /** Called by the gun each time a bullet leaves a barrel. */
+  flashMuzzle(): void {
+    this.muzzleFlash = 0.05;
+  }
+
+  damage(amount: number): void {
+    if (!this.alive || this.invulnerable > 0) return;
+    this.armor = Math.max(0, this.armor - amount);
+    this.hitFlash = 0.18;
+    this.onHit?.(amount);
+    if (this.armor <= 0) {
+      this.alive = false;
+      this.isFiring = false;
+      this.isCharging = false;
+      this.charge = 0;
+      this.root.visible = false;
+      this.shadow.visible = false;
+      this.velocity.set(0, 0);
+      this.respawnTimer = RESPAWN_TIME;
+      this.onDeath?.();
+    }
+  }
+
   update(dt: number, input: Input, world: World): void {
     this.time += dt;
+    this.invulnerable = Math.max(0, this.invulnerable - dt);
+
+    if (!this.alive) {
+      // Drain button events so nothing fires the instant we respawn.
+      input.consumePress('missile');
+      input.consumePress('boost');
+      this.respawnTimer -= dt;
+      if (this.respawnTimer <= 0) this.respawn(world);
+      return;
+    }
+
     const move = input.getMove();
     // Screen up = world -Z, screen right = world +X (camera looks from the south).
     const dirX = move.x;
     const dirZ = -move.y;
     const mag = Math.hypot(dirX, dirZ);
-    const firing = input.isHeld('gun');
 
     // --- Boost: a short dash toward the stick (or straight ahead if centered) ---
     this.boostCooldown = Math.max(0, this.boostCooldown - dt);
@@ -85,20 +145,21 @@ export class Ship {
       this.velocity.set(bx * BOOST_SPEED, bz * BOOST_SPEED);
       this.boostTimer = BOOST_TIME;
       this.boostCooldown = BOOST_COOLDOWN;
+      this.invulnerable = Math.max(this.invulnerable, BOOST_INVULNERABLE);
       this.onBoost?.();
     }
 
     // --- Missile: hold to charge, drag from the button to aim, release to fire ---
     if (input.consumePress('missile') && !this.isCharging) {
       this.isCharging = true;
-      this.charge = MIN_CHARGE;
+      this.charge = 0;
       this.aimHeading = this.heading;
     }
     if (this.isCharging) {
       const before = this.charge;
       this.charge = Math.min(1, this.charge + dt / CHARGE_TIME);
       if (before < 1 && this.charge >= 1) this.onFullCharge?.();
-      const aim = input.getAim();
+      const aim = input.getAim('missile');
       if (aim.x !== 0 || aim.y !== 0) this.aimHeading = Math.atan2(-aim.x, aim.y);
     }
     if (input.consumeRelease('missile') && this.isCharging) {
@@ -106,9 +167,14 @@ export class Ship {
       this.isCharging = false;
       this.charge = 0;
     }
-    const speedScale = this.isCharging ? CHARGING_SPEED : 1;
+
+    // --- Gun: hold to fire; drag from the button to aim (twin-stick) ---
+    this.isFiring = input.isHeld('gun');
+    const gunAim = input.getAim('gun');
+    const gunAiming = this.isFiring && (gunAim.x !== 0 || gunAim.y !== 0);
 
     // --- Velocity: ease toward where the stick is pointing (gives helicopter momentum) ---
+    const speedScale = this.isCharging ? CHARGING_SPEED : this.isFiring ? GUN_SPEED : 1;
     if (this.boostTimer > 0) {
       this.boostTimer -= dt;
       this.velocity.multiplyScalar(Math.exp(-1.5 * dt));
@@ -118,13 +184,14 @@ export class Ship {
       this.velocity.y += (dirZ * MAX_SPEED * speedScale - this.velocity.y) * k;
     }
 
-    // --- Heading: face the missile aim while charging, otherwise face the stick ---
-    // (turning is slow while GUN is held so you can strafe)
+    // --- Heading: missile aim > gun aim > stick direction ---
     if (this.isCharging) {
       this.heading = approachAngle(this.heading, this.aimHeading, AIM_TURN_RATE * dt);
+    } else if (gunAiming) {
+      this.heading = approachAngle(this.heading, Math.atan2(-gunAim.x, gunAim.y), AIM_TURN_RATE * dt);
     } else if (mag > 0.15) {
       const target = Math.atan2(-dirX, -dirZ);
-      this.heading = approachAngle(this.heading, target, (firing ? TURN_RATE_FIRING : TURN_RATE) * dt);
+      this.heading = approachAngle(this.heading, target, (this.isFiring ? TURN_RATE_FIRING : TURN_RATE) * dt);
     }
 
     // --- Position, kept inside the map ---
@@ -153,7 +220,23 @@ export class Ship {
     this.roll = damp(this.roll, clamp(-sideSpeed * 0.03, -0.6, 0.6), 6, dt);
     this.tilt.rotation.set(this.pitch, 0, this.roll);
 
-    // --- Visual effects ---
+    this.updateVisuals(dt, ground);
+  }
+
+  private respawn(world: World): void {
+    this.alive = true;
+    this.armor = MAX_ARMOR;
+    this.invulnerable = RESPAWN_INVULNERABLE;
+    this.velocity.set(0, 0);
+    this.heading = 0;
+    this.root.position.set(0, world.heightAt(0, 0) + HOVER_HEIGHT, 0);
+    this.root.visible = true;
+    this.shadow.visible = true;
+    this.onRespawn?.();
+  }
+
+  private updateVisuals(dt: number, ground: number): void {
+    const p = this.root.position;
     const speed = this.velocity.length();
     this.rotor.rotation.y += dt * (16 + speed * 0.5);
     (this.rotorRing.material as THREE.MeshBasicMaterial).opacity = 0.25 + Math.sin(this.time * 6) * 0.08;
@@ -162,8 +245,14 @@ export class Ship {
     this.engineMat.color.setRGB(0.44 + boostGlow * 0.56, 0.97, 1);
     for (const e of this.engines) e.scale.setScalar(damp(e.scale.x, 1 + boostGlow * 0.9, 12, dt));
 
-    const flash = firing && Math.floor(this.time * 28) % 2 === 0;
-    for (const m of this.muzzles) m.visible = flash;
+    this.muzzleFlash -= dt;
+    for (const m of this.muzzles) m.visible = this.muzzleFlash > 0;
+
+    // Red flash when hit; blink while invulnerable after respawning.
+    this.hitFlash = Math.max(0, this.hitFlash - dt);
+    const f = this.hitFlash / 0.18;
+    for (const m of this.flashMats) m.emissive.setRGB(f * 0.9, f * 0.1, f * 0.15);
+    this.tilt.visible = this.invulnerable > 0.4 ? Math.floor(this.time * 14) % 2 === 0 : true;
 
     this.shadow.position.set(p.x, ground + 0.15, p.z);
     this.shadow.rotation.y = this.heading;
@@ -173,6 +262,7 @@ export class Ship {
     const hull = toon('#efe2c4');
     const accent = toon('#b8233a');
     const dark = toon('#3a2a3f');
+    this.flashMats.push(hull, accent, dark);
     const t = this.tilt;
 
     // Body

@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import { damp } from './math';
 
-const BASE_FOV = 40;
+const BASE_FOV = 45;
 const LOOK_AHEAD = 0.45; // seconds of velocity to lead the camera by
-const CAM_HEIGHT = 40; // camera height above the ship's focus point
-const CAM_BACK = 28; // and how far behind (south of) it
+const CAM_HEIGHT = 44; // camera height above the ship's focus point
+const CAM_BACK = 30; // and how far behind (south of) it
 
 /**
  * Angled top-down camera (a 3/4 view) that follows the ship, leads slightly in
