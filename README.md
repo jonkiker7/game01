@@ -50,12 +50,15 @@ On iPhone, use Share → **Add to Home Screen** for full-screen play.
 The game starts on **Halcyon Station**, a huge retro-futuristic station orbiting the jungle planet.
 You see it from an isometric angle (like Diablo or the old Fallouts): rectangular rooms joined by
 corridors, and any wall between the camera and your pilot drops down so you can always see
-yourself. Many doors to the rest of the station are sealed (for now).
+yourself. Doors slide open as you walk up to them. Some rooms are down flights of stairs (the
+Armory, the Hangar and your quarters), and railed openings in the floor look down shafts into the
+depths of the station. Many doors to the rest of the station are sealed (for now).
 
 You wake up in your **Pilot Quarters** (south-west). Walk with the left stick; the action button
 says **TALK** near someone and **LAUNCH** at your ship. The room's name shows as you walk in.
 
-- **Concourse:** the hub in the middle, with the **information desk** run by **BOLT**, a robot.
+- **Concourse:** the grand hub in the middle (twice the ceiling height, columns, a balcony and a
+  light well down to the reactor), with the **information desk** run by **BOLT**, a robot.
   Ask BOLT where anyone is: picking a destination lights a green arrow at your feet that leads you
   through the doorways, and a beacon over the destination.
 - **Armory** (west), **Boutique** (east), **Hangar Bay** (north, with your ship on the pad).
@@ -157,7 +160,7 @@ npm run preview   # serve the production build
 - `src/game/Enemies.ts`: turret towers, drones, and spawning (enemies only fire while on screen)
 - `src/game/Effects.ts`: pooled smoke, explosions, shockwaves, sparks, embers, debris, and floating motes
 - `src/game/Hud.ts`: armor bar, salvage, objective, missile pips, messages, and damage/heal flashes
-- `src/base/`: home base: `HomeBase.ts` (scene, crew, launch cutscene), `Layout.ts` (the floor plan: rooms, corridors, doors, key spots), `Station.ts` (builds the rooms, cutaway walls, decor and the view), `Robot.ts` (BOLT), `Pilot.ts` (the on-foot character), `BaseUI.ts` (dialogue and shops), `Save.ts` (progress, perks, outfits, ships)
+- `src/base/`: home base: `HomeBase.ts` (scene, crew, launch cutscene), `Layout.ts` (the floor plan: rooms, corridors, levels, stairs, floor holes, doors, key spots), `Station.ts` (builds the rooms, cutaway walls, decor and the view), `Robot.ts` (BOLT), `Pilot.ts` (the on-foot character), `BaseUI.ts` (dialogue and shops), `Save.ts` (progress, perks, outfits, ships)
 - `src/game/Mortars.ts`: tower plasma mortars with landing warnings
 - `src/game/Combat.ts`: every hit goes through here so elemental upgrades can react
 - `src/game/run/`: the roguelite run: `Run.ts` (sectors and flow), `Upgrades.ts` (stats and upgrade pool), `Arena.ts` (wall, reward orb, gates), `RunUI.ts` (upgrade cards and summary)

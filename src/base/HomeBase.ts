@@ -6,11 +6,11 @@ import { buildShipDesign, SHIP_DESIGNS, type ShipDesignId, type ShipParts } from
 import { CONVERSATIONS, IDLE, type Line, type StoryState } from '../content/dialogue';
 import type { BaseUI, ShopRow } from './BaseUI';
 import type { ConversationUI } from './Conversation';
-import { CORRIDORS, DESTINATIONS, inRect, type Rect, ROOMS, roomAt, SPOTS, WALKABLE } from './Layout';
+import { CORRIDORS, DESTINATIONS, heightAt, HOLES, inRect, type Rect, ROOMS, roomAt, SPOTS, WALKABLE } from './Layout';
 import { Pilot } from './Pilot';
 import { Robot } from './Robot';
 import { HELMETS, PERKS, type SaveData, SHIP_PRICES, SUITS, writeSave } from './Save';
-import { buildStation, type Collider, STATION, type WallSegment } from './Station';
+import { buildStation, type Collider, type SlidingDoor, STATION, type WallSegment } from './Station';
 
 const WALK_SPEED = 11;
 const TALK_RANGE = 7.5; // generous, so you can talk across a counter
@@ -22,8 +22,9 @@ const CAM_OFFSET = new THREE.Vector3(13, 24, 13);
 const CAM_RIGHT = new THREE.Vector2(1, -1).normalize();
 const CAM_FORWARD = new THREE.Vector2(-1, -1).normalize();
 
-const PAD = new THREE.Vector3(SPOTS.pad.x, 0, SPOTS.pad.z);
-const BAY_EXIT = new THREE.Vector3(SPOTS.bayExit.x, 30, SPOTS.bayExit.z);
+const PAD = new THREE.Vector3(SPOTS.pad.x, heightAt(SPOTS.pad.x, SPOTS.pad.z), SPOTS.pad.z);
+const BAY_EXIT = new THREE.Vector3(SPOTS.bayExit.x, PAD.y + 30, SPOTS.bayExit.z);
+const DOOR_RANGE = 6; // doors slide open when you're this close
 const SHIP_YAW = 0.45; // parked nose-north, angled toward the camera a little
 
 export type Spawn = 'wake' | 'landed';
@@ -51,12 +52,12 @@ interface Waypoint {
 
 const DOORS: Waypoint[] = [
   { x: 0, z: -22, areas: ['hangar', 'c0'] },
-  { x: 0, z: -12, areas: ['concourse', 'c0'] },
-  { x: -14, z: 0, areas: ['concourse', 'c1'] },
+  { x: 0, z: -14, areas: ['concourse', 'c0'] },
+  { x: -18, z: 0, areas: ['concourse', 'c1'] },
   { x: -26, z: 0, areas: ['armory', 'c1'] },
-  { x: 14, z: 0, areas: ['concourse', 'c2'] },
+  { x: 18, z: 0, areas: ['concourse', 'c2'] },
   { x: 26, z: 0, areas: ['boutique', 'c2'] },
-  { x: 0, z: 12, areas: ['concourse', 'c3'] },
+  { x: 0, z: 16, areas: ['concourse', 'c3'] },
   { x: 0, z: 23, areas: ['c3', 'c4', 'c5'] },
   { x: -18, z: 23, areas: ['c4', 'quarters'] },
 ];
@@ -95,6 +96,7 @@ const FLOOR: Rect[] = (() => {
 })();
 
 function onFloor(x: number, z: number): boolean {
+  if (HOLES.some((h) => inRect(h, x, z, -BODY - 0.3))) return false; // stay behind the railings
   return FLOOR.some((r) => x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1);
 }
 
@@ -112,6 +114,8 @@ export class HomeBase {
   private readonly npcs: Npc[] = [];
   private readonly colliders: Collider[];
   private readonly walls: WallSegment[];
+  private readonly doors: SlidingDoor[];
+  private readonly spinners: THREE.Object3D[];
   private readonly holo: THREE.Object3D;
   private readonly planets: THREE.Object3D[];
   private readonly robot = new Robot();
@@ -148,6 +152,8 @@ export class HomeBase {
     const built = buildStation(this.scene);
     this.colliders = built.colliders;
     this.walls = built.walls;
+    this.doors = built.doors;
+    this.spinners = built.spinners;
     this.holo = built.holo;
     this.planets = built.planets;
 
@@ -172,10 +178,11 @@ export class HomeBase {
     this.pilot.root.visible = true;
     this.pilot.root.scale.setScalar(1);
     const at = SPOTS[spawn];
-    this.pilot.root.position.set(at.x, 0, at.z);
+    this.pilot.root.position.set(at.x, heightAt(at.x, at.z), at.z);
     this.pilot.root.rotation.y = spawn === 'landed' ? Math.PI : -Math.PI / 2; // toward the door
     this.parkShip();
     this.focus.copy(this.pilot.root.position);
+    this.focus.y += 1.6;
     this.placeCamera(1);
     this.room = null; // so the room name shows on arrival
     this.setGuide(null);
@@ -184,6 +191,7 @@ export class HomeBase {
     this.setShip(this.save.ship);
     this.updateMarkers();
     for (const w of this.walls) w.cut = -1; // snap the cutaway walls this frame
+    for (const d of this.doors) d.open = 0;
   }
 
   /** Is a menu or conversation open? (Then the pilot doesn't walk.) */
@@ -207,6 +215,7 @@ export class HomeBase {
     this.time += dt;
     this.holo.rotation.y += dt * 0.6;
     for (const p of this.planets) p.rotation.y += dt * 0.008;
+    for (const sp of this.spinners) sp.rotation.z += dt * 0.5;
     if (!this.convo.active) this.talkingTo = null;
     for (const n of this.npcs) {
       n.animate(dt);
@@ -217,6 +226,7 @@ export class HomeBase {
     if (this.launching >= 0) {
       this.updateLaunch(dt);
       this.updateWalls(dt, this.focus);
+      this.updateDoors(dt);
       return;
     }
 
@@ -234,6 +244,7 @@ export class HomeBase {
         this.pilot.root.rotation.y = approachAngle(this.pilot.root.rotation.y, Math.atan2(-dx, -dz), 12 * dt);
       }
     }
+    p.y = heightAt(p.x, p.z); // up and down the stairs
     this.pilot.animate(dt, speed);
 
     // Announce the room when you walk into one.
@@ -262,9 +273,24 @@ export class HomeBase {
     // Camera follows the pilot.
     this.focus.x = damp(this.focus.x, p.x, 5, dt);
     this.focus.z = damp(this.focus.z, p.z, 5, dt);
-    this.focus.y = 1.6;
+    this.focus.y = damp(this.focus.y, p.y + 1.6, 6, dt);
     this.placeCamera(1);
     this.updateWalls(dt, p);
+    this.updateDoors(dt);
+  }
+
+  /** Sliding doors part when the pilot walks up to them, and close behind. */
+  private updateDoors(dt: number): void {
+    const p = this.pilot.root.position;
+    const near = this.pilot.root.visible;
+    for (const d of this.doors) {
+      const want = near && Math.hypot(p.x - d.x, p.z - d.z) < DOOR_RANGE ? 1 : 0;
+      d.open = damp(d.open, want, want ? 9 : 5, dt);
+      const slide = d.open * (d.half - 0.15);
+      d.left.position.x = -slide;
+      d.right.position.x = slide;
+      d.light.color.set(d.open > 0.5 ? '#7dff9a' : STATION.red).multiplyScalar(1.6);
+    }
   }
 
   private placeCamera(back: number): void {
@@ -277,8 +303,22 @@ export class HomeBase {
     if (onFloor(p.x + dx, p.z + dz)) {
       p.x += dx;
       p.z += dz;
-    } else if (onFloor(p.x + dx, p.z)) p.x += dx;
-    else if (onFloor(p.x, p.z + dz)) p.z += dz;
+    } else if (Math.abs(dx) > 1e-4 && onFloor(p.x + dx, p.z)) p.x += dx;
+    else if (Math.abs(dz) > 1e-4 && onFloor(p.x, p.z + dz)) p.z += dz;
+    else {
+      // Caught on a corner (e.g. a doorway's edge): try veering a little either way.
+      for (const turn of [0.5, -0.5, 1, -1]) {
+        const c = Math.cos(turn);
+        const s = Math.sin(turn);
+        const nx = (dx * c - dz * s) * 0.8;
+        const nz = (dx * s + dz * c) * 0.8;
+        if (onFloor(p.x + nx, p.z + nz)) {
+          p.x += nx;
+          p.z += nz;
+          break;
+        }
+      }
+    }
     for (const c of this.colliders) {
       const ox = p.x - c.x;
       const oz = p.z - c.z;
@@ -431,7 +471,7 @@ export class HomeBase {
   private setGuide(id: string | null): void {
     this.guide = DESTINATIONS.find((d) => d.id === id) ?? null;
     this.arrow.visible = this.beacon.visible = !!this.guide;
-    if (this.guide) this.beacon.position.set(this.guide.x, 0, this.guide.z);
+    if (this.guide) this.beacon.position.set(this.guide.x, heightAt(this.guide.x, this.guide.z), this.guide.z);
     this.ui.setGuide(this.guide ? `▶ GUIDING TO ${this.guide.label.toUpperCase()}` : null);
   }
 
@@ -444,7 +484,7 @@ export class HomeBase {
       return;
     }
     const next = this.nextStep(p.x, p.z, g);
-    this.arrow.position.set(p.x, 0, p.z);
+    this.arrow.position.set(p.x, p.y, p.z);
     this.arrow.rotation.y = approachAngle(this.arrow.rotation.y, Math.atan2(-(next.x - p.x), -(next.z - p.z)), 10 * dt);
     for (const c of this.arrow.children) {
       const k = (this.time * 2 - c.userData.i * 0.33) % 1;
@@ -499,7 +539,7 @@ export class HomeBase {
   // ---------------------------------------------------------------- launch cutscene
 
   private parkShip(): void {
-    this.shipHolder.position.set(PAD.x, 1.8, PAD.z);
+    this.shipHolder.position.set(PAD.x, PAD.y + 1.8, PAD.z);
     this.shipHolder.rotation.set(0, SHIP_YAW, 0);
   }
 
@@ -518,7 +558,7 @@ export class HomeBase {
   private updateLaunch(dt: number): void {
     const t = (this.launching += dt);
     const pilot = this.pilot.root;
-    const boarding = new THREE.Vector3(PAD.x + 4, 0, PAD.z + 3.5);
+    const boarding = new THREE.Vector3(PAD.x + 4, PAD.y, PAD.z + 3.5);
     if (t < 1) {
       const k = t;
       pilot.position.lerpVectors(this.launchFrom, boarding, k * (2 - k));
@@ -535,7 +575,7 @@ export class HomeBase {
     const ship = this.shipHolder;
     if (t >= 1.3 && t < 2.6) {
       const k = (t - 1.3) / 1.3;
-      ship.position.y = 1.8 + k * k * 5;
+      ship.position.y = PAD.y + 1.8 + k * k * 5;
       ship.rotation.z = Math.sin(t * 9) * 0.03;
     } else if (t >= 2.6) {
       const k = Math.min(1, (t - 2.6) / 2);
@@ -543,7 +583,7 @@ export class HomeBase {
       ship.rotation.y = approachAngle(ship.rotation.y, Math.atan2(-dir.x, -dir.z), 3 * dt);
       ship.rotation.x = -0.25 * k;
       const dist = 70 * k * k * k; // accelerate
-      ship.position.set(PAD.x + dir.x * dist, 6.8 + dir.y * dist * 0.4, PAD.z + dir.z * dist);
+      ship.position.set(PAD.x + dir.x * dist, PAD.y + 6.8 + dir.y * dist * 0.4, PAD.z + dir.z * dist);
     }
     this.engineMat.color.set('#6ff7ff').multiplyScalar(1.8 * (t > 1.3 ? 1.6 : 1));
 
@@ -565,7 +605,7 @@ export class HomeBase {
       markerY: 5.9,
       model: this.robot,
       animate: (dt) => this.robot.animate(dt, this.talkingTo === bot),
-      pos: new THREE.Vector3(SPOTS.bot.x, 0, SPOTS.bot.z),
+      pos: new THREE.Vector3(SPOTS.bot.x, heightAt(SPOTS.bot.x, SPOTS.bot.z), SPOTS.bot.z),
     };
     const crew = (suit: string, helmet: string) => {
       const p = new Pilot(suit, helmet);
@@ -576,7 +616,7 @@ export class HomeBase {
       marker: newMarker(),
       markerY: 4.1,
       ...crew('crimson', 'tactical'),
-      pos: new THREE.Vector3(SPOTS.rook.x, 0, SPOTS.rook.z),
+      pos: new THREE.Vector3(SPOTS.rook.x, heightAt(SPOTS.rook.x, SPOTS.rook.z), SPOTS.rook.z),
       shopLabel: 'UPGRADES',
       shop: () =>
         this.ui.openShop('QUARTERMASTER · PERMANENT UPGRADES', () =>
@@ -605,7 +645,7 @@ export class HomeBase {
       marker: newMarker(),
       markerY: 4.1,
       ...crew('midnight', 'fishbowl'),
-      pos: new THREE.Vector3(SPOTS.juno.x, 0, SPOTS.juno.z),
+      pos: new THREE.Vector3(SPOTS.juno.x, heightAt(SPOTS.juno.x, SPOTS.juno.z), SPOTS.juno.z),
       shopLabel: 'WARDROBE',
       shop: () =>
         this.ui.openShop('OUTFITTER · SUITS & HELMETS', () => [
@@ -618,7 +658,7 @@ export class HomeBase {
       marker: newMarker(),
       markerY: 4.1,
       ...crew('arctic', 'dome'),
-      pos: new THREE.Vector3(SPOTS.pip.x, 0, SPOTS.pip.z),
+      pos: new THREE.Vector3(SPOTS.pip.x, heightAt(SPOTS.pip.x, SPOTS.pip.z), SPOTS.pip.z),
       shopLabel: 'HANGAR',
       shop: () =>
         this.ui.openShop('MECHANIC · SHIPS', () =>
@@ -649,6 +689,7 @@ export class HomeBase {
     for (const n of [bot, rook, juno, pip]) {
       n.model.root.position.copy(n.pos);
       n.model.root.rotation.y = Math.PI; // face south, toward whoever walks up
+      n.markerY += n.pos.y;
       n.marker.position.set(n.pos.x, n.markerY, n.pos.z);
       this.scene.add(n.model.root, n.marker);
       if (n.id !== 'bot') this.colliders.push({ x: n.pos.x, z: n.pos.z, r: 1.1 });

@@ -86,7 +86,7 @@ export class Robot {
   animate(dt: number, talking = false): void {
     this.time += dt;
     const t = this.time;
-    this.inner.position.y = 0.35 + Math.sin(t * 2.2) * 0.15;
+    this.inner.position.y = 0.75 + Math.sin(t * 2.2) * 0.15;
     this.head.rotation.z = Math.sin(t * 0.9) * 0.08;
     this.head.rotation.y = Math.sin(t * 0.5) * 0.25;
     this.arms[0].rotation.x = Math.sin(t * (talking ? 6 : 1.5)) * (talking ? 0.6 : 0.15);

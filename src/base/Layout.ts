@@ -36,6 +36,12 @@ export interface Room {
   gaps: { side: Side; a: number; b: number }[];
   /** Window spans (low sill + glass) instead of solid wall. */
   windows?: { side: Side; a: number; b: number }[];
+  /** Floor height (rooms down or up stairs). */
+  level: number;
+  /** Wall height (the concourse is taller and grander). */
+  height: number;
+  /** Openings in the floor, looking down into the depths of the station. */
+  holes?: Rect[];
 }
 
 export interface Corridor {
@@ -44,6 +50,10 @@ export interface Corridor {
   axis: 'ns' | 'ew';
   /** Openings in a corridor's side walls (for branches). */
   gaps?: { side: Side; a: number; b: number }[];
+  /** Floor height at the start (x0 / z0 end) and the end (x1 / z1 end). Default flat at 0. */
+  levels?: [number, number];
+  /** Where the stairs are along the corridor (between them the floor steps between levels). */
+  stairs?: [number, number];
 }
 
 export interface SealedDoor {
@@ -59,8 +69,10 @@ export const ROOMS: Room[] = [
     id: 'concourse',
     name: 'CONCOURSE',
     subtitle: 'Halcyon Station · Deck 3',
-    rect: { x0: -14, z0: -12, x1: 14, z1: 12 },
+    rect: { x0: -18, z0: -14, x1: 18, z1: 16 },
     floor: '#d6ccb8',
+    level: 0,
+    height: 11,
     gaps: [
       { side: 'n', a: -4, b: 4 },
       { side: 's', a: -4, b: 4 },
@@ -68,9 +80,10 @@ export const ROOMS: Room[] = [
       { side: 'e', a: -3, b: 3 },
     ],
     windows: [
-      { side: 'n', a: -12, b: -6 },
-      { side: 'n', a: 6, b: 12 },
+      { side: 'n', a: -16, b: -8 },
+      { side: 'n', a: 8, b: 16 },
     ],
+    holes: [{ x0: -5, z0: 4, x1: 5, z1: 10 }], // the light well
   },
   {
     id: 'hangar',
@@ -78,10 +91,13 @@ export const ROOMS: Room[] = [
     subtitle: "Pip's workshop · Launch deck",
     rect: { x0: -20, z0: -54, x1: 22, z1: -22 },
     floor: '#bfb6a6',
+    level: -4,
+    height: 8,
     gaps: [
       { side: 's', a: -4, b: 4 },
       { side: 'n', a: -9, b: 13 }, // the bay door to space
     ],
+    holes: [{ x0: 13, z0: -51, x1: 20, z1: -44 }], // cargo lift shaft
   },
   {
     id: 'armory',
@@ -89,6 +105,8 @@ export const ROOMS: Room[] = [
     subtitle: "Rook's supply depot",
     rect: { x0: -46, z0: -10, x1: -26, z1: 10 },
     floor: '#c9bda6',
+    level: -3,
+    height: 5.2,
     gaps: [{ side: 'e', a: -3, b: 3 }],
   },
   {
@@ -97,6 +115,8 @@ export const ROOMS: Room[] = [
     subtitle: "Juno's wardrobe",
     rect: { x0: 26, z0: -10, x1: 46, z1: 10 },
     floor: '#d9c6cf',
+    level: 0,
+    height: 5.2,
     gaps: [{ side: 'w', a: -3, b: 3 }],
     windows: [{ side: 'e', a: -6, b: 6 }],
   },
@@ -106,24 +126,26 @@ export const ROOMS: Room[] = [
     subtitle: 'Your bunk',
     rect: { x0: -34, z0: 15, x1: -18, z1: 31 },
     floor: '#cbbfae',
+    level: -2,
+    height: 5.2,
     gaps: [{ side: 'e', a: 20, b: 26 }],
     windows: [{ side: 'n', a: -30, b: -24 }],
   },
 ];
 
 export const CORRIDORS: Corridor[] = [
-  { rect: { x0: -4, z0: -22, x1: 4, z1: -12 }, axis: 'ns' }, // concourse ↔ hangar
-  { rect: { x0: -26, z0: -3, x1: -14, z1: 3 }, axis: 'ew' }, // concourse ↔ armory
-  { rect: { x0: 14, z0: -3, x1: 26, z1: 3 }, axis: 'ew' }, // concourse ↔ boutique
+  { rect: { x0: -4, z0: -22, x1: 4, z1: -14 }, axis: 'ns', levels: [-4, 0], stairs: [-20, -16] }, // concourse ↔ hangar
+  { rect: { x0: -26, z0: -3, x1: -18, z1: 3 }, axis: 'ew', levels: [-3, 0], stairs: [-24.5, -19.5] }, // concourse ↔ armory
+  { rect: { x0: 18, z0: -3, x1: 26, z1: 3 }, axis: 'ew' }, // concourse ↔ boutique
   {
-    rect: { x0: -4, z0: 12, x1: 4, z1: 40 },
+    rect: { x0: -4, z0: 16, x1: 4, z1: 40 },
     axis: 'ns',
     gaps: [
       { side: 'w', a: 20, b: 26 },
       { side: 'e', a: 20, b: 26 },
     ],
   }, // south hall
-  { rect: { x0: -18, z0: 20, x1: -4, z1: 26 }, axis: 'ew' }, // south hall ↔ quarters
+  { rect: { x0: -18, z0: 20, x1: -4, z1: 26 }, axis: 'ew', levels: [-2, 0], stairs: [-14, -9] }, // south hall ↔ quarters
   { rect: { x0: 4, z0: 20, x1: 20, z1: 26 }, axis: 'ew' }, // south hall → med bay (sealed)
 ];
 
@@ -135,11 +157,11 @@ export const SEALED: SealedDoor[] = [
 
 /** Signs over doorways (position just inside the doorway, label). */
 export const SIGNS: { x: number; z: number; text: string }[] = [
-  { x: 0, z: -20, text: '▲ HANGAR BAY' },
-  { x: -20, z: -1.5, text: '◀ ARMORY' },
+  { x: 0, z: -15.5, text: '▲ HANGAR BAY' },
+  { x: -19.5, z: -1.5, text: '◀ ARMORY' },
   { x: 20, z: -1.5, text: 'BOUTIQUE ▶' },
-  { x: 0, z: 16, text: '▼ QUARTERS · DECK 4' },
-  { x: -12, z: 21.5, text: '◀ PILOT QUARTERS' },
+  { x: 0, z: 19, text: '▼ QUARTERS · DECK 4' },
+  { x: -7, z: 21.5, text: '◀ PILOT QUARTERS' },
 ];
 
 // Key spots.
@@ -152,7 +174,7 @@ export const SPOTS = {
   pad: { x: 2, z: -40 },
   /** The ship leaves through the bay door toward here. */
   bayExit: { x: 2, z: -120 },
-  bot: { x: 0, z: -3.5 },
+  bot: { x: 0, z: -5 },
   rook: { x: -36, z: -5 },
   juno: { x: 37, z: -4 },
   pip: { x: -13, z: -33 },
@@ -172,6 +194,28 @@ export function inRect(r: Rect, x: number, z: number, margin = 0): boolean {
 
 /** All walkable rectangles (rooms and corridors). */
 export const WALKABLE: Rect[] = [...ROOMS.map((r) => r.rect), ...CORRIDORS.map((c) => c.rect)];
+
+/** Every hole in the floor. */
+export const HOLES: Rect[] = ROOMS.flatMap((r) => r.holes ?? []);
+
+/** Floor height of a corridor at a point (stairs ramp between its two levels). */
+export function corridorLevel(c: Corridor, x: number, z: number): number {
+  if (!c.levels) return 0;
+  const [l0, l1] = c.levels;
+  if (!c.stairs) return l0;
+  const u = c.axis === 'ns' ? z : x;
+  const [a, b] = c.stairs;
+  const t = Math.min(1, Math.max(0, (u - a) / (b - a)));
+  return l0 + (l1 - l0) * t;
+}
+
+/** Floor height anywhere in the station. */
+export function heightAt(x: number, z: number): number {
+  const room = ROOMS.find((r) => inRect(r.rect, x, z, -0.01));
+  if (room) return room.level;
+  const c = CORRIDORS.find((k) => inRect(k.rect, x, z, -0.01));
+  return c ? corridorLevel(c, x, z) : 0;
+}
 
 export function roomAt(x: number, z: number): Room | null {
   return ROOMS.find((r) => inRect(r.rect, x, z)) ?? null;
