@@ -4,9 +4,9 @@ import { glow } from './materials';
 import type { Ship } from './Ship';
 
 const MAX = 24;
-const BLAST_RADIUS = 30; // matches the red warning ring
+const BLAST_RADIUS = 20; // matches the red warning ring
 const DAMAGE = 14;
-const SPEED = 34; // units per second across the ground
+const SPEED = 59.5; // units per second across the ground
 const LEAD = 0.35; // seconds of the ship's velocity to aim ahead by
 
 interface Mortar {
@@ -75,7 +75,7 @@ export class Mortars {
     m.from.copy(from);
     m.to.set(s.x + ship.velocity.x * LEAD, s.y, s.z + ship.velocity.y * LEAD);
     const dist = Math.hypot(m.to.x - from.x, m.to.z - from.z);
-    m.duration = THREE.MathUtils.clamp(dist / SPEED, 0.65, 2);
+    m.duration = THREE.MathUtils.clamp(dist / SPEED, 0.37, 1.15);
     m.t = 0;
     m.active = true;
     m.obj.visible = true;
