@@ -29,19 +29,23 @@ export const LANDING_PAD = { x: 0, z: 0, radius: 7 };
 
 /** Groups of enemy turrets. Coordinates are (x, z); the landing pad is at 0, 0. */
 export const OUTPOSTS: [number, number][] = [
-  [0, -48],
-  [45, -78],
-  [-55, -62],
-  [75, 12],
-  [-78, 20],
-  [12, 85],
-  [-40, 120],
-  [95, -125],
-  [-120, -110],
-  [130, 95],
-  [-150, 40],
-  [150, -40],
-];
+  // Each sector's arena is centred on one of these (see run/Run.ts); the first is next to the
+  // landing pad. Spread out so a sortie visits different parts of the jungle.
+  [0, -70],
+  [140, -120],
+  [-140, -110],
+  [170, 40],
+  [-170, 30],
+  [0, 110],
+  [110, 200],
+  [-120, 190],
+  [230, -230],
+  [-230, -230],
+  [240, 170],
+  [-240, 170],
+  [60, -240],
+  [-70, -240],
+]
 
 type Placer = (rand: () => number) => { x: number; z: number };
 
@@ -53,7 +57,7 @@ type Placer = (rand: () => number) => { x: number; z: number };
  * plants keep clear of the landing pad and the turret outposts so enemies stay readable.
  */
 export class World {
-  readonly halfSize = 220;
+  readonly halfSize = 360;
   readonly palette = JUNGLE;
   readonly group = new THREE.Group();
   private readonly bulbMat: THREE.MeshBasicMaterial;
@@ -64,7 +68,7 @@ export class World {
     this.bulbMat = glow(this.palette.bulb);
     this.buildGround();
     this.buildTrees(this.placer(4, 12, 1.8));
-    this.buildGiantTrees(this.placer(10, 16, 0.8));
+    this.buildGiantTrees(this.placer(10, 34, 0.8)); // well clear of towers so they never hide them
     this.buildPinkFans(this.placer(1, 9, 1.2));
     this.buildBulbStalks(this.placer(2, 9, 1));
     this.buildFerns(this.placer(0, 7, 0.6));
@@ -95,7 +99,7 @@ export class World {
 
   private buildGround(): void {
     const size = this.halfSize * 2 + 200;
-    const seg = 220;
+    const seg = 300;
     const geo = new THREE.PlaneGeometry(size, size, seg, seg);
     geo.rotateX(-Math.PI / 2);
 
@@ -201,7 +205,7 @@ export class World {
   // ---------------------------------------------------------------- props
 
   /** Purple-trunked jungle trees with drooping teal leaves. Canopy tops out below the ship. */
-  private buildTrees(place: Placer, count = 560): void {
+  private buildTrees(place: Placer, count = 1500): void {
     const rand = mulberry32(31);
     const matrices: THREE.Matrix4[] = [];
     for (let i = 0; i < count; i++) {
@@ -223,7 +227,7 @@ export class World {
    * Giant trees scattered through the play area: canopies far below the ship and the tower
    * guns (top out around 20 units), so they add depth without hiding anything that matters.
    */
-  private buildGiantTrees(place: Placer, count = 70): void {
+  private buildGiantTrees(place: Placer, count = 190): void {
     const rand = mulberry32(81);
     const matrices: THREE.Matrix4[] = [];
     for (let i = 0; i < count; i++) {
@@ -242,7 +246,7 @@ export class World {
   }
 
   /** Big pink leaves fanning up out of the ground, like the reference's alien foliage. */
-  private buildPinkFans(place: Placer, count = 900): void {
+  private buildPinkFans(place: Placer, count = 2400): void {
     const rand = mulberry32(41);
     const matrices: THREE.Matrix4[] = [];
     for (let i = 0; i < count; i++) {
@@ -254,7 +258,7 @@ export class World {
   }
 
   /** Curving stalks topped with glowing pink bulbs. */
-  private buildBulbStalks(place: Placer, clusters = 170): void {
+  private buildBulbStalks(place: Placer, clusters = 460): void {
     const rand = mulberry32(51);
     const matrices: THREE.Matrix4[] = [];
     for (let c = 0; c < clusters; c++) {
@@ -279,7 +283,7 @@ export class World {
   }
 
   /** Low ferns as ground cover. */
-  private buildFerns(place: Placer, count = 1500): void {
+  private buildFerns(place: Placer, count = 4000): void {
     const rand = mulberry32(61);
     const matrices: THREE.Matrix4[] = [];
     for (let i = 0; i < count; i++) {
@@ -290,7 +294,7 @@ export class World {
     this.instanced([{ geo: fern(), mat: toon('#ffffff'), colors: this.palette.fern, outline: false }], matrices, 62);
   }
 
-  private buildRocks(place: Placer, count = 110): void {
+  private buildRocks(place: Placer, count = 300): void {
     const rand = mulberry32(11);
     const matrices: THREE.Matrix4[] = [];
     for (let i = 0; i < count; i++) {
@@ -305,7 +309,7 @@ export class World {
   }
 
   /** Old yellow machinery half swallowed by the jungle (like the reference's ruins). */
-  private buildRelics(place: Placer, count = 18): void {
+  private buildRelics(place: Placer, count = 45): void {
     const rand = mulberry32(71);
     const matrices: THREE.Matrix4[] = [];
     for (let i = 0; i < count; i++) {
@@ -325,7 +329,7 @@ export class World {
   }
 
   /** Glowing seed pods on the ground. */
-  private buildSpores(place: Placer, count = 220): void {
+  private buildSpores(place: Placer, count = 600): void {
     const rand = mulberry32(37);
     const matrices: THREE.Matrix4[] = [];
     for (let i = 0; i < count; i++) {
