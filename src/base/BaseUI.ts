@@ -18,13 +18,19 @@ export class BaseUI {
     root.insertAdjacentHTML(
       'beforeend',
       `<div id="base-salvage"></div>
-       <div id="shop" class="overlay"><div class="panel"><div class="head"><h2></h2><span class="wallet"></span></div><div class="rows"></div><button class="close">DONE ▸</button></div></div>`,
+       <div id="shop" class="overlay"><div class="panel"><div class="head"><h2></h2><span class="wallet"></span><button class="x" aria-label="Close">✕</button></div><div class="rows"></div><button class="close">DONE ▸</button></div></div>`,
     );
     this.shop = root.querySelector('#shop') as HTMLElement;
     this.salvage = root.querySelector('#base-salvage') as HTMLElement;
-    this.shop.querySelector('.close')!.addEventListener('pointerup', (e) => {
-      e.stopPropagation();
-      this.closeShop();
+    // Close with DONE, the ✕, or by tapping outside the panel.
+    for (const sel of ['.close', '.x']) {
+      this.shop.querySelector(sel)!.addEventListener('pointerup', (e) => {
+        e.stopPropagation();
+        this.closeShop();
+      });
+    }
+    this.shop.addEventListener('pointerup', (e) => {
+      if (e.target === this.shop) this.closeShop();
     });
   }
 
