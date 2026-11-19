@@ -4,9 +4,9 @@ import { glow } from './materials';
 import type { Ship } from './Ship';
 
 const MAX = 24;
-const BLAST_RADIUS = 10; // matches the red warning ring
+const BLAST_RADIUS = 30; // matches the red warning ring
 const DAMAGE = 14;
-const SPEED = 17; // units per second across the ground
+const SPEED = 34; // units per second across the ground
 const LEAD = 0.35; // seconds of the ship's velocity to aim ahead by
 
 interface Mortar {
@@ -38,8 +38,8 @@ export class Mortars {
     const coreGeo = new THREE.SphereGeometry(1.6, 16, 12);
     const haloGeo = new THREE.SphereGeometry(3.2, 16, 12);
     const outlineGeo = new THREE.SphereGeometry(2.05, 16, 12);
-    const ringGeo = new THREE.RingGeometry(BLAST_RADIUS - 0.6, BLAST_RADIUS, 64);
-    const discGeo = new THREE.CircleGeometry(BLAST_RADIUS, 64);
+    const ringGeo = new THREE.RingGeometry(BLAST_RADIUS - 1, BLAST_RADIUS, 96);
+    const discGeo = new THREE.CircleGeometry(BLAST_RADIUS, 96);
     for (let i = 0; i < MAX; i++) {
       const obj = new THREE.Group();
       const core = new THREE.Mesh(coreGeo, glow('#ffb36b', {}, 2));
@@ -75,7 +75,7 @@ export class Mortars {
     m.from.copy(from);
     m.to.set(s.x + ship.velocity.x * LEAD, s.y, s.z + ship.velocity.y * LEAD);
     const dist = Math.hypot(m.to.x - from.x, m.to.z - from.z);
-    m.duration = THREE.MathUtils.clamp(dist / SPEED, 1.3, 4);
+    m.duration = THREE.MathUtils.clamp(dist / SPEED, 0.65, 2);
     m.t = 0;
     m.active = true;
     m.obj.visible = true;
