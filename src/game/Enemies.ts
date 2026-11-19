@@ -22,7 +22,7 @@ interface Ctx {
   onScreen: (e: Enemy) => boolean;
 }
 
-abstract class Enemy implements Hittable {
+export abstract class Enemy implements Hittable {
   readonly root = new THREE.Group();
   abstract readonly radius: number;
   abstract readonly hitBottom: number;
@@ -33,7 +33,20 @@ abstract class Enemy implements Hittable {
   protected hp: number;
   protected flash = 0;
   protected readonly mats: THREE.MeshToonMaterial[] = [];
+  /** Every toon material, for status tints (chilled blue, burning orange). */
+  private readonly allMats: THREE.MeshToonMaterial[] = [];
   protected time = Math.random() * 10;
+
+  // ---- Status effects (from Cryo and Plasma upgrades) ----
+  /** Seconds left chilled (slowed), and chill stacks building toward a freeze. */
+  chilled = 0;
+  private chillStacks = 0;
+  /** Seconds left frozen solid (can't move or shoot). */
+  frozen = 0;
+  /** Burning: damage per second and seconds left. */
+  burnDps = 0;
+  burnTime = 0;
+  private ice: THREE.Mesh | null = null;
 
   constructor(readonly maxHp: number) {
     this.hp = maxHp;
@@ -52,12 +65,82 @@ abstract class Enemy implements Hittable {
     }
   }
 
+  get burning(): boolean {
+    return this.burnTime > 0;
+  }
+
+  /** Add chill stacks; 5 stacks freezes the enemy. */
+  chill(stacks: number): void {
+    if (!this.alive) return;
+    this.chilled = 2.5;
+    this.chillStacks += stacks;
+    if (this.chillStacks >= 5) {
+      this.chillStacks = 0;
+      this.freeze(1.6);
+    }
+  }
+
+  freeze(seconds: number): void {
+    if (!this.alive) return;
+    this.frozen = Math.max(this.frozen, seconds);
+    this.chilled = Math.max(this.chilled, seconds + 1);
+  }
+
+  ignite(dps: number, seconds: number): void {
+    if (!this.alive) return;
+    this.burnDps = Math.max(this.burnDps, dps);
+    this.burnTime = Math.max(this.burnTime, seconds);
+  }
+
   update(ctx: Ctx): void {
-    this.time += ctx.dt;
-    this.flash = Math.max(0, this.flash - ctx.dt);
-    const f = this.flash > 0 ? 1 : 0;
-    for (const m of this.mats) m.emissive.setRGB(f, f, f);
-    this.think(ctx);
+    const dt = ctx.dt;
+    this.time += dt;
+    this.flash = Math.max(0, this.flash - dt);
+
+    // Burning: damage over time (in small ticks, without the white hit flash).
+    if (this.burnTime > 0) {
+      this.burnTime -= dt;
+      this.hp -= this.burnDps * dt;
+      if (this.hp <= 0 && this.alive) {
+        this.alive = false;
+        this.onKilled?.(this);
+        return;
+      }
+      if (this.burnTime <= 0) this.burnDps = 0;
+    }
+    this.frozen = Math.max(0, this.frozen - dt);
+    this.chilled = Math.max(0, this.chilled - dt);
+    if (this.chilled <= 0) this.chillStacks = 0;
+
+    // Status tint: frozen pale blue, chilled blue, burning flickering orange; hits flash white.
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    if (this.frozen > 0) [r, g, b] = [0.35, 0.7, 0.95];
+    else if (this.chilled > 0) [r, g, b] = [0.08, 0.28, 0.55];
+    if (this.burnTime > 0) {
+      const k = 0.55 + Math.sin(this.time * 22) * 0.25;
+      r = Math.max(r, 0.95 * k);
+      g = Math.max(g, 0.35 * k);
+      b = Math.max(b, 0.05 * k);
+    }
+    for (const m of this.allMats) m.emissive.setRGB(r, g, b);
+    if (this.flash > 0) for (const m of this.mats) m.emissive.setRGB(1, 1, 1);
+
+    // Ice shell while frozen.
+    if (this.frozen > 0 && !this.ice) {
+      this.ice = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(this.radius * 1.25, 1),
+        glow('#c8f6ff', { transparent: true, opacity: 0.4, depthWrite: false }, 1.2),
+      );
+      this.ice.position.y = this.aimHeight + (this.kind === 'turret' ? 0.8 : 0);
+      this.root.add(this.ice);
+    }
+    if (this.ice) this.ice.visible = this.frozen > 0;
+
+    // Frozen enemies don't act; chilled ones act at a slower pace.
+    if (this.frozen > 0) return;
+    this.think(this.chilled > 0 ? { ...ctx, dt: dt * 0.55 } : ctx);
   }
 
   protected abstract think(ctx: Ctx): void;
@@ -65,6 +148,7 @@ abstract class Enemy implements Hittable {
   /** @param flashes whether this part flashes white when hit (towers only flash their gun). */
   protected mat(color: string, flashes = true): THREE.MeshToonMaterial {
     const m = rimToon(color, ENEMY_GLOW, 0.75);
+    this.allMats.push(m);
     if (flashes) this.mats.push(m);
     return m;
   }
@@ -280,7 +364,7 @@ export interface ArenaBounds {
  */
 export class EnemyManager {
   readonly enemies: Enemy[] = [];
-  onKill?: (kind: 'turret' | 'drone', pos: THREE.Vector3) => void;
+  onKill?: (kind: 'turret' | 'drone', pos: THREE.Vector3, enemy: Enemy) => void;
 
   /** Enemy health multiplier (later sectors are tougher). */
   hpMul = 1;
@@ -398,7 +482,7 @@ export class EnemyManager {
    * ship's altitude along the camera's line of sight, so anything that looks inside the blast
    * is hit, whether it's a drone at your height or a tower gun below.
    */
-  damageAt(point: THREE.Vector3, radius: number, amount: number): void {
+  damageAt(point: THREE.Vector3, radius: number, amount: number, hit?: (e: Enemy, amount: number) => void): void {
     const b = this.projectToPlane(point, this.probe);
     for (const e of this.enemies) {
       if (!e.alive) continue;
@@ -406,12 +490,27 @@ export class EnemyManager {
       const r = radius + e.radius;
       const dx = v.x - b.x;
       const dz = v.z - b.z;
-      if (dx * dx + dz * dz < r * r) e.damage(amount);
+      if (dx * dx + dz * dz < r * r) {
+        if (hit) hit(e, amount);
+        else e.damage(amount);
+      }
     }
   }
 
+  /** Living enemies nearest to (x, z) by on-screen position, within `range`, excluding `skip`. */
+  nearest(x: number, z: number, range: number, count: number, skip?: Set<Enemy>): Enemy[] {
+    const found: { e: Enemy; d: number }[] = [];
+    for (const e of this.enemies) {
+      if (!e.alive || skip?.has(e)) continue;
+      const v = this.visualPosition(e, this.probe2);
+      const d = Math.hypot(v.x - x, v.z - z);
+      if (d < range) found.push({ e, d });
+    }
+    return found.sort((a, b) => a.d - b.d).slice(0, count).map((f) => f.e);
+  }
+
   /** Every living enemy whose on-screen position is within `radius` of (x, z) at ship altitude. */
-  forEachNear(x: number, z: number, radius: number, fn: (e: Hittable) => void): void {
+  forEachNear(x: number, z: number, radius: number, fn: (e: Enemy) => void): void {
     for (const e of this.enemies) {
       if (!e.alive) continue;
       const v = this.visualPosition(e, this.probe2);
@@ -474,7 +573,7 @@ export class EnemyManager {
         pos.y += dead.aimHeight;
       }
       this.effects.explosion(pos, dead.kind === 'turret' ? 5 : 3.5, ground);
-      this.onKill?.(dead.kind, pos);
+      this.onKill?.(dead.kind, pos, dead);
     };
     this.enemies.push(e);
     this.scene.add(e.root);

@@ -20,7 +20,8 @@ import {
   MissileSystem,
   missileRange,
 } from './game/Missiles';
-import { Bullets, EnemyShots } from './game/Projectiles';
+import { BULLET_STYLES, Bullets, EnemyShots } from './game/Projectiles';
+import { Combat } from './game/Combat';
 import { ArenaVisual } from './game/run/Arena';
 import { Run } from './game/run/Run';
 import { RunUI } from './game/run/RunUI';
@@ -82,17 +83,39 @@ const shipParam = new URLSearchParams(location.search).get('ship');
 const ship = new Ship(scene, isShipDesign(shipParam) ? shipParam : 'b');
 const missiles = new MissileSystem(scene, world, effects);
 const aim = new AimIndicator(scene);
-const bullets = new Bullets(scene, effects);
+// One bullet pool per gun type, each with its own look, speed and range.
+const guns = {
+  machinegun: new Bullets(scene, effects, BULLET_STYLES.machinegun),
+  scatter: new Bullets(scene, effects, BULLET_STYLES.scatter),
+  rail: new Bullets(scene, effects, BULLET_STYLES.rail),
+};
+const allGuns = Object.values(guns);
 const enemyShots = new EnemyShots(scene, effects);
 const enemies = new EnemyManager(scene, world, effects);
 const hud = new Hud($('hud'));
 const pickups = new Pickups(scene, effects);
 const pickupTarget = new THREE.Vector3();
+// All hits go through Combat so Arc / Cryo / Plasma upgrades can react.
+const combat = new Combat(enemies, effects, () => ship.stats);
+for (const g of allGuns) g.onHit = (t, dmg) => combat.hit(t, dmg, 'gun');
+
+// ---- Nova (special ability): charges from damage dealt ----
+const NOVA_COST = 350; // damage dealt to fill the charge
+const NOVA_RADIUS = 26;
+const NOVA_DAMAGE = 90;
+let specialCharge = 0;
+combat.onDamage = (amount) => {
+  specialCharge = Math.min(1, specialCharge + (amount / NOVA_COST) * ship.stats.specialChargeMul);
+};
+
+// ---- Cluster bomblets waiting to go off ----
+const bomblets: { x: number; y: number; z: number; t: number }[] = [];
+const bombletPos = new THREE.Vector3();
 const radar = new Radar($('hud'));
 
 // ?debug in the URL exposes game objects for automated tests and console tinkering.
 if (new URLSearchParams(location.search).has('debug')) {
-  Object.assign(window, { __game: { ship, enemies, missiles, pickups, get run() { return run; } } });
+  Object.assign(window, { __game: { ship, enemies, missiles, pickups, combat, get run() { return run; }, chargeNova: () => (specialCharge = 1) } });
 }
 
 const rig = new CameraRig(window.innerWidth / window.innerHeight);
@@ -109,13 +132,15 @@ const run = new Run({
   ui: new RunUI($('hud')),
   hud,
   clearField: () => {
-    bullets.clear();
+    for (const g of allGuns) g.clear();
+    bomblets.length = 0;
     enemyShots.clear();
     missiles.clear();
     pickups.clear();
   },
   snapCamera: () => rig.snapTo(ship.root.position),
   setPaused: (p) => (paused = p),
+  resetRunState: () => (specialCharge = 0),
   releaseInput: () => input.releaseAll(),
 });
 
@@ -139,7 +164,7 @@ const input = new Input({
   stickZone: $('stick-zone'),
   stickBase: $('stick-base'),
   stickKnob: $('stick-knob'),
-  buttons: { gun: $('btn-gun'), missile: $('btn-missile'), boost: $('btn-boost') },
+  buttons: { gun: $('btn-gun'), missile: $('btn-missile'), boost: $('btn-boost'), special: $('btn-special') },
 });
 
 // ---------- Events ----------
@@ -163,7 +188,20 @@ function missileLock(charge: number, heading: number) {
 }
 
 ship.onMissile = (charge, heading) => {
-  missiles.fire(ship.root.position, heading, charge, missileLock(charge, heading));
+  const p = ship.root.position;
+  if (ship.stats.secondary === 'swarm') {
+    // Swarm Rockets: a volley of small homing rockets, one per nearby target (more with charge).
+    const count = 3 + Math.round(charge * 3);
+    const range = missileRange(charge) + 12;
+    const targets = enemies.nearest(p.x, p.z, range, count);
+    for (let i = 0; i < count; i++) {
+      const t = targets.length ? targets[i % targets.length] : null;
+      const spread = heading + (i - (count - 1) / 2) * 0.22;
+      missiles.fire(p, spread, 0.12 + charge * 0.2, t);
+    }
+  } else {
+    missiles.fire(p, heading, charge, missileLock(charge, heading));
+  }
   rig.kick(1 + charge * 2, 0.15);
 };
 ship.onHit = () => {
@@ -190,12 +228,24 @@ pickups.onCollect = (heal) => {
 missiles.onExplode = (pos, power) => {
   freeze(0.03 + power * 0.04);
   const st = ship.stats;
-  enemies.damageAt(pos, missileBlastRadius(power) * st.missileRadiusMul, missileDamage(power) * st.missileDamageMul);
+  const swarm = st.secondary === 'swarm';
+  const dmg = missileDamage(power) * st.missileDamageMul * (swarm ? 0.6 : 1);
+  enemies.damageAt(pos, missileBlastRadius(power) * st.missileRadiusMul, dmg, (t, amt) => combat.hit(t, amt, 'missile'));
+  // Cluster Bomb: the blast throws out 5 bomblets that go off a moment later.
+  if (st.secondary === 'cluster') {
+    const spreadR = missileBlastRadius(power) * st.missileRadiusMul * 1.7;
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2 + Math.random() * 0.8;
+      const r = spreadR * (0.55 + Math.random() * 0.45);
+      bomblets.push({ x: pos.x + Math.cos(a) * r, y: pos.y, z: pos.z + Math.sin(a) * r, t: 0.12 + Math.random() * 0.25 });
+    }
+  }
   rig.kick(0, 0.5 + power * 0.9);
   input.vibrate(25 + Math.round(power * 30));
 };
-enemies.onKill = (kind, pos) => {
+enemies.onKill = (kind, pos, enemy) => {
   run.onKill(kind);
+  combat.onKill(enemy, pos, world.heightAt(pos.x, pos.z));
   // Sometimes a wreck drops a healing orb that floats up to flying height.
   if (Math.random() < DROP_CHANCE[kind] + ship.stats.dropBonus) {
     enemies.projectToPlane(pos, pickupTarget);
@@ -215,9 +265,13 @@ const bulletDir = new THREE.Vector3();
 const cameraPos = new THREE.Vector3();
 
 function updateGun(dt: number): void {
+  const st = ship.stats;
+  const weapon = st.primary;
+  // Each gun fires at its own pace: machine gun fast, scatter and rail slower but heavier.
+  const rate = st.gunRate * (weapon === 'scatter' ? 0.36 : weapon === 'rail' ? 0.2 : 1);
   gunTimer -= dt;
   if (!ship.isFiring || gunTimer > 0) return;
-  gunTimer += 1 / ship.stats.gunRate;
+  gunTimer += 1 / rate;
   if (gunTimer < 0) gunTimer = 0;
 
   ship.getMuzzle(barrel, muzzlePos);
@@ -233,13 +287,39 @@ function updateGun(dt: number): void {
     const v = enemies.visualPosition(target, visualPos);
     angle = Math.atan2(-(v.x - muzzlePos.x), -(v.z - muzzlePos.z));
   }
-  angle += (Math.random() - 0.5) * GUN_SPREAD * 2;
-  // Split Shot adds bullets fanned out to each side.
-  const side = ship.stats.gunSideShots;
-  for (let i = -side; i <= side; i++) {
-    const a = angle + i * SIDE_SHOT_ANGLE;
-    bullets.fire(muzzlePos, bulletDir.set(-Math.sin(a), 0, -Math.cos(a)), ship.stats.gunDamage, ship.velocity);
+  const pool = guns[weapon];
+  const fire = (a: number, damage: number) =>
+    pool.fire(muzzlePos, bulletDir.set(-Math.sin(a), 0, -Math.cos(a)), damage, ship.velocity);
+
+  if (weapon === 'scatter') {
+    // A cone of pellets; Split Shot adds two more per level.
+    const pellets = 6 + st.gunSideShots * 2;
+    for (let i = 0; i < pellets; i++) {
+      const k = pellets === 1 ? 0 : i / (pellets - 1) - 0.5;
+      fire(angle + k * 0.56 + (Math.random() - 0.5) * 0.05, st.gunDamage * 0.85);
+    }
+    rig.kick(0, 0.12);
+    return;
   }
+  const damage = weapon === 'rail' ? st.gunDamage * 4.5 : st.gunDamage;
+  angle += weapon === 'rail' ? 0 : (Math.random() - 0.5) * GUN_SPREAD * 2;
+  // Split Shot adds bullets fanned out to each side.
+  for (let i = -st.gunSideShots; i <= st.gunSideShots; i++) fire(angle + i * SIDE_SHOT_ANGLE, damage);
+  if (weapon === 'rail') rig.kick(0, 0.2);
+}
+
+/** Nova: a shockwave around the ship that damages everything nearby and wipes out enemy shots. */
+function fireNova(): void {
+  const p = ship.root.position;
+  const radius = NOVA_RADIUS * ship.stats.novaRadiusMul;
+  specialCharge = 0;
+  ship.invulnerable = Math.max(ship.invulnerable, 0.6);
+  enemyShots.clear();
+  enemies.damageAt(p, radius, NOVA_DAMAGE, (t, amt) => combat.hit(t, amt, 'nova'));
+  effects.nova(p, radius);
+  freeze(0.1);
+  rig.kick(10, 1.4);
+  input.vibrate(80);
 }
 
 // ---------- Resize & fullscreen ----------
@@ -302,6 +382,7 @@ let perfTime = 0;
 let perfFrames = 0;
 let elapsed = 0;
 const boostBtn = $('btn-boost');
+const specialBtn = $('btn-special');
 const aimLead = new THREE.Vector2();
 let frames = 0;
 let fpsTimer = 0;
@@ -332,14 +413,33 @@ renderer.setAnimationLoop((now: number) => {
     enemies.forEachNear(p.x, p.z, 3, (e) => {
       if (rammed.has(e)) return;
       rammed.add(e);
-      e.damage(ship.stats.ramDamage);
+      combat.hit(e, ship.stats.ramDamage, 'ram');
       effects.spark(e.root.position, '#6ff7ff', 2);
     });
   }
   missiles.radiusMul = ship.stats.missileRadiusMul;
+  combat.update(dt, ship.root.position);
+  // Nova button.
+  if (input.consumePress('special') && ship.alive && !paused) {
+    if (specialCharge >= 1) fireNova();
+    else input.vibrate(8);
+  }
+  // Cluster bomblets.
+  for (let i = bomblets.length - 1; i >= 0; i--) {
+    const bm = bomblets[i];
+    bm.t -= dt;
+    if (bm.t > 0) continue;
+    bomblets.splice(i, 1);
+    const st = ship.stats;
+    bombletPos.set(bm.x, bm.y, bm.z);
+    effects.explosion(bombletPos, 2.8 * st.missileRadiusMul, world.heightAt(bm.x, bm.z));
+    enemies.damageAt(bombletPos, 3.5 * st.missileRadiusMul, 22 * st.missileDamageMul, (t, amt) => combat.hit(t, amt, 'bomblet'));
+    rig.kick(0, 0.2);
+  }
   pickups.healMul = ship.stats.healMul;
   enemies.update(dt, ship, enemyShots, rig.camera);
-  bullets.update(dt, enemies.enemies, (x, z) => world.heightAt(x, z), cameraPos.setFromMatrixPosition(rig.camera.matrixWorld));
+  cameraPos.setFromMatrixPosition(rig.camera.matrixWorld);
+  for (const g of allGuns) g.update(dt, enemies.enemies, (x, z) => world.heightAt(x, z), cameraPos);
   enemyShots.update(dt, ship);
   pickups.update(dt, ship);
   missiles.update(dt, enemies.enemies, cameraPos.setFromMatrixPosition(rig.camera.matrixWorld));
@@ -363,6 +463,8 @@ renderer.setAnimationLoop((now: number) => {
   hud.setArmor(ship.armor, ship.stats.maxArmor);
   hud.setMissiles(ship.missiles, ship.missileRecharge, ship.stats.missileMax);
   hud.setSalvage(run.salvage);
+  specialBtn.style.setProperty('--charge', String(specialCharge));
+  specialBtn.classList.toggle('ready', specialCharge >= 1);
   hud.setObjective(run.objective());
   run.blips(blips);
   const ac = run.arenaCenter;

@@ -2,7 +2,12 @@
  * Everything an upgrade can change during a run. Values start at the ship's defaults and
  * upgrades modify them; the game reads them every frame.
  */
+export type PrimaryWeapon = 'machinegun' | 'scatter' | 'rail';
+export type SecondaryWeapon = 'missile' | 'cluster' | 'swarm';
+
 export interface Stats {
+  primary: PrimaryWeapon;
+  secondary: SecondaryWeapon;
   gunRate: number; // bullets per second
   gunDamage: number; // per bullet
   gunSideShots: number; // extra bullets fanned out either side
@@ -17,10 +22,30 @@ export interface Stats {
   healMul: number; // healing orb strength
   dropBonus: number; // added to healing orb drop chance
   salvageMul: number;
+  // Special ability (Nova)
+  specialChargeMul: number; // how fast it charges from damage dealt
+  novaRadiusMul: number;
+  // Arc family (lightning)
+  arcRounds: number; // gun hits can chain lightning (level)
+  arcWarheads: number; // missile blasts arc to nearby enemies
+  staticField: number; // periodic zap on the nearest enemy
+  // Cryo family (ice)
+  cryoRounds: number; // gun hits chill; stacks freeze
+  cryoWarheads: number; // missile blasts freeze
+  frostbite: number; // chilled/frozen enemies take extra damage
+  // Plasma family (fire)
+  plasmaRounds: number; // gun hits ignite
+  plasmaWarheads: number; // missile blasts ignite
+  meltdown: number; // burning enemies explode when destroyed
+  // Duos (need two families)
+  superconductor: number; // Arc + Cryo: lightning chills
+  thermalShock: number; // Cryo + Plasma: igniting a chilled enemy deals a burst of damage
 }
 
 export function defaultStats(): Stats {
   return {
+    primary: 'machinegun',
+    secondary: 'missile',
     gunRate: 11,
     gunDamage: 7,
     gunSideShots: 0,
@@ -35,10 +60,23 @@ export function defaultStats(): Stats {
     healMul: 1,
     dropBonus: 0,
     salvageMul: 1,
+    specialChargeMul: 1,
+    novaRadiusMul: 1,
+    arcRounds: 0,
+    arcWarheads: 0,
+    staticField: 0,
+    cryoRounds: 0,
+    cryoWarheads: 0,
+    frostbite: 0,
+    plasmaRounds: 0,
+    plasmaWarheads: 0,
+    meltdown: 0,
+    superconductor: 0,
+    thermalShock: 0,
   };
 }
 
-export type UpgradeCategory = 'gun' | 'missile' | 'boost' | 'hull';
+export type UpgradeCategory = 'gun' | 'missile' | 'boost' | 'hull' | 'special' | 'arc' | 'cryo' | 'plasma' | 'duo' | 'weapon';
 
 export interface Upgrade {
   id: string;
@@ -49,6 +87,8 @@ export interface Upgrade {
   /** How many times it can be taken in one run. */
   max: number;
   apply(s: Stats): void;
+  /** Only offered when this returns true (e.g. duos need both families). */
+  requires?: (s: Stats) => boolean;
   /** Optional one-off effect when taken (e.g. heal). */
   onTake?: (ctx: { heal(amount: number): void }) => void;
 }
@@ -97,12 +137,71 @@ export const UPGRADES: Upgrade[] = [
   { id: 'salvager', name: 'Salvager', category: 'hull', text: 'Earn 50% more salvage.', max: 2, apply: (s) => (s.salvageMul *= 1.5) },
 ];
 
-/** Three different upgrades the player hasn't maxed out yet. */
-export function rollUpgrades(taken: Map<string, number>, count = 3): Upgrade[] {
-  const pool = UPGRADES.filter((u) => (taken.get(u.id) ?? 0) < u.max);
-  for (let i = pool.length - 1; i > 0; i--) {
+// ---- Special ability ----
+UPGRADES.push(
+  { id: 'capacitor', name: 'Capacitor', category: 'special', text: 'Nova charges 35% faster.', max: 2, apply: (s) => (s.specialChargeMul *= 1.35) },
+  { id: 'overload', name: 'Overload', category: 'special', text: 'Nova blast is 40% wider.', max: 2, apply: (s) => (s.novaRadiusMul *= 1.4) },
+);
+
+// ---- Families: Arc (lightning), Cryo (ice), Plasma (fire) ----
+UPGRADES.push(
+  { id: 'arc-rounds', name: 'Arc Rounds', category: 'arc', text: 'Bullet hits may chain lightning to 2 nearby enemies.', max: 2, apply: (s) => s.arcRounds++ },
+  { id: 'arc-warheads', name: 'Arc Warheads', category: 'arc', text: 'Missile blasts arc lightning to 3 more enemies.', max: 2, apply: (s) => s.arcWarheads++ },
+  { id: 'static-field', name: 'Static Field', category: 'arc', text: 'Every 2.5 s, zap the nearest enemy.', max: 2, apply: (s) => s.staticField++ },
+  { id: 'cryo-rounds', name: 'Cryo Rounds', category: 'cryo', text: 'Bullet hits chill enemies. 5 chills freeze them solid.', max: 2, apply: (s) => s.cryoRounds++ },
+  { id: 'cryo-warheads', name: 'Cryo Warheads', category: 'cryo', text: 'Missile blasts freeze everything they hit.', max: 2, apply: (s) => s.cryoWarheads++ },
+  { id: 'frostbite', name: 'Frostbite', category: 'cryo', text: 'Chilled enemies take 20% more damage; frozen ones 50%.', max: 1, apply: (s) => s.frostbite++, requires: (s) => s.cryoRounds + s.cryoWarheads > 0 },
+  { id: 'plasma-rounds', name: 'Plasma Rounds', category: 'plasma', text: 'Bullet hits set enemies burning.', max: 2, apply: (s) => s.plasmaRounds++ },
+  { id: 'plasma-warheads', name: 'Plasma Warheads', category: 'plasma', text: 'Missile blasts ignite everything they hit.', max: 2, apply: (s) => s.plasmaWarheads++ },
+  { id: 'meltdown', name: 'Meltdown', category: 'plasma', text: 'Burning enemies explode when destroyed.', max: 1, apply: (s) => s.meltdown++, requires: (s) => s.plasmaRounds + s.plasmaWarheads > 0 },
+  {
+    id: 'superconductor',
+    name: 'Superconductor',
+    category: 'duo',
+    text: 'ARC + CRYO: lightning chills everything it strikes.',
+    max: 1,
+    apply: (s) => s.superconductor++,
+    requires: (s) => s.arcRounds + s.arcWarheads + s.staticField > 0 && s.cryoRounds + s.cryoWarheads > 0,
+  },
+  {
+    id: 'thermal-shock',
+    name: 'Thermal Shock',
+    category: 'duo',
+    text: 'CRYO + PLASMA: igniting a chilled enemy deals a 30 damage burst.',
+    max: 1,
+    apply: (s) => s.thermalShock++,
+    requires: (s) => s.cryoRounds + s.cryoWarheads > 0 && s.plasmaRounds + s.plasmaWarheads > 0,
+  },
+);
+
+// ---- Weapons (offered by the Armory reward; each replaces the weapon in its slot) ----
+export const PRIMARY_NAMES: Record<PrimaryWeapon, string> = { machinegun: 'Machine Gun', scatter: 'Scatter Cannon', rail: 'Rail Lance' };
+export const SECONDARY_NAMES: Record<SecondaryWeapon, string> = { missile: 'Missiles', cluster: 'Cluster Bomb', swarm: 'Swarm Rockets' };
+
+const WEAPONS: Upgrade[] = [
+  { id: 'w-machinegun', name: 'Machine Gun', category: 'weapon', text: 'Steady stream of bullets. Your trusty default.', max: 99, apply: (s) => (s.primary = 'machinegun'), requires: (s) => s.primary !== 'machinegun' },
+  { id: 'w-scatter', name: 'Scatter Cannon', category: 'weapon', text: 'Short-range blasts of 6 pellets. Devastating up close.', max: 99, apply: (s) => (s.primary = 'scatter'), requires: (s) => s.primary !== 'scatter' },
+  { id: 'w-rail', name: 'Rail Lance', category: 'weapon', text: 'Slow, heavy bolts that pierce every enemy in a line.', max: 99, apply: (s) => (s.primary = 'rail'), requires: (s) => s.primary !== 'rail' },
+  { id: 'w-missile', name: 'Missiles', category: 'weapon', text: 'Charged, aimable missile with lock-on. The default.', max: 99, apply: (s) => (s.secondary = 'missile'), requires: (s) => s.secondary !== 'missile' },
+  { id: 'w-cluster', name: 'Cluster Bomb', category: 'weapon', text: 'The blast splits into 5 bomblets that scatter and explode.', max: 99, apply: (s) => (s.secondary = 'cluster'), requires: (s) => s.secondary !== 'cluster' },
+  { id: 'w-swarm', name: 'Swarm Rockets', category: 'weapon', text: 'Release a volley of homing rockets; charge longer for more.', max: 99, apply: (s) => (s.secondary = 'swarm'), requires: (s) => s.secondary !== 'swarm' },
+];
+
+/** Three weapons different from what's equipped (Armory reward). */
+export function rollWeapons(s: Stats, count = 3): Upgrade[] {
+  return shuffle(WEAPONS.filter((w) => !w.requires || w.requires(s))).slice(0, count);
+}
+
+function shuffle<T>(list: T[]): T[] {
+  for (let i = list.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
+    [list[i], list[j]] = [list[j], list[i]];
   }
-  return pool.slice(0, count);
+  return list;
+}
+
+/** Three different upgrades the player hasn't maxed out yet (and meets the requirements for). */
+export function rollUpgrades(taken: Map<string, number>, stats: Stats, count = 3): Upgrade[] {
+  const pool = UPGRADES.filter((u) => (taken.get(u.id) ?? 0) < u.max && (!u.requires || u.requires(stats)));
+  return shuffle(pool).slice(0, count);
 }

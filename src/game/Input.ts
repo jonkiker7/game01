@@ -1,4 +1,4 @@
-export type ButtonName = 'gun' | 'missile' | 'boost';
+export type ButtonName = 'gun' | 'missile' | 'boost' | 'special';
 /** Buttons that double as aiming sticks (hold and drag). */
 export type AimButton = 'gun' | 'missile';
 
@@ -26,6 +26,7 @@ const KEY_BUTTONS: Record<string, ButtonName> = {
   KeyK: 'missile',
   KeyL: 'boost',
   Space: 'boost',
+  KeyU: 'special',
 };
 
 /**
@@ -43,7 +44,7 @@ export class Input {
   private stickOriginY = 0;
   private readonly stickRadius = 60;
 
-  private readonly touchHeld: Record<ButtonName, boolean> = { gun: false, missile: false, boost: false };
+  private readonly touchHeld: Record<ButtonName, boolean> = { gun: false, missile: false, boost: false, special: false };
   private readonly keys = new Set<string>();
   private readonly pressed = new Set<ButtonName>();
   private readonly released = new Set<ButtonName>();
@@ -205,7 +206,7 @@ export class Input {
     let pointer: number | null = null;
     let centerX = 0;
     let centerY = 0;
-    const aim = name === 'boost' ? null : this.aims[name];
+    const aim = name === 'gun' || name === 'missile' ? this.aims[name] : null;
 
     el.addEventListener('pointerdown', (e) => {
       e.preventDefault();

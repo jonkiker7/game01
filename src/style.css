@@ -170,6 +170,41 @@ body {
   box-shadow: 0 0 12px #6ff7ff;
 }
 
+#btn-special {
+  right: 132px;
+  bottom: 128px;
+  width: 52px;
+  height: 52px;
+  font-size: 10px;
+  color: #d9c8ff;
+  border-color: rgba(180, 150, 255, 0.5);
+  background: radial-gradient(circle at 50% 35%, rgba(80, 40, 140, 0.75), rgba(20, 8, 40, 0.75));
+}
+
+/* Nova charge fills up from the bottom; when full the button glows and pulses. */
+#btn-special::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: linear-gradient(to top, rgba(170, 130, 255, 0.55) calc(var(--charge, 0) * 100%), transparent 0);
+}
+
+#btn-special.ready {
+  color: #ffffff;
+  border-color: #c9a8ff;
+  animation: nova-ready 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes nova-ready {
+  from {
+    box-shadow: 0 0 6px rgba(190, 150, 255, 0.5);
+  }
+  to {
+    box-shadow: 0 0 22px rgba(200, 160, 255, 1);
+  }
+}
+
 /* Boost cooldown: a dark wedge that sweeps away as boost recharges. */
 #btn-boost::after {
   content: '';

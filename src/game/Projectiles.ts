@@ -137,43 +137,66 @@ export interface Hittable {
   damage(amount: number): void;
 }
 
-const BULLET_SPEED = 80;
-const BULLET_LIFE = 0.55; // → 44 units of range (about what fits on screen)
+/** How a kind of player bullet looks and flies. */
+export interface BulletStyle {
+  color: string;
+  /** Size of the round (width, height, length). */
+  size: [number, number, number];
+  speed: number;
+  /** Seconds before it fizzles (speed x life = range). */
+  life: number;
+  /** Pierces through every enemy instead of stopping at the first. */
+  pierce: boolean;
+}
 
-/** The player's machine-gun rounds. */
+export const BULLET_STYLES = {
+  machinegun: { color: '#ffe27a', size: [0.38, 0.38, 1.2], speed: 80, life: 0.55, pierce: false },
+  scatter: { color: '#ffb35c', size: [0.42, 0.42, 0.8], speed: 75, life: 0.32, pierce: false },
+  rail: { color: '#9ff4ff', size: [0.5, 0.5, 4.5], speed: 150, life: 0.38, pierce: true },
+} satisfies Record<string, BulletStyle>;
+
+/**
+ * One kind of player bullet (machine gun, scatter pellets, rail bolts). Each kind has its own
+ * pool and look; `onHit` lets upgrades react to hits (lightning, chill, burn).
+ */
 export class Bullets {
+  onHit?: (target: Hittable, damage: number) => void;
   private readonly pool: ShotPool;
   private readonly tmp = new THREE.Vector3();
   private readonly ray = new THREE.Vector3();
   private readonly closest = new THREE.Vector3();
+  /** Which enemies each piercing bolt has already hit. */
+  private readonly pierced = new WeakMap<object, Set<Hittable>>();
 
   constructor(
     scene: THREE.Scene,
     private readonly effects: Effects,
+    private readonly style: BulletStyle = BULLET_STYLES.machinegun,
   ) {
     const geo = new THREE.CapsuleGeometry(0.5, 1, 2, 6);
     geo.rotateX(Math.PI / 2); // long axis along +Z
-    this.pool = new ShotPool(scene, geo, 120, new THREE.Vector3(0.38, 0.38, 1.2), [
-      { material: glow('#ffe27a'), scale: 1 },
-    ]);
+    this.pool = new ShotPool(scene, geo, 160, new THREE.Vector3(...style.size), [{ material: glow(style.color), scale: 1 }]);
   }
 
-  /** `dir` is a normalized 3D direction (bullets usually angle down from the ship). */
   clear(): void {
     this.pool.clear();
   }
 
-  /** `carry` is the ship's (x, z) velocity, added so bullets don't lag behind a fast ship. */
+  /**
+   * `dir` is a normalized 3D direction; `carry` is the ship's (x, z) velocity, added so bullets
+   * don't lag behind a fast ship.
+   */
   fire(from: THREE.Vector3, dir: THREE.Vector3, damage: number, carry?: THREE.Vector2): void {
+    const { speed, life } = this.style;
     this.pool.add({
       x: from.x,
       y: from.y,
       z: from.z,
-      vx: dir.x * BULLET_SPEED + (carry?.x ?? 0),
-      vy: dir.y * BULLET_SPEED,
-      vz: dir.z * BULLET_SPEED + (carry?.y ?? 0),
+      vx: dir.x * speed + (carry?.x ?? 0),
+      vy: dir.y * speed,
+      vz: dir.z * speed + (carry?.y ?? 0),
       ceiling: Infinity,
-      life: BULLET_LIFE,
+      life,
       damage,
     });
   }
@@ -196,9 +219,16 @@ export class Bullets {
         const tp = t.root.position;
         const hit = rayToVerticalSegment(camera, this.ray, tp.x, tp.z, tp.y + t.hitBottom, tp.y + t.hitTop, this.closest);
         if (hit < t.radius) {
-          t.damage(s.damage);
-          this.effects.spark(this.closest);
-          return true;
+          if (this.style.pierce) {
+            let set = this.pierced.get(s);
+            if (!set) this.pierced.set(s, (set = new Set()));
+            if (set.has(t)) continue;
+            set.add(t);
+          }
+          if (this.onHit) this.onHit(t, s.damage);
+          else t.damage(s.damage);
+          this.effects.spark(this.closest, this.style.color, this.style.pierce ? 1.6 : 1);
+          if (!this.style.pierce) return true;
         }
       }
       // Bullets that reach the ground kick up a spark and stop.
