@@ -4,7 +4,7 @@ import { glow } from './materials';
 import type { Ship } from './Ship';
 
 const MAX = 24;
-const BLAST_RADIUS = 6.5;
+const BLAST_RADIUS = 10; // matches the red warning ring
 const DAMAGE = 14;
 const SPEED = 17; // units per second across the ground
 const LEAD = 0.35; // seconds of the ship's velocity to aim ahead by
@@ -38,8 +38,8 @@ export class Mortars {
     const coreGeo = new THREE.SphereGeometry(1.6, 16, 12);
     const haloGeo = new THREE.SphereGeometry(3.2, 16, 12);
     const outlineGeo = new THREE.SphereGeometry(2.05, 16, 12);
-    const ringGeo = new THREE.RingGeometry(BLAST_RADIUS - 0.45, BLAST_RADIUS, 48);
-    const discGeo = new THREE.CircleGeometry(BLAST_RADIUS, 48);
+    const ringGeo = new THREE.RingGeometry(BLAST_RADIUS - 0.6, BLAST_RADIUS, 64);
+    const discGeo = new THREE.CircleGeometry(BLAST_RADIUS, 64);
     for (let i = 0; i < MAX; i++) {
       const obj = new THREE.Group();
       const core = new THREE.Mesh(coreGeo, glow('#ffb36b', {}, 2));
@@ -113,7 +113,8 @@ export class Mortars {
         m.marker.visible = false;
         this.effects.explosion(m.to, BLAST_RADIUS * 0.9, groundY(m.to.x, m.to.z));
         const s = ship.root.position;
-        if (Math.hypot(s.x - m.to.x, s.z - m.to.z) < BLAST_RADIUS + ship.radius * 0.5) ship.damage(DAMAGE);
+        // Hit if any part of the ship is inside the ring.
+        if (Math.hypot(s.x - m.to.x, s.z - m.to.z) < BLAST_RADIUS + ship.radius) ship.damage(DAMAGE);
       }
     }
   }
