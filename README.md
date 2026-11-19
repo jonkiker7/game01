@@ -49,7 +49,7 @@ On iPhone, use Share → **Add to Home Screen** for full-screen play.
 
 The game starts on **Halcyon Station**, a huge retro-futuristic station orbiting the jungle planet.
 You see it from an isometric angle (like Diablo or the old Fallouts): rectangular rooms joined by
-corridors, and any wall between the camera and your pilot drops down so you can always see
+corridors. Walls between the camera and your pilot (and the near walls of the room you are in) turn see-through, so you can always see
 yourself. Doors slide open as you walk up to them. Some rooms are down flights of stairs (the
 Armory, the Hangar and your quarters), and railed openings in the floor look down shafts into the
 depths of the station. Many doors to the rest of the station are sealed (for now).
