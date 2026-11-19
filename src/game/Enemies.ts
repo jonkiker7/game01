@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { Effects } from './Effects';
 import { addOutlines, GLOW, glow, rimToon } from './materials';
 import { approachAngle, mulberry32, wrapAngle } from './math';
+import type { Mortars } from './Mortars';
 import type { EnemyShots, Hittable } from './Projectiles';
 import { HOVER_HEIGHT, type Ship } from './Ship';
 import type { World } from './World';
@@ -12,10 +13,13 @@ const ENEMY_GLOW = '#ff2e63';
 const TOWER_STONE = '#4a2f5e';
 /** Enemies only attack inside this distance, which roughly matches what's visible on screen. */
 const ATTACK_RANGE = 36;
+/** Towers lob mortars from much farther away (the landing ring warns you where they'll hit). */
+const TOWER_RANGE = 75;
 
 interface Ctx {
   ship: Ship;
   shots: EnemyShots;
+  mortars: Mortars;
   world: World;
   dt: number;
   /** True if this enemy's gun is on screen. Enemies only shoot when you can see them. */
@@ -229,9 +233,9 @@ class Turret extends Enemy {
 
   private readonly bandMat = glow(ENEMY_GLOW);
 
-  protected think({ ship, shots, dt, onScreen }: Ctx): void {
+  protected think({ ship, mortars, dt }: Ctx): void {
     const { dx, dz, dist } = this.distanceTo(ship);
-    const awake = ship.alive && dist < ATTACK_RANGE && onScreen(this);
+    const awake = ship.alive && dist < TOWER_RANGE;
     if (awake) {
       this.head.rotation.y = approachAngle(this.head.rotation.y, Math.atan2(-dx, -dz), 2.2 * dt);
     }
@@ -242,14 +246,10 @@ class Turret extends Enemy {
 
     this.cooldown -= dt;
     if (this.cooldown <= 0) {
-      this.cooldown = 2.6 + Math.random() * 0.8;
+      this.cooldown = 3 + Math.random() * 1.2;
       if (!awake) return;
       this.muzzle.getWorldPosition(this.tmp);
-      const yaw = this.head.rotation.y;
-      for (const spread of [-0.22, 0, 0.22]) {
-        const a = yaw + spread;
-        shots.fire(this.tmp, -Math.sin(a), -Math.cos(a), 15, ship.root.position.y, dist * 0.8);
-      }
+      mortars.fire(this.tmp, ship);
     }
   }
 }
@@ -440,7 +440,7 @@ export class EnemyManager {
     }
   }
 
-  update(dt: number, ship: Ship, shots: EnemyShots, camera: THREE.Camera): void {
+  update(dt: number, ship: Ship, shots: EnemyShots, mortars: Mortars, camera: THREE.Camera): void {
     this.camPos.setFromMatrixPosition(camera.matrixWorld);
     this.planeY = ship.root.position.y;
     this.viewProj.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
@@ -450,7 +450,7 @@ export class EnemyManager {
       this.probe.y += e.aimHeight;
       return this.frustum.containsPoint(this.probe);
     };
-    const ctx: Ctx = { ship, shots, world: this.world, dt, onScreen };
+    const ctx: Ctx = { ship, shots, mortars, world: this.world, dt, onScreen };
     const sp = ship.root.position;
     for (const e of this.enemies) {
       const far = Math.hypot(e.root.position.x - sp.x, e.root.position.z - sp.z) > CULL_DISTANCE;
