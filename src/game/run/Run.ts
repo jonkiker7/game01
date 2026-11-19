@@ -9,9 +9,18 @@ import type { RunUI } from './RunUI';
 import { defaultStats, PRIMARY_NAMES, rollUpgrades, rollWeapons, SECONDARY_NAMES, type Stats, type Upgrade, UPGRADES } from './Upgrades';
 
 export const SECTORS = 7;
+
+/** How a sortie ended. */
+export interface RunResult {
+  won: boolean;
+  sectorsCleared: number;
+  totalSectors: number;
+  kills: number;
+  salvage: number;
+  upgrades: string[];
+}
 const ARENA_RADIUS = 110;
 const SURVIVE_TIME = 40;
-const SALVAGE_KEY = 'star-rotor-salvage';
 
 type EncounterKind = 'outpost' | 'survive' | 'stronghold';
 type Phase = 'fight' | 'reward' | 'choosing' | 'gates' | 'transition' | 'over';
@@ -39,6 +48,10 @@ interface Deps {
   releaseInput: () => void;
   /** Reset per-run state kept outside the run (special charge, etc.). */
   resetRunState: () => void;
+  /** Starting stats for a sortie (defaults plus permanent upgrades from home base). */
+  baseStats: () => Stats;
+  /** The run is over (won or shot down): bank salvage and show the summary. */
+  onFinish: (summary: RunResult) => void;
 }
 
 /**
@@ -79,7 +92,7 @@ export class Run {
   /** Start a brand new sortie from the landing zone. */
   start(): void {
     const { ship, enemies, world } = this.d;
-    this.stats = defaultStats();
+    this.stats = this.d.baseStats();
     this.levels.clear();
     this.takenNames.length = 0;
     this.sector = 1;
@@ -283,26 +296,14 @@ export class Run {
 
   private finish(): void {
     this.d.releaseInput();
-    let total = this.salvage;
-    try {
-      total += Number(localStorage.getItem(SALVAGE_KEY) ?? 0) || 0;
-      localStorage.setItem(SALVAGE_KEY, String(total));
-    } catch {
-      /* private mode: salvage just isn't saved */
-    }
-    const cleared = this.won ? SECTORS : this.sector - 1;
-    this.d.ui.showEnd(
-      {
-        won: this.won,
-        sectorsCleared: cleared,
-        totalSectors: SECTORS,
-        kills: this.kills,
-        salvage: this.salvage,
-        totalSalvage: total,
-        upgrades: this.takenNames,
-      },
-      () => this.start(),
-    );
+    this.d.onFinish({
+      won: this.won,
+      sectorsCleared: this.won ? SECTORS : this.sector - 1,
+      totalSectors: SECTORS,
+      kills: this.kills,
+      salvage: this.salvage,
+      upgrades: [...this.takenNames],
+    });
   }
 
   /** What the HUD should say under the radar. */
