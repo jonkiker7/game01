@@ -15,6 +15,10 @@ export interface SaveData {
   /** How the last sortie went (NPCs comment on it). */
   lastRun: { won: boolean; sectors: number; kills: number } | null;
   runs: number;
+  wins: number;
+  deaths: number;
+  /** Conversations already heard (see src/content/dialogue.ts). */
+  seen: string[];
 }
 
 const KEY = 'star-rotor-save';
@@ -32,6 +36,9 @@ function fresh(): SaveData {
     helmet: 'dome',
     lastRun: null,
     runs: 0,
+    wins: 0,
+    deaths: 0,
+    seen: [],
   };
 }
 

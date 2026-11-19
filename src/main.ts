@@ -5,6 +5,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import './style.css';
 import { BaseUI } from './base/BaseUI';
+import { ConversationUI } from './base/Conversation';
 import { HomeBase } from './base/HomeBase';
 import { applyPerks, loadSave, writeSave } from './base/Save';
 import { AimIndicator } from './game/AimIndicator';
@@ -159,6 +160,8 @@ const run = new Run({
     save.salvage += r.salvage;
     save.lastRun = { won: r.won, sectors: r.sectorsCleared, kills: r.kills };
     save.runs++;
+    if (r.won) save.wins++;
+    else save.deaths++;
     writeSave(save);
     runUI.showEnd({ ...r, totalSalvage: save.salvage }, () => runUI.fade(() => goToBase()), 'RETURN TO STATION ▸');
   },
@@ -175,7 +178,7 @@ composer.addPass(renderPass);
 
 // ---------- Home base (the space station) ----------
 const baseUI = new BaseUI($('hud'));
-const base = new HomeBase(save, baseUI);
+const base = new HomeBase(save, baseUI, new ConversationUI($('hud')));
 type Mode = 'base' | 'run';
 let mode: Mode = 'base';
 const gunBtn = $('btn-gun');
