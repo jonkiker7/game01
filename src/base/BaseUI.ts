@@ -1,15 +1,3 @@
-export interface Speaker {
-  name: string;
-  role: string;
-  color: string;
-  icon: string;
-}
-
-export interface DialogOption {
-  label: string;
-  action: () => void;
-}
-
 export interface ShopRow {
   name: string;
   text: string;
@@ -21,21 +9,17 @@ export interface ShopRow {
   onClick?: () => void;
 }
 
-/** Home base overlays: the dialogue box with a speaker portrait, and the shop panels. */
+/** Home base overlays: the salvage readout and the shop panels (conversations are in Conversation.ts). */
 export class BaseUI {
-  private readonly dialog: HTMLElement;
   private readonly shop: HTMLElement;
   private readonly salvage: HTMLElement;
-  private onDialogClose: (() => void) | null = null;
 
   constructor(root: HTMLElement) {
     root.insertAdjacentHTML(
       'beforeend',
       `<div id="base-salvage"></div>
-       <div id="dialog"><div class="portrait"></div><div class="body"><div class="who"></div><div class="line"></div><div class="options"></div></div></div>
        <div id="shop" class="overlay"><div class="panel"><div class="head"><h2></h2><span class="wallet"></span></div><div class="rows"></div><button class="close">DONE ▸</button></div></div>`,
     );
-    this.dialog = root.querySelector('#dialog') as HTMLElement;
     this.shop = root.querySelector('#shop') as HTMLElement;
     this.salvage = root.querySelector('#base-salvage') as HTMLElement;
     this.shop.querySelector('.close')!.addEventListener('pointerup', (e) => {
@@ -45,53 +29,13 @@ export class BaseUI {
   }
 
   get busy(): boolean {
-    return this.dialog.classList.contains('visible') || this.shop.classList.contains('visible');
+    return this.shop.classList.contains('visible');
   }
 
   setSalvage(n: number): void {
     this.salvage.textContent = `⬢ ${n} SALVAGE`;
     const wallet = this.shop.querySelector('.wallet');
     if (wallet) wallet.textContent = `⬢ ${n}`;
-  }
-
-  say(who: Speaker, line: string, options: DialogOption[], onClose?: () => void): void {
-    const portrait = this.dialog.querySelector('.portrait') as HTMLElement;
-    portrait.textContent = who.icon;
-    portrait.style.setProperty('--who', who.color);
-    (this.dialog.querySelector('.who') as HTMLElement).innerHTML = `${who.name} <span>${who.role}</span>`;
-    const lineEl = this.dialog.querySelector('.line') as HTMLElement;
-    lineEl.textContent = '';
-    const opts = this.dialog.querySelector('.options') as HTMLElement;
-    opts.replaceChildren();
-    for (const o of options) {
-      const b = document.createElement('button');
-      b.textContent = o.label;
-      b.addEventListener('pointerup', (e) => {
-        e.stopPropagation();
-        this.closeDialog(false);
-        o.action();
-      });
-      opts.appendChild(b);
-    }
-    this.onDialogClose = onClose ?? null;
-    this.dialog.classList.add('visible');
-    // Typewriter effect.
-    let i = 0;
-    const tick = () => {
-      if (!this.dialog.classList.contains('visible') || i > line.length) return;
-      lineEl.textContent = line.slice(0, i);
-      i += 2;
-      window.setTimeout(tick, 16);
-    };
-    tick();
-  }
-
-  closeDialog(notify = true): void {
-    if (!this.dialog.classList.contains('visible')) return;
-    this.dialog.classList.remove('visible');
-    const cb = this.onDialogClose;
-    this.onDialogClose = null;
-    if (notify) cb?.();
   }
 
   private onShopClose: (() => void) | null = null;

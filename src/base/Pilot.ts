@@ -130,19 +130,22 @@ export class Pilot {
       antenna.position.set(0.38, 0.35, 0.15);
       this.helmet.add(shell, brow, visor, fin, antenna);
     } else if (style === 'fishbowl') {
-      // Retro glass bubble with the head visible inside.
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 10), rimToon('#f0c8a0', rim, 0.3));
-      const eyes = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.06, 0.05), dark);
-      eyes.position.set(0, 0.05, -0.28);
+      // Retro glass bubble with tinted, reflective glass: the pilot stays faceless.
       const ring = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.08, 8, 20), armor);
       ring.rotation.x = Math.PI / 2;
       ring.position.y = -0.35;
-      const glass = new THREE.Mesh(
-        new THREE.SphereGeometry(0.58, 18, 14),
-        glow(s.accent, { transparent: true, opacity: 0.18, depthWrite: false }, 1),
+      const glass = new THREE.Mesh(new THREE.SphereGeometry(0.58, 18, 14), rimToon('#1d2a3a', s.accent, 0.8));
+      const shine = new THREE.Mesh(
+        new THREE.SphereGeometry(0.2, 10, 8),
+        glow('#ffffff', { transparent: true, opacity: 0.55, depthWrite: false }, 1.2),
       );
-      glass.userData.noOutline = true;
-      this.helmet.add(head, eyes, ring, glass);
+      shine.scale.set(1.3, 0.6, 0.3);
+      shine.position.set(-0.22, 0.26, -0.42);
+      shine.userData.noOutline = true;
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.04, 6, 24, Math.PI), glow(s.accent, {}, 1.4));
+      band.position.set(0, 0.02, -0.12);
+      band.rotation.set(0.15, 0, 0);
+      this.helmet.add(ring, glass, shine, band);
     } else {
       // Classic dome with a big glowing visor and an armor crest.
       const shell = new THREE.Mesh(new THREE.SphereGeometry(0.52, 18, 14), suit);

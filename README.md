@@ -60,6 +60,24 @@ Board your ship to launch: a short cutscene flies you out of the hangar bay into
 the run, the summary banks your salvage and takes you back to the station. Progress is saved in the
 browser. Add `?sortie` to the URL to skip straight into a run (handy for testing).
 
+## Conversations and portraits
+
+Talking to the crew opens a Hades-style conversation: big portraits on both sides (your helmeted
+pilot on the left, the crew member on the right), a name banner, typed-out text, expressions that
+change line by line, and branching choices. A gold **!** over someone means they have something
+new to say. The crew remembers what you've already talked about and picks new conversations as
+your runs, wins and deaths add up.
+
+- **Writing dialogue:** edit `src/content/dialogue.ts` (instructions at the top of the file).
+  All current lines are placeholders.
+- **Characters:** names, roles and colours in `src/content/characters.ts` (the player's callsign
+  is a placeholder too).
+- **Adding portrait art:** save PNGs as `public/portraits/<character>/<mood>.png`, e.g.
+  `public/portraits/rook/happy.png`, then list the moods under `art` for that character in
+  `characters.ts`. Moods: neutral, happy, annoyed, surprised, sad. Best results: transparent
+  background, waist-up, about 1000–1500 px tall, consistent framing across characters. Characters
+  without art use generated placeholder portraits.
+
 ## Sorties (roguelite runs)
 
 Each run is a **sortie** of 7 sectors. Every sector is an arena around a jungle outpost, fenced

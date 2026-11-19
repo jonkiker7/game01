@@ -3,7 +3,9 @@ import type { Input } from '../game/Input';
 import { addOutlines, glow } from '../game/materials';
 import { approachAngle, damp } from '../game/math';
 import { buildShipDesign, SHIP_DESIGNS, type ShipDesignId, type ShipParts } from '../game/ShipDesigns';
-import type { BaseUI, ShopRow, Speaker } from './BaseUI';
+import { CONVERSATIONS, IDLE, type StoryState } from '../content/dialogue';
+import type { BaseUI, ShopRow } from './BaseUI';
+import type { ConversationUI } from './Conversation';
 import { Pilot } from './Pilot';
 import { HELMETS, PERKS, type SaveData, SHIP_PRICES, SUITS, writeSave } from './Save';
 import { BAY_EXIT, buildStation, type Collider, DECK_RADIUS, PAD, STATION } from './Station';
@@ -14,12 +16,13 @@ const LAUNCH_RANGE = 9.5;
 const CAM_OFFSET = new THREE.Vector3(0, 11.5, 13.5); // close and fairly low, so the windows and planets show behind the crew
 
 interface Npc {
-  speaker: Speaker;
+  id: 'rook' | 'juno' | 'pip';
   pilot: Pilot;
   pos: THREE.Vector3;
-  lines: (s: SaveData) => string;
   shop: () => void;
   shopLabel: string;
+  /** "!" over their head when they have something new to say. */
+  marker: THREE.Sprite;
 }
 
 type Target = { kind: 'npc'; npc: Npc } | { kind: 'ship' };
@@ -51,6 +54,7 @@ export class HomeBase {
   constructor(
     private readonly save: SaveData,
     private readonly ui: BaseUI,
+    private readonly convo: ConversationUI,
   ) {
     this.scene.background = new THREE.Color(STATION.space);
     this.scene.add(new THREE.HemisphereLight('#ffe9d0', '#2a2440', 1.2));
@@ -91,6 +95,12 @@ export class HomeBase {
     this.ui.setSalvage(this.save.salvage);
     this.pilot.setLook(this.save.suit, this.save.helmet);
     this.setShip(this.save.ship);
+    this.updateMarkers();
+  }
+
+  /** Is a menu or conversation open? (Then the pilot doesn't walk.) */
+  private get busy(): boolean {
+    return this.ui.busy || this.convo.active;
   }
 
   setAspect(aspect: number): void {
@@ -100,7 +110,7 @@ export class HomeBase {
 
   /** What the action button should say right now (null = nothing in reach). */
   get actionLabel(): string | null {
-    if (this.launching >= 0 || this.ui.busy) return null;
+    if (this.launching >= 0 || this.busy) return null;
     if (!this.target) return null;
     return this.target.kind === 'ship' ? 'LAUNCH' : 'TALK';
   }
@@ -109,7 +119,10 @@ export class HomeBase {
     this.time += dt;
     this.holo.rotation.y += dt * 0.6;
     this.planet.rotation.y += dt * 0.01;
-    for (const n of this.npcs) n.pilot.animate(dt, 0);
+    for (const n of this.npcs) {
+      n.pilot.animate(dt, 0);
+      n.marker.position.y = 4.1 + Math.sin(this.time * 4) * 0.15;
+    }
     if (this.shipParts) for (const s of this.shipParts.spinners) s.obj.rotation.y += s.dir * dt * (this.launching >= 0 ? 22 : 2);
 
     if (this.launching >= 0) {
@@ -120,7 +133,7 @@ export class HomeBase {
     // Walk (unless a menu is open).
     const p = this.pilot.root.position;
     let speed = 0;
-    if (!this.ui.busy) {
+    if (!this.busy) {
       const m = input.getMove();
       const len = Math.hypot(m.x, m.y);
       if (len > 0.05) {
@@ -145,7 +158,7 @@ export class HomeBase {
     }
     if (Math.hypot(p.x - PAD.x, p.z - PAD.z) < LAUNCH_RANGE && !this.target) this.target = { kind: 'ship' };
 
-    if (input.consumePress('gun') && this.target && !this.ui.busy) this.act(this.target);
+    if (input.consumePress('gun') && this.target && !this.busy) this.act(this.target);
 
     // Camera follows the pilot.
     this.focus.x = damp(this.focus.x, p.x, 5, dt);
@@ -161,10 +174,39 @@ export class HomeBase {
       return;
     }
     const n = t.npc;
-    this.ui.say(n.speaker, n.lines(this.save), [
-      { label: n.shopLabel, action: () => n.shop() },
-      { label: 'LATER', action: () => {} },
-    ]);
+    // Face the player while talking.
+    const p = this.pilot.root.position;
+    n.pilot.root.rotation.y = Math.atan2(-(p.x - n.pos.x), -(p.z - n.pos.z));
+    const next = this.nextConversation(n.id);
+    const lines = next
+      ? next.lines
+      : [{ who: n.id, mood: 'neutral' as const, text: IDLE[n.id][Math.floor(Math.random() * IDLE[n.id].length)] }];
+    if (next) {
+      this.save.seen.push(next.id);
+      writeSave(this.save);
+    }
+    this.convo.play(n.id, lines, [{ label: n.shopLabel, action: () => n.shop() }, { label: 'LEAVE' }]);
+    this.updateMarkers();
+  }
+
+  /** The best unheard conversation for this crew member right now, if any. */
+  private nextConversation(npc: Npc['id']) {
+    const s = this.save;
+    const state: StoryState = {
+      runs: s.runs,
+      wins: s.wins,
+      deaths: s.deaths,
+      salvage: s.salvage,
+      lastRun: s.lastRun,
+      seen: (id) => s.seen.includes(id),
+    };
+    return CONVERSATIONS.filter((c) => c.npc === npc && !s.seen.includes(c.id) && (!c.when || c.when(state))).sort(
+      (a, b) => (b.priority ?? 0) - (a.priority ?? 0),
+    )[0];
+  }
+
+  private updateMarkers(): void {
+    for (const n of this.npcs) n.marker.visible = !!this.nextConversation(n.id);
   }
 
   // ---------------------------------------------------------------- launch cutscene
@@ -227,16 +269,11 @@ export class HomeBase {
   private addCrew(): void {
     const save = this.save;
     const rook: Npc = {
-      speaker: { name: 'ROOK', role: 'QUARTERMASTER', color: '#e2733a', icon: '⚙' },
+      id: 'rook',
+      marker: newMarker(),
       pilot: new Pilot('crimson', 'tactical'),
       pos: new THREE.Vector3(-15, 0, -9.2),
       shopLabel: 'UPGRADES',
-      lines: (s) =>
-        s.runs === 0
-          ? "Name's Rook. You bring back salvage, I bolt better gear onto you. Simple arrangement."
-          : s.lastRun?.won
-            ? "A full sortie. Even I'm impressed. Don't let it go to your helmet. Got salvage to spend?"
-            : `Shot down after ${s.lastRun?.sectors ?? 0} sectors, huh? Armor's cheaper than funerals, rookie. Spend that scrap.`,
       shop: () =>
         this.ui.openShop('QUARTERMASTER · PERMANENT UPGRADES', () =>
           PERKS.map((p): ShopRow => {
@@ -260,14 +297,11 @@ export class HomeBase {
         ),
     };
     const juno: Npc = {
-      speaker: { name: 'JUNO', role: 'OUTFITTER', color: '#ff5fd2', icon: '✦' },
+      id: 'juno',
+      marker: newMarker(),
       pilot: new Pilot('midnight', 'fishbowl'),
       pos: new THREE.Vector3(-7, 0, -14.2),
       shopLabel: 'WARDROBE',
-      lines: (s) =>
-        s.suit === 'standard'
-          ? "Darling, you can't save the galaxy in standard issue. Let's find you something with a little flair."
-          : 'Now THAT is a pilot who gets noticed. The enemy will be so distracted.',
       shop: () =>
         this.ui.openShop('OUTFITTER · SUITS & HELMETS', () => [
           ...SUITS.map((suit): ShopRow => this.cosmeticRow(suit.name, 'Suit', suit.id, suit.price, 'suits', 'suit')),
@@ -275,14 +309,11 @@ export class HomeBase {
         ]),
     };
     const pip: Npc = {
-      speaker: { name: 'PIP', role: 'MECHANIC', color: '#6ff7ff', icon: '🔧' },
+      id: 'pip',
+      marker: newMarker(),
       pilot: new Pilot('arctic', 'dome'),
       pos: new THREE.Vector3(3, 0, -16),
       shopLabel: 'HANGAR',
-      lines: (s) =>
-        s.runs === 0
-          ? "Pip here! I keep your birds flying. The Manta's fueled and ready. I've got a few other ships out back, too!"
-          : "Welcome back! Not too many dents this time. Want to try a different ship? I've got options!",
       shop: () =>
         this.ui.openShop('MECHANIC · SHIPS', () =>
           SHIP_DESIGNS.map((d): ShopRow => {
@@ -312,7 +343,8 @@ export class HomeBase {
     for (const n of [rook, juno, pip]) {
       n.pilot.root.position.copy(n.pos);
       n.pilot.root.rotation.y = Math.PI; // face the camera / player
-      this.scene.add(n.pilot.root);
+      n.marker.position.set(n.pos.x, 4.1, n.pos.z);
+      this.scene.add(n.pilot.root, n.marker);
       this.colliders.push({ x: n.pos.x, z: n.pos.z, r: 1.1 });
       this.npcs.push(n);
     }
@@ -371,4 +403,30 @@ export class HomeBase {
       }
     }
   }
+}
+
+/** A bobbing gold "!" shown over a crew member who has something new to say. */
+function newMarker(): THREE.Sprite {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d')!;
+  g.fillStyle = '#1b1233';
+  g.beginPath();
+  g.arc(64, 64, 56, 0, Math.PI * 2);
+  g.fill();
+  g.fillStyle = '#f2c46d';
+  g.beginPath();
+  g.arc(64, 64, 48, 0, Math.PI * 2);
+  g.fill();
+  g.fillStyle = '#1b1233';
+  g.font = "900 80px 'Cinzel', Georgia, serif";
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText('!', 64, 68);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+  s.scale.set(1.4, 1.4, 1);
+  s.renderOrder = 30;
+  return s;
 }
