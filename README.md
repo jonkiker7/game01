@@ -90,6 +90,22 @@ your runs, wins and deaths add up.
   background, waist-up, about 1000–1500 px tall, consistent framing across characters. Characters
   without art use generated placeholder portraits.
 
+## Contracts
+
+Talk to **BOLT** at the info desk and pick **CONTRACTS** to see the contract board: three jobs
+posted by the crew, each tied to one sector of your next sortie. Take one at a time.
+
+- **Retrieve:** a cargo pod is down in that sector (look for the orange light beam): fly over it.
+- **Hunt:** an alpha drone (big, gold-crowned, tough) leads the swarm there. The sector isn't
+  clear until it's destroyed.
+- **Uplink:** a relay beacon stands there: hover inside its ring until the upload reaches 100%.
+
+The contract shows on the radar (orange) and under it (◆). Finish it and the reward is paid when
+the sortie ends, even if you're shot down afterwards. Miss it and it stays active for the next
+sortie (or drop it from the board). New offers go up after every sortie. The crew members who
+post contracts have things to say once you've finished one. Contract writing lives in
+`src/content/contracts.ts` (placeholder text, edit freely).
+
 ## Sorties (roguelite runs)
 
 Each run is a **sortie** of 7 sectors. Every sector is an arena around a jungle outpost, fenced
@@ -184,6 +200,6 @@ One-time setup: **Settings → Pages → Source: GitHub Actions**.
 4. ✅ Run structure: sectors, arenas, rewards, upgrade choices, gates, run summary, salvage
 5. ✅ Upgrades and weapons: Scatter/Rail guns, Cluster/Swarm missiles, Arc/Cryo/Plasma families and duos, Nova special
 6. ✅ Home base: space station hub, walkable pilot, crew with dialogue, permanent upgrades, outfits, ships, launch cutscene; multi-room isometric station with BOLT's info desk
-7. Contracts: NPC missions that appear as special arenas in a sortie
+7. ✅ Contracts: BOLT's contract board, retrieve / hunt / uplink objectives in sorties
 8. Bosses and new enemies
 9. Polish: audio, menus, saves, offline play

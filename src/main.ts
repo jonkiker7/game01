@@ -7,7 +7,7 @@ import './style.css';
 import { BaseUI } from './base/BaseUI';
 import { ConversationUI } from './base/Conversation';
 import { HomeBase } from './base/HomeBase';
-import { applyPerks, loadSave, writeSave } from './base/Save';
+import { applyPerks, loadSave, rollContracts, writeSave } from './base/Save';
 import { AimIndicator } from './game/AimIndicator';
 import { CameraRig } from './game/CameraRig';
 import { Effects } from './game/Effects';
@@ -28,6 +28,7 @@ import { BULLET_STYLES, Bullets, EnemyShots } from './game/Projectiles';
 import { Combat } from './game/Combat';
 import { Mortars } from './game/Mortars';
 import { ArenaVisual } from './game/run/Arena';
+import { ContractTracker } from './game/run/Contracts';
 import { Run } from './game/run/Run';
 import { defaultStats } from './game/run/Upgrades';
 import { RunUI } from './game/run/RunUI';
@@ -133,7 +134,10 @@ rig.snapTo(ship.root.position);
 const runUI = new RunUI($('hud'));
 let paused = false;
 const blips: Blip[] = [];
+const contracts = new ContractTracker(scene, world, enemies, hud);
 const run = new Run({
+  contracts,
+  activeContract: () => save.contracts.active,
   ship,
   enemies,
   world,
@@ -158,6 +162,15 @@ const run = new Run({
   },
   onFinish: (r) => {
     save.salvage += r.salvage;
+    if (r.contract?.done && save.contracts.active) {
+      // Contract complete: pay out, and the crew member who posted it remembers.
+      const c = save.contracts.active;
+      save.salvage += c.reward;
+      save.contracts.done++;
+      save.contracts.byClient[c.client] = (save.contracts.byClient[c.client] ?? 0) + 1;
+      save.contracts.active = null;
+    }
+    save.contracts.offers = rollContracts(); // a fresh board after every sortie
     save.lastRun = { won: r.won, sectors: r.sectorsCleared, kills: r.kills };
     save.runs++;
     if (r.won) save.wins++;
@@ -299,7 +312,7 @@ missiles.onExplode = (pos, power) => {
   input.vibrate(25 + Math.round(power * 30));
 };
 enemies.onKill = (kind, pos, enemy) => {
-  run.onKill(kind);
+  run.onKill(kind, enemy);
   combat.onKill(enemy, pos, world.heightAt(pos.x, pos.z));
   // Sometimes a wreck drops a healing orb that floats up to flying height.
   if (Math.random() < DROP_CHANCE[kind] + ship.stats.dropBonus) {

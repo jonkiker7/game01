@@ -34,6 +34,8 @@ export abstract class Enemy implements Hittable {
   abstract readonly aimHeight: number;
   abstract readonly kind: 'turret' | 'drone';
   alive = true;
+  /** A contract target (the "alpha"): bigger, tougher, marked on the radar. */
+  elite = false;
   protected hp: number;
   protected flash = 0;
   protected readonly mats: THREE.MeshToonMaterial[] = [];
@@ -256,10 +258,10 @@ class Turret extends Enemy {
 
 /** Flying drone: closes in, circles you, and fires quick bursts. */
 class Drone extends Enemy {
-  readonly radius = 1.9;
+  readonly radius: number;
   readonly kind = 'drone';
-  readonly hitBottom = -2.5;
-  readonly hitTop = 3;
+  readonly hitBottom: number;
+  readonly hitTop: number;
   readonly aimHeight = 0;
   private readonly body = new THREE.Group();
   private readonly ring: THREE.Mesh;
@@ -271,8 +273,11 @@ class Drone extends Enemy {
   private burstTimer = 0;
   private readonly tmp = new THREE.Vector3();
 
-  constructor(hpMul = 1) {
+  constructor(hpMul = 1, readonly size = 1) {
     super(30 * hpMul);
+    this.radius = 1.9 * size;
+    this.hitBottom = -2.5 * size;
+    this.hitTop = 3 * size;
     const core = new THREE.Mesh(new THREE.IcosahedronGeometry(1.1, 0), this.mat(ENEMY_ARMOR));
     const eye = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 8), glow(ENEMY_GLOW));
     eye.position.z = -0.75;
@@ -291,6 +296,21 @@ class Drone extends Enemy {
     this.ring.rotation.x = Math.PI / 2;
     this.body.add(core, eye);
     this.root.add(this.body, this.ring);
+    if (size > 1) {
+      // The alpha: a gold crown of spikes and a halo.
+      const gold = glow('#ffc23a', {}, 1.6);
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2;
+        const spike = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.9, 5), gold);
+        spike.position.set(Math.cos(a) * 0.7, 1.2, Math.sin(a) * 0.7);
+        this.body.add(spike);
+      }
+      const halo = new THREE.Mesh(new THREE.TorusGeometry(2.3, 0.1, 6, 32), gold);
+      halo.rotation.x = Math.PI / 2;
+      this.ring.add(halo);
+      this.body.scale.setScalar(size);
+      this.ring.scale.setScalar(size);
+    }
     addOutlines(this.root);
   }
 
@@ -327,8 +347,8 @@ class Drone extends Enemy {
     // Fire a 3-shot burst at the player every few seconds.
     this.cooldown -= dt;
     if (this.cooldown <= 0 && ship.alive && dist < ATTACK_RANGE - 4 && onScreen(this)) {
-      this.cooldown = 2.4 + Math.random();
-      this.burst = 3;
+      this.cooldown = (2.4 + Math.random()) / (this.size > 1 ? 1.6 : 1);
+      this.burst = this.size > 1 ? 5 : 3;
       this.burstTimer = 0;
     }
     if (this.burst > 0) {
@@ -471,7 +491,7 @@ export class EnemyManager {
       this.droneTimer -= dt;
       if (this.droneTimer <= 0) {
         this.droneTimer = this.drones.interval;
-        const alive = this.enemies.filter((e) => e.kind === 'drone').length;
+        const alive = this.enemies.filter((e) => e.kind === 'drone' && !e.elite).length;
         if (alive < this.drones.max) this.spawnDrone();
       }
     }
@@ -577,6 +597,16 @@ export class EnemyManager {
     };
     this.enemies.push(e);
     this.scene.add(e.root);
+  }
+
+  /** The contract's alpha drone: a big, tough drone arriving from the arena's edge. */
+  spawnElite(): Enemy {
+    const a = this.rand() * Math.PI * 2;
+    const r = this.arena.r * 0.6;
+    const e = new Drone(this.hpMul * 9, 1.8);
+    e.elite = true;
+    this.register(e, this.arena.x + Math.cos(a) * r, this.arena.z + Math.sin(a) * r);
+    return e;
   }
 
   /** A drone arriving from a random point on the arena's edge. */

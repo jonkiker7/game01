@@ -383,14 +383,55 @@ export class HomeBase {
       writeSave(this.save);
     }
     if (n.id === 'bot') {
-      lines.push(...this.directions());
-      this.convo.play(n.id, lines);
+      this.convo.play(n.id, lines, [
+        { label: 'CONTRACTS', action: () => this.openContracts() },
+        { label: 'DIRECTIONS', action: () => this.convo.play('bot', this.directions()) },
+        { label: 'LEAVE' },
+      ]);
     } else {
       // You found who BOLT pointed you to.
       if (this.guide && SPOTS[n.id as 'rook'] && this.guide.id === GUIDE_FOR[n.id]) this.setGuide(null);
       this.convo.play(n.id, lines, [{ label: n.shopLabel!, action: () => n.shop?.() }, { label: 'LEAVE' }]);
     }
     this.updateMarkers();
+  }
+
+  /** BOLT's contract board: take one job at a time for your next sortie. */
+  private openContracts(): void {
+    const board = this.save.contracts;
+    const who = (c: { client: string }) => c.client.toUpperCase();
+    this.ui.openShop('CONTRACT BOARD · ONE AT A TIME', () => {
+      const rows: ShopRow[] = [];
+      const active = board.active;
+      if (active) {
+        rows.push({
+          name: `▶ ${active.title}`,
+          text: `${active.text} <i>${KIND_LABEL[active.type]} · from ${who(active)}</i>`,
+          status: `ACTIVE · SECTOR ${active.sector} · ⬢ ${active.reward}`,
+          button: 'DROP',
+          onClick: () => {
+            board.active = null;
+            writeSave(this.save);
+          },
+        });
+      }
+      for (const c of board.offers) {
+        rows.push({
+          name: c.title,
+          text: `${c.text} <i>${KIND_LABEL[c.type]} · from ${who(c)}</i>`,
+          status: `SECTOR ${c.sector} · ⬢ ${c.reward}`,
+          button: active ? null : 'ACCEPT',
+          onClick: () => {
+            if (board.active) return;
+            board.active = c;
+            board.offers = board.offers.filter((o) => o !== c);
+            writeSave(this.save);
+          },
+        });
+      }
+      if (rows.length === 0) rows.push({ name: 'No contracts posted', text: 'New jobs go up after every sortie.', status: '', button: null });
+      return rows;
+    });
   }
 
   /** BOLT's menu: where everyone is. Picking one lights a path there. */
@@ -435,6 +476,8 @@ export class HomeBase {
       salvage: s.salvage,
       lastRun: s.lastRun,
       seen: (id) => s.seen.includes(id),
+      contracts: s.contracts.done,
+      contractsFor: (who) => s.contracts.byClient[who] ?? 0,
     };
     return CONVERSATIONS.filter((c) => c.npc === npc && !s.seen.includes(c.id) && (!c.when || c.when(state))).sort(
       (a, b) => (b.priority ?? 0) - (a.priority ?? 0),
@@ -748,6 +791,8 @@ export class HomeBase {
     addOutlines(this.shipHolder);
   }
 }
+
+const KIND_LABEL = { retrieve: 'RETRIEVE', hunt: 'HUNT', uplink: 'UPLINK' } as const;
 
 /** Which of BOLT's destinations each crew member is at. */
 const GUIDE_FOR: Record<string, string> = { rook: 'armory', juno: 'boutique', pip: 'hangar' };

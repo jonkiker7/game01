@@ -21,6 +21,7 @@ export interface RunSummary {
   salvage: number;
   totalSalvage: number;
   upgrades: string[];
+  contract: { title: string; reward: number; done: boolean } | null;
 }
 
 /** Full-screen run overlays: the 1-of-3 upgrade cards, the end-of-run summary, and fades. */
@@ -84,6 +85,15 @@ export class RunUI {
         <div><b>${s.kills}</b><span>ENEMIES DESTROYED</span></div>
         <div><b>⬢ ${s.salvage}</b><span>SALVAGE EARNED</span></div>
       </div>
+      ${
+        s.contract
+          ? `<div class="contract ${s.contract.done ? 'done' : ''}">${
+              s.contract.done
+                ? `CONTRACT COMPLETE · ${s.contract.title} · +⬢ ${s.contract.reward}`
+                : `CONTRACT NOT DONE · ${s.contract.title} <small>(still active for your next sortie)</small>`
+            }</div>`
+          : ''
+      }
       <div class="upgrades">${s.upgrades.length ? s.upgrades.map((u) => `<span>${u}</span>`).join('') : '<em>No upgrades taken</em>'}</div>
       <div class="total">Salvage banked: ⬢ ${s.totalSalvage} <small>(spend it with the crew back on the station)</small></div>
       <button class="again">${buttonLabel}</button>`;
