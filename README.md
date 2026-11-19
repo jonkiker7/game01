@@ -12,6 +12,7 @@ classic 16-bit isometric helicopter shooters, with a painterly toon look.
 | Machine gun (hold, drag to aim) | **GUN** button, used as an aiming stick | J (fires straight ahead) |
 | Missile (hold to charge, drag to aim, release to fire) | **MSL** button, used as an aiming stick | K (fires straight ahead) |
 | Boost (dash) | **BOOST** button | L / Space |
+| Nova (special) | **NOVA** button, when charged | U |
 
 Both weapon buttons are twin-stick style: hold and drag your thumb toward a target and the ship
 turns to face it. Holding GUN without dragging fires straight ahead and slows turning, so you can
@@ -55,8 +56,8 @@ in by a glowing energy wall:
 
 Clearing a sector drops a **reward orb** in the middle of the arena. Fly into it:
 
-- **Upgrade:** pick 1 of 3 upgrades (faster gun, split shot, extra missile, bigger blasts, more
-  armor, ramming boost, and more; see `src/game/run/Upgrades.ts`).
+- **Upgrade:** pick 1 of 3 upgrades (see `src/game/run/Upgrades.ts`).
+- **Armory:** pick a new weapon for one of your slots.
 - **Repair:** restore 40% armor.
 - **Salvage:** currency for home base (coming in a later milestone). Kills earn salvage too.
 
@@ -66,6 +67,21 @@ shot down the run ends; the summary screen shows your progress and banks your sa
 
 The radar marks whatever the current step is about (towers, drones, the reward, or the gates) and
 shows the arena wall as a dashed circle.
+
+## Weapons, upgrades and Nova
+
+- **Gun slot:** Machine Gun (default), **Scatter Cannon** (6-pellet short-range blasts) or
+  **Rail Lance** (slow, heavy bolts that pierce every enemy in a line).
+- **Missile slot:** Missiles (default, charged with lock-on), **Cluster Bomb** (the blast throws
+  out 5 bomblets) or **Swarm Rockets** (a volley of homing rockets; charge for more).
+- **Nova:** the NOVA button charges as you deal damage. When it glows, tap it for a shockwave
+  that damages everything around you and wipes out enemy shots.
+- **Upgrade families** (coloured cards):
+  - **Arc (lightning):** Arc Rounds, Arc Warheads, Static Field
+  - **Cryo (ice):** Cryo Rounds (chill; 5 chills freeze), Cryo Warheads, Frostbite
+  - **Plasma (fire):** Plasma Rounds, Plasma Warheads, Meltdown
+  - **Duos** (need two families): Superconductor (Arc + Cryo), Thermal Shock (Cryo + Plasma)
+- Plus core upgrades for the gun, missiles, boost, hull and Nova.
 
 ## Ship designs
 
@@ -99,6 +115,7 @@ npm run preview   # serve the production build
 - `src/game/Enemies.ts`: turret towers, drones, and spawning (enemies only fire while on screen)
 - `src/game/Effects.ts`: pooled smoke, explosions, shockwaves, sparks, embers, debris, and floating motes
 - `src/game/Hud.ts`: armor bar, salvage, objective, missile pips, messages, and damage/heal flashes
+- `src/game/Combat.ts`: every hit goes through here so elemental upgrades can react
 - `src/game/run/`: the roguelite run: `Run.ts` (sectors and flow), `Upgrades.ts` (stats and upgrade pool), `Arena.ts` (wall, reward orb, gates), `RunUI.ts` (upgrade cards and summary)
 - `src/game/Radar.ts`: the radar
 - `src/game/AimIndicator.ts`: the charging aim line and target ring
@@ -118,7 +135,7 @@ One-time setup: **Settings → Pages → Source: GitHub Actions**.
 2. ✅ Combat: twin-stick gun and missiles, turrets, drones, armor, explosions
 3. ✅ Art pass: ink outlines, rim light, bloom, painted ground, particles, hit-stop
 4. ✅ Run structure: sectors, arenas, rewards, upgrade choices, gates, run summary, salvage
-5. Upgrades and weapons: new weapon types per slot, upgrade families, a special ability
+5. ✅ Upgrades and weapons: Scatter/Rail guns, Cluster/Swarm missiles, Arc/Cryo/Plasma families and duos, Nova special
 6. Home base: walkable hub, NPCs and dialogue, permanent upgrades
 7. Contracts: NPC missions that appear as special arenas in a sortie
 8. Bosses and new enemies

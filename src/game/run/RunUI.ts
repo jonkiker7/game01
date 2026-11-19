@@ -5,6 +5,12 @@ const CATEGORY: Record<UpgradeCategory, { icon: string; color: string; name: str
   missile: { icon: '➶', color: '#ff8a5c', name: 'MISSILES' },
   boost: { icon: '»', color: '#6ff7ff', name: 'BOOST' },
   hull: { icon: '⬡', color: '#7dff9a', name: 'HULL' },
+  special: { icon: '✺', color: '#c9a8ff', name: 'NOVA' },
+  arc: { icon: 'ϟ', color: '#9fb8ff', name: 'ARC · LIGHTNING' },
+  cryo: { icon: '❄', color: '#8ff0ff', name: 'CRYO · ICE' },
+  plasma: { icon: '🜂', color: '#ff8a3d', name: 'PLASMA · FIRE' },
+  duo: { icon: '✧', color: '#ffe680', name: 'DUO' },
+  weapon: { icon: '⚔', color: '#e0b3ff', name: 'WEAPON' },
 };
 
 export interface RunSummary {
@@ -45,7 +51,8 @@ export class RunUI {
   }
 
   /** Show three upgrade cards; calls `pick` with the chosen one. */
-  chooseUpgrade(options: Upgrade[], levels: Map<string, number>, pick: (u: Upgrade) => void): void {
+  chooseUpgrade(options: Upgrade[], levels: Map<string, number>, pick: (u: Upgrade) => void, title = 'CHOOSE AN UPGRADE'): void {
+    (this.cardsEl.querySelector('h2') as HTMLElement).textContent = title;
     const list = this.cardsEl.querySelector('.cards') as HTMLElement;
     list.replaceChildren();
     for (const u of options) {
@@ -58,7 +65,7 @@ export class RunUI {
         <div class="cat">${cat.name}</div>
         <div class="name">${u.name}</div>
         <div class="text">${u.text}</div>
-        <div class="level">${level > 0 ? `LEVEL ${level} → ${level + 1}` : 'NEW'}</div>`;
+        <div class="level">${u.category === 'weapon' ? 'EQUIP' : level > 0 ? `LEVEL ${level} → ${level + 1}` : 'NEW'}</div>`;
       card.addEventListener('pointerup', (e) => {
         e.stopPropagation();
         this.cardsEl.classList.remove('visible');

@@ -6,7 +6,7 @@ import { HOVER_HEIGHT, type Ship } from '../Ship';
 import { LANDING_PAD, OUTPOSTS, type World } from '../World';
 import { type ArenaVisual, type Gate, REWARD_STYLE, type Reward } from './Arena';
 import type { RunUI } from './RunUI';
-import { defaultStats, rollUpgrades, type Stats, UPGRADES } from './Upgrades';
+import { defaultStats, PRIMARY_NAMES, rollUpgrades, rollWeapons, SECONDARY_NAMES, type Stats, type Upgrade, UPGRADES } from './Upgrades';
 
 export const SECTORS = 7;
 const ARENA_RADIUS = 110;
@@ -37,6 +37,8 @@ interface Deps {
   setPaused: (paused: boolean) => void;
   /** Let go of all held buttons (whenever a full-screen menu opens or closes). */
   releaseInput: () => void;
+  /** Reset per-run state kept outside the run (special charge, etc.). */
+  resetRunState: () => void;
 }
 
 /**
@@ -86,6 +88,7 @@ export class Run {
     this.won = false;
     this.used.clear();
     this.reward = 'upgrade';
+    this.d.resetRunState();
     this.d.clearField();
     enemies.reset();
     this.d.arena.hideGates();
@@ -191,15 +194,16 @@ export class Run {
   private collectReward(): void {
     const { ship, hud, arena, ui } = this.d;
     arena.hideReward();
-    if (this.reward === 'upgrade') {
-      const options = rollUpgrades(this.levels);
+    if (this.reward === 'upgrade' || this.reward === 'weapon') {
+      const isWeapon = this.reward === 'weapon';
+      const options = isWeapon ? this.weaponOptions() : rollUpgrades(this.levels, this.stats);
       if (options.length > 0) {
         this.phase = 'choosing';
         this.d.setPaused(true);
         this.d.releaseInput();
         ui.chooseUpgrade(options, this.levels, (u) => {
           this.levels.set(u.id, (this.levels.get(u.id) ?? 0) + 1);
-          this.takenNames.push(u.name);
+          this.takenNames.push(isWeapon ? `⚔ ${u.name}` : u.name);
           u.apply(this.stats);
           u.onTake?.({ heal: (n) => ship.heal(n) });
           // Keep current values sensible after stat changes.
@@ -208,7 +212,7 @@ export class Run {
           this.d.releaseInput();
           hud.show(u.name.toUpperCase(), 1.6);
           this.openGates();
-        });
+        }, isWeapon ? 'ARMORY · CHOOSE A WEAPON' : 'CHOOSE AN UPGRADE');
         return;
       }
     } else if (this.reward === 'repair') {
@@ -223,6 +227,15 @@ export class Run {
     this.openGates();
   }
 
+  /** Armory options, with the card text saying which weapon each one replaces. */
+  private weaponOptions(): Upgrade[] {
+    return rollWeapons(this.stats).map((w) => {
+      const primary = ['w-machinegun', 'w-scatter', 'w-rail'].includes(w.id);
+      const current = primary ? PRIMARY_NAMES[this.stats.primary] : SECONDARY_NAMES[this.stats.secondary];
+      return { ...w, text: `${w.text} Replaces your ${current}.` };
+    });
+  }
+
   /** Two gates on the far side of the arena, each showing the next encounter's reward. */
   private openGates(): void {
     const y = this.d.ship.root.position.y;
@@ -230,7 +243,7 @@ export class Run {
     if (this.sector + 1 === SECTORS) {
       this.gates = [{ x: this.center.x, z: this.center.y - edge, reward: 'final' }];
     } else {
-      const pool: Reward[] = ['upgrade', 'upgrade', 'salvage', 'repair'];
+      const pool: Reward[] = ['upgrade', 'upgrade', 'upgrade', 'weapon', 'salvage', 'repair'];
       const a = pool[Math.floor(Math.random() * pool.length)];
       let b = pool[Math.floor(Math.random() * pool.length)];
       while (b === a) b = pool[Math.floor(Math.random() * pool.length)];

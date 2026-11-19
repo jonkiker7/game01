@@ -205,6 +205,8 @@ export class Effects {
   private readonly debris: Particles;
   private readonly motes: Motes;
   private readonly tmp = new THREE.Vector3();
+  private readonly bolts: THREE.Mesh[] = [];
+  private nextBolt = 0;
 
   constructor(
     scene: THREE.Scene,
@@ -225,11 +227,68 @@ export class Effects {
     );
     this.debris = new Particles(scene, new THREE.DodecahedronGeometry(1, 0), toon('#2c1533'), 90, 38);
     this.motes = new Motes(scene);
+    // Lightning bolts: ribbons of 8 segments, reused.
+    for (let i = 0; i < 16; i++) {
+      const segs = 8;
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array((segs + 1) * 2 * 3), 3));
+      const index: number[] = [];
+      for (let k = 0; k < segs; k++) {
+        const a = k * 2;
+        index.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+      }
+      geo.setIndex(index);
+      const bolt = new THREE.Mesh(
+        geo,
+        glow('#a9c8ff', { transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }),
+      );
+      bolt.visible = false;
+      bolt.frustumCulled = false;
+      scene.add(bolt);
+      this.bolts.push(bolt);
+    }
   }
 
   /** Glowing streak behind the engines while boosting. */
   trail(pos: THREE.Vector3): void {
     this.trails.spawn(pos, '#6ff7ff', 0.5, 0.7, 0.12, 0.9);
+  }
+
+  /** A jagged lightning bolt between two points that flickers out quickly. */
+  lightning(from: THREE.Vector3, to: THREE.Vector3, color = '#a9c8ff'): void {
+    const bolt = this.bolts[this.nextBolt];
+    this.nextBolt = (this.nextBolt + 1) % this.bolts.length;
+    const pos = bolt.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const segs = pos.count / 2 - 1;
+    const dx = to.x - from.x;
+    const dz = to.z - from.z;
+    const len = Math.hypot(dx, dz) || 1;
+    // Sideways direction (on the ground plane) for the ribbon's width and the zig-zag.
+    const sx = -dz / len;
+    const sz = dx / len;
+    for (let i = 0; i <= segs; i++) {
+      const k = i / segs;
+      const jag = i === 0 || i === segs ? 0 : (Math.random() - 0.5) * 2.4;
+      const x = from.x + dx * k + sx * jag;
+      const y = from.y + (to.y - from.y) * k;
+      const z = from.z + dz * k + sz * jag;
+      pos.setXYZ(i * 2, x - sx * 0.25, y, z - sz * 0.25);
+      pos.setXYZ(i * 2 + 1, x + sx * 0.25, y, z + sz * 0.25);
+    }
+    pos.needsUpdate = true;
+    bolt.geometry.computeBoundingSphere();
+    (bolt.material as THREE.MeshBasicMaterial).color.set(color).multiplyScalar(GLOW * 1.4);
+    bolt.userData.life = 0.16;
+    bolt.visible = true;
+    this.sparks.spawn(to, color, 0.15, 0.4, 1.6, 1);
+  }
+
+  /** Nova shockwave: a wide violet ring, a flash, and sparks. */
+  nova(pos: THREE.Vector3, radius: number): void {
+    this.rings.spawn(pos, '#c9a8ff', 0.55, 2, radius * 1.05, 1);
+    this.rings.spawn(pos, '#ffffff', 0.3, 1, radius * 0.7, 0.8);
+    this.blasts.spawn(pos, '#d9c2ff', 0.35, 2, radius * 0.45, 0.7);
+    this.embersBurst(pos, 24, 22, 0.16);
   }
 
   /** Green flash and ring when a healing orb is collected. */
@@ -294,6 +353,12 @@ export class Effects {
   }
 
   update(dt: number, focus: THREE.Vector3): void {
+    for (const b of this.bolts) {
+      if (!b.visible) continue;
+      b.userData.life -= dt;
+      (b.material as THREE.MeshBasicMaterial).opacity = Math.max(0, b.userData.life / 0.16) * (0.7 + Math.random() * 0.3);
+      if (b.userData.life <= 0) b.visible = false;
+    }
     this.embers.update(dt, this.groundY);
     this.debris.update(dt, this.groundY);
     this.motes.update(dt, focus);
