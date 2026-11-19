@@ -9,7 +9,7 @@ import type { RunUI } from './RunUI';
 import { defaultStats, rollUpgrades, type Stats, UPGRADES } from './Upgrades';
 
 export const SECTORS = 7;
-const ARENA_RADIUS = 70;
+const ARENA_RADIUS = 110;
 const SURVIVE_TIME = 40;
 const SALVAGE_KEY = 'star-rotor-salvage';
 
@@ -110,15 +110,15 @@ export class Run {
     const hpMul = 1 + 0.15 * (s - 1);
     if (this.kind === 'outpost') {
       enemies.configure(bounds, hpMul, { max: 1 + Math.floor(s / 2), interval: Math.max(3.5, 7 - s * 0.4) });
-      enemies.spawnTurrets(cx, cz, Math.min(3 + s, 9), 8, 30);
+      enemies.spawnTurrets(cx, cz, Math.min(3 + s, 9), 12, 44);
     } else if (this.kind === 'survive') {
       enemies.configure(bounds, hpMul, { max: 3 + Math.floor(s / 2), interval: 2.4 });
-      enemies.spawnTurrets(cx, cz, 2, 10, 24);
+      enemies.spawnTurrets(cx, cz, 3, 14, 36);
       this.timer = SURVIVE_TIME;
     } else {
       enemies.configure(bounds, hpMul, { max: 4, interval: 4 });
-      enemies.spawnTurrets(cx, cz, 6, 6, 16);
-      enemies.spawnTurrets(cx, cz, 7, 24, 36);
+      enemies.spawnTurrets(cx, cz, 6, 8, 20);
+      enemies.spawnTurrets(cx, cz, 8, 32, 50);
     }
     this.phase = 'fight';
     hud.show(s === SECTORS ? `FINAL SECTOR · ${TITLES[this.kind]}` : `SECTOR ${s} · ${TITLES[this.kind]}`, 2.6);
