@@ -22,6 +22,7 @@ import {
 } from './game/Missiles';
 import { BULLET_STYLES, Bullets, EnemyShots } from './game/Projectiles';
 import { Combat } from './game/Combat';
+import { Mortars } from './game/Mortars';
 import { ArenaVisual } from './game/run/Arena';
 import { Run } from './game/run/Run';
 import { RunUI } from './game/run/RunUI';
@@ -91,6 +92,7 @@ const guns = {
 };
 const allGuns = Object.values(guns);
 const enemyShots = new EnemyShots(scene, effects);
+const mortars = new Mortars(scene, effects);
 const enemies = new EnemyManager(scene, world, effects);
 const hud = new Hud($('hud'));
 const pickups = new Pickups(scene, effects);
@@ -115,7 +117,7 @@ const radar = new Radar($('hud'));
 
 // ?debug in the URL exposes game objects for automated tests and console tinkering.
 if (new URLSearchParams(location.search).has('debug')) {
-  Object.assign(window, { __game: { ship, enemies, missiles, pickups, combat, get run() { return run; }, chargeNova: () => (specialCharge = 1) } });
+  Object.assign(window, { __game: { ship, enemies, missiles, pickups, combat, mortars, get run() { return run; }, chargeNova: () => (specialCharge = 1) } });
 }
 
 const rig = new CameraRig(window.innerWidth / window.innerHeight);
@@ -135,6 +137,7 @@ const run = new Run({
     for (const g of allGuns) g.clear();
     bomblets.length = 0;
     enemyShots.clear();
+    mortars.clear();
     missiles.clear();
     pickups.clear();
   },
@@ -315,6 +318,7 @@ function fireNova(): void {
   specialCharge = 0;
   ship.invulnerable = Math.max(ship.invulnerable, 0.6);
   enemyShots.clear();
+  mortars.clear();
   enemies.damageAt(p, radius, NOVA_DAMAGE, (t, amt) => combat.hit(t, amt, 'nova'));
   effects.nova(p, radius);
   freeze(0.1);
@@ -437,7 +441,8 @@ renderer.setAnimationLoop((now: number) => {
     rig.kick(0, 0.2);
   }
   pickups.healMul = ship.stats.healMul;
-  enemies.update(dt, ship, enemyShots, rig.camera);
+  enemies.update(dt, ship, enemyShots, mortars, rig.camera);
+  mortars.update(dt, ship, (x, z) => world.heightAt(x, z));
   cameraPos.setFromMatrixPosition(rig.camera.matrixWorld);
   for (const g of allGuns) g.update(dt, enemies.enemies, (x, z) => world.heightAt(x, z), cameraPos);
   enemyShots.update(dt, ship);
