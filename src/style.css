@@ -686,6 +686,14 @@ body {
   white-space: pre-line;
 }
 
+/* Upgrade cards and the run summary scroll if they don't fit (small phones). */
+#upgrade-screen,
+#end-screen {
+  overflow-y: auto;
+  touch-action: pan-y;
+  justify-content: safe center;
+}
+
 /* ---------- Home base ---------- */
 /* In the base only the stick and the action button are shown. */
 body.mode-base #armor,
@@ -700,8 +708,45 @@ body.mode-base .aim-ring {
   display: none;
 }
 
-body:not(.mode-base) #base-salvage,
-body:not(.mode-base) #shop .panel {
+body:not(.mode-base) #base-salvage {
+  display: none;
+}
+
+body.mode-base #btn-gun {
+  font-size: 13px;
+  transition: opacity 0.2s, transform 0.08s;
+}
+
+body.mode-base #btn-gun.idle {
+  opacity: 0.25;
+}
+
+#base-salvage {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top));
+  left: calc(16px + env(safe-area-inset-left));
+  font-family: var(--display);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #9ef3ff;
+  text-shadow: 0 1px 2px #000;
+}
+
+#shop button {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--gold);
+  background: rgba(122, 19, 40, 0.85);
+  border: 2px solid var(--gold-dim);
+  border-radius: 999px;
+  padding: 7px 14px;
+  cursor: pointer;
+}
+
+#shop .panel {
   width: min(620px, 100%);
   max-height: 100%;
   display: flex;
@@ -716,8 +761,45 @@ body:not(.mode-base) #shop .panel {
 
 #shop .head {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 10px;
+}
+
+#shop .head h2 {
+  flex: 1;
+}
+
+#shop .head .x {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+}
+
+#shop .close {
+  flex: none;
+}
+
+/* Short (landscape phone) screens: tighter panel and rows. */
+@media (max-height: 460px) {
+  #shop .panel {
+    padding: 10px 12px;
+    gap: 6px;
+  }
+
+  #shop .head h2 {
+    font-size: 15px;
+  }
+
+  #shop .row {
+    padding: 5px 8px;
+  }
+
+  #shop .row b {
+    font-size: 13px;
+  }
 }
 
 #shop .wallet {
@@ -726,7 +808,14 @@ body:not(.mode-base) #shop .panel {
 }
 
 #shop .rows {
+  /* The list scrolls on its own so the panel always fits and DONE stays visible. */
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y; /* the rest of the game blocks touch scrolling; allow it here */
+  padding-right: 4px;
   display: flex;
   flex-direction: column;
   gap: 6px;
