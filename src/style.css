@@ -1031,3 +1031,74 @@ body.in-convo #base-salvage {
     transform: translateY(3px);
   }
 }
+
+/* ---- Station: room name toast and BOLT's guide readout ---- */
+body:not(.mode-base) #room-toast,
+body:not(.mode-base) #guide-tag,
+body.in-convo #room-toast,
+body.in-convo #guide-tag {
+  display: none;
+}
+
+#room-toast {
+  position: absolute;
+  top: 18%;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+}
+
+#room-toast.show {
+  animation: room-toast 2.2s ease forwards;
+}
+
+#room-toast h3 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(22px, 5vw, 38px);
+  font-weight: 900;
+  letter-spacing: 0.22em;
+  color: #f2c46d;
+  text-shadow: 0 2px 0 #1b1233, 0 0 18px rgba(226, 115, 58, 0.6);
+}
+
+#room-toast span {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--display);
+  font-size: 12px;
+  letter-spacing: 0.3em;
+  color: #e8dfcc;
+  text-shadow: 0 1px 2px #000;
+}
+
+@keyframes room-toast {
+  0% { opacity: 0; transform: translateX(-50%) translateY(8px); }
+  15% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  75% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+#guide-tag {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 14px;
+  border: 2px solid #2fb5a0;
+  border-radius: 14px;
+  background: rgba(13, 42, 30, 0.8);
+  font-family: var(--display);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: #7dff9a;
+  pointer-events: none;
+  display: none;
+}
+
+#guide-tag.show {
+  display: block;
+}

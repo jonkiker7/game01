@@ -163,7 +163,7 @@ const run = new Run({
     if (r.won) save.wins++;
     else save.deaths++;
     writeSave(save);
-    runUI.showEnd({ ...r, totalSalvage: save.salvage }, () => runUI.fade(() => goToBase()), 'RETURN TO STATION ▸');
+    runUI.showEnd({ ...r, totalSalvage: save.salvage }, () => runUI.fade(() => goToBase('landed')), 'RETURN TO STATION ▸');
   },
   releaseInput: () => input.releaseAll(),
 });
@@ -193,9 +193,9 @@ function setMode(m: Mode): void {
   input.releaseAll();
 }
 
-function goToBase(): void {
+function goToBase(spawn: 'wake' | 'landed' = 'wake'): void {
   setMode('base');
-  base.enter();
+  base.enter(spawn);
 }
 
 // Boarding the ship at the base plays the launch cutscene, then fades into a sortie.
