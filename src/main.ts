@@ -116,6 +116,7 @@ const run = new Run({
   },
   snapCamera: () => rig.snapTo(ship.root.position),
   setPaused: (p) => (paused = p),
+  releaseInput: () => input.releaseAll(),
 });
 
 // ---------- Post-processing (HIGH quality) ----------
