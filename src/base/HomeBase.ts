@@ -114,7 +114,7 @@ function onFloor(x: number, z: number): boolean {
  */
 export class HomeBase {
   readonly scene = new THREE.Scene();
-  readonly camera = new THREE.PerspectiveCamera(40, 1, 0.5, 1400);
+  readonly camera = new THREE.PerspectiveCamera(40, 1, 2, 1400);
   /** Called when the launch cutscene is nearly done (start the fade into the sortie). */
   onLaunch?: () => void;
 
