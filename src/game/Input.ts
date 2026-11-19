@@ -48,12 +48,29 @@ export class Input {
   private readonly pressed = new Set<ButtonName>();
   private readonly released = new Set<ButtonName>();
   private readonly aims: Record<AimButton, AimStick>;
+  /** Force-release functions for the stick and every button (see releaseAll). */
+  private readonly releasers: (() => void)[] = [];
 
   constructor(private readonly el: InputElements) {
     this.aims = { gun: this.makeAimStick(), missile: this.makeAimStick() };
     this.bindStick();
     for (const name of Object.keys(el.buttons) as ButtonName[]) this.bindButton(name, el.buttons[name]);
     this.bindKeyboard();
+
+    // Safety nets for a "stuck" button: phones sometimes never deliver the finger-lifted event
+    // (a popup appears under the thumb, a notification or edge swipe steals the touch, etc.).
+    // - No fingers on the screen at all means nothing can be held.
+    const noTouches = (e: TouchEvent) => {
+      if (e.touches.length === 0) this.releaseAll();
+    };
+    window.addEventListener('touchend', noTouches, { passive: true });
+    window.addEventListener('touchcancel', noTouches, { passive: true });
+    // - Losing focus (app switch, notification shade, lock screen) releases everything.
+    window.addEventListener('blur', () => this.releaseAll());
+    window.addEventListener('pagehide', () => this.releaseAll());
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.releaseAll();
+    });
 
     // Block long-press menus and iOS pinch gestures.
     window.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -98,6 +115,12 @@ export class Input {
     return { x: a.x, y: a.y };
   }
 
+  /** Let go of every button and the stick (e.g. when a full-screen menu opens or closes). */
+  releaseAll(): void {
+    for (const release of this.releasers) release();
+    this.keys.clear();
+  }
+
   /** Call at the end of every frame so unused taps don't linger. */
   endFrame(): void {
     this.pressed.clear();
@@ -133,8 +156,8 @@ export class Input {
       this.updateStick(e.clientX, e.clientY);
     });
 
-    const release = (e: PointerEvent) => {
-      if (e.pointerId !== this.stickPointer) return;
+    const forceRelease = () => {
+      if (this.stickPointer === null) return;
       this.stickPointer = null;
       this.stickX = 0;
       this.stickY = 0;
@@ -144,8 +167,16 @@ export class Input {
       stickBase.style.left = '';
       stickBase.style.top = '';
     };
+    const release = (e: PointerEvent) => {
+      if (e.pointerId === this.stickPointer) forceRelease();
+    };
     stickZone.addEventListener('pointerup', release);
     stickZone.addEventListener('pointercancel', release);
+    stickZone.addEventListener('lostpointercapture', release);
+    // Also catch the finger lifting anywhere on the page, in case capture was lost.
+    window.addEventListener('pointerup', release);
+    window.addEventListener('pointercancel', release);
+    this.releasers.push(forceRelease);
   }
 
   private updateStick(px: number, py: number): void {
@@ -204,8 +235,8 @@ export class Input {
       });
     }
 
-    const release = (e: PointerEvent) => {
-      if (e.pointerId !== pointer) return;
+    const forceRelease = () => {
+      if (pointer === null) return;
       pointer = null;
       this.touchHeld[name] = false;
       this.released.add(name);
@@ -217,9 +248,16 @@ export class Input {
         aim.y = 0;
       }
     };
+    const release = (e: PointerEvent) => {
+      if (e.pointerId === pointer) forceRelease();
+    };
     el.addEventListener('pointerup', release);
     el.addEventListener('pointercancel', release);
     el.addEventListener('lostpointercapture', release);
+    // Also catch the finger lifting anywhere on the page, in case capture was lost.
+    window.addEventListener('pointerup', release);
+    window.addEventListener('pointercancel', release);
+    this.releasers.push(forceRelease);
   }
 
   private makeAimStick(): AimStick {

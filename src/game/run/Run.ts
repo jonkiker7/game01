@@ -35,6 +35,8 @@ interface Deps {
   snapCamera: () => void;
   /** Pause / unpause the game world (upgrade screen). */
   setPaused: (paused: boolean) => void;
+  /** Let go of all held buttons (whenever a full-screen menu opens or closes). */
+  releaseInput: () => void;
 }
 
 /**
@@ -194,6 +196,7 @@ export class Run {
       if (options.length > 0) {
         this.phase = 'choosing';
         this.d.setPaused(true);
+        this.d.releaseInput();
         ui.chooseUpgrade(options, this.levels, (u) => {
           this.levels.set(u.id, (this.levels.get(u.id) ?? 0) + 1);
           this.takenNames.push(u.name);
@@ -202,6 +205,7 @@ export class Run {
           // Keep current values sensible after stat changes.
           ship.armor = Math.min(ship.armor, this.stats.maxArmor);
           this.d.setPaused(false);
+          this.d.releaseInput();
           hud.show(u.name.toUpperCase(), 1.6);
           this.openGates();
         });
@@ -265,6 +269,7 @@ export class Run {
   }
 
   private finish(): void {
+    this.d.releaseInput();
     let total = this.salvage;
     try {
       total += Number(localStorage.getItem(SALVAGE_KEY) ?? 0) || 0;
