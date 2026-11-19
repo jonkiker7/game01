@@ -1,9 +1,11 @@
 import * as THREE from 'three';
-import type { EnemyManager } from '../Enemies';
+import type { Contract } from '../../base/Save';
+import type { Enemy, EnemyManager } from '../Enemies';
 import type { Hud } from '../Hud';
 import type { Blip } from '../Radar';
 import { HOVER_HEIGHT, type Ship } from '../Ship';
 import { LANDING_PAD, OUTPOSTS, type World } from '../World';
+import type { ContractTracker } from './Contracts';
 import { type ArenaVisual, type Gate, REWARD_STYLE, type Reward } from './Arena';
 import type { RunUI } from './RunUI';
 import { defaultStats, PRIMARY_NAMES, rollUpgrades, rollWeapons, SECONDARY_NAMES, type Stats, type Upgrade, UPGRADES } from './Upgrades';
@@ -18,6 +20,8 @@ export interface RunResult {
   kills: number;
   salvage: number;
   upgrades: string[];
+  /** The contract you took, and whether you finished it. */
+  contract: { title: string; reward: number; done: boolean } | null;
 }
 const ARENA_RADIUS = 110;
 const SURVIVE_TIME = 40;
@@ -50,6 +54,9 @@ interface Deps {
   resetRunState: () => void;
   /** Starting stats for a sortie (defaults plus permanent upgrades from home base). */
   baseStats: () => Stats;
+  /** The contract taken from the board (tracked during the sortie). */
+  contracts: ContractTracker;
+  activeContract: () => Contract | null;
   /** The run is over (won or shot down): bank salvage and show the summary. */
   onFinish: (summary: RunResult) => void;
 }
@@ -104,6 +111,7 @@ export class Run {
     this.d.resetRunState();
     this.d.clearField();
     enemies.reset();
+    this.d.contracts.begin(this.d.activeContract());
     this.d.arena.hideGates();
     this.d.arena.hideReward();
     ship.reset(world, LANDING_PAD.x, LANDING_PAD.z, this.stats);
@@ -136,13 +144,15 @@ export class Run {
       enemies.spawnTurrets(cx, cz, 6, 8, 20);
       enemies.spawnTurrets(cx, cz, 8, 32, 50);
     }
+    this.d.contracts.enterSector(s, cx, cz, ARENA_RADIUS);
     this.phase = 'fight';
     hud.show(s === SECTORS ? `FINAL SECTOR · ${TITLES[this.kind]}` : `SECTOR ${s} · ${TITLES[this.kind]}`, 2.6);
   }
 
   /** Called when the player destroys an enemy. */
-  onKill(kind: 'turret' | 'drone'): void {
+  onKill(kind: 'turret' | 'drone', enemy?: Enemy): void {
     this.kills++;
+    if (enemy) this.d.contracts.onKill(enemy);
     this.salvage += Math.round((kind === 'turret' ? 6 : 3) * this.stats.salvageMul);
   }
 
@@ -157,11 +167,12 @@ export class Run {
   update(dt: number): void {
     const { ship, enemies, arena } = this.d;
     if (this.phase !== 'over' && this.phase !== 'transition') ship.confine(this.center.x, this.center.y, ARENA_RADIUS - 3);
+    if (this.phase !== 'transition') this.d.contracts.update(dt, ship);
 
     switch (this.phase) {
       case 'fight': {
         const done = this.kind === 'survive' ? (this.timer -= dt) <= 0 : enemies.turretsLeft === 0;
-        if (done) this.clearEncounter();
+        if (done && !this.d.contracts.blocking) this.clearEncounter();
         break;
       }
       case 'reward': {
@@ -276,6 +287,7 @@ export class Run {
     this.d.ui.fade(() => {
       const { arena, enemies, ship, world } = this.d;
       arena.hideGates();
+      this.d.contracts.leaveSector();
       this.d.clearField();
       enemies.reset();
       this.sector++;
@@ -303,15 +315,26 @@ export class Run {
       kills: this.kills,
       salvage: this.salvage,
       upgrades: [...this.takenNames],
+      contract: this.d.contracts.result(),
     });
   }
 
   /** What the HUD should say under the radar. */
   objective(): string {
+    const line = this.d.contracts.objectiveLine(this.sector);
+    const text = this.baseObjective();
+    return line && this.phase !== 'over' ? `${text}\n${line}` : text;
+  }
+
+  private baseObjective(): string {
     const head = this.sector === SECTORS ? 'FINAL SECTOR' : `SECTOR ${this.sector}/${SECTORS}`;
     switch (this.phase) {
       case 'fight':
-        if (this.kind === 'survive') return `${head}\nSURVIVE · ${Math.ceil(Math.max(0, this.timer))}s`;
+        if (this.kind === 'survive') {
+          if (this.timer <= 0 && this.d.contracts.blocking) return `${head}\nDESTROY THE ALPHA`;
+          return `${head}\nSURVIVE · ${Math.ceil(Math.max(0, this.timer))}s`;
+        }
+        if (this.d.enemies.turretsLeft === 0 && this.d.contracts.blocking) return `${head}\nDESTROY THE ALPHA`;
         return `${head}\nDESTROY THE TOWERS · ${this.d.enemies.turretsLeft} LEFT`;
       case 'reward':
         return `${head}\nCOLLECT ${REWARD_STYLE[this.reward].label.slice(2)}`;
@@ -330,7 +353,7 @@ export class Run {
     if (this.phase === 'fight') {
       for (const e of this.d.enemies.enemies) {
         if (!e.alive) continue;
-        if (e.kind === 'turret' || this.kind === 'survive') out.push({ x: e.root.position.x, z: e.root.position.z, kind: 'target' });
+        if (!e.elite && (e.kind === 'turret' || this.kind === 'survive')) out.push({ x: e.root.position.x, z: e.root.position.z, kind: 'target' });
       }
     } else if (this.phase === 'reward') {
       const r = this.d.arena.rewardPosition;
@@ -338,6 +361,7 @@ export class Run {
     } else if (this.phase === 'gates') {
       for (const g of this.gates) out.push({ x: g.x, z: g.z, kind: 'reward', color: REWARD_STYLE[g.reward].color });
     }
+    if (this.phase !== 'over' && this.phase !== 'transition') this.d.contracts.blip(out);
   }
 }
 

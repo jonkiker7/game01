@@ -43,6 +43,9 @@ export interface StoryState {
   salvage: number;
   lastRun: { won: boolean; sectors: number; kills: number } | null;
   seen: (id: string) => boolean;
+  /** Contracts finished in total, and for one crew member ('rook', 'juno', 'pip'). */
+  contracts: number;
+  contractsFor: (who: string) => number;
 }
 
 export interface Conversation {
@@ -64,6 +67,7 @@ export const CONVERSATIONS: Conversation[] = [
       { who: 'bot', mood: 'happy', text: 'GREETINGS, PILOT {callsign}! Welcome to Halcyon Station, Deck 3. I am BOLT, your information unit.' },
       { who: 'bot', mood: 'neutral', text: 'Halcyon has four hundred and twelve rooms. Most of them are sealed. Budget cuts. And the Bloom.' },
       { who: 'bot', mood: 'happy', text: 'The rooms that ARE open are right off this concourse. Ask me where anything is!' },
+      { who: 'bot', mood: 'neutral', text: 'I also keep the CONTRACT BOARD. The crew post jobs for your sorties: take one, finish it, get paid. Very efficient.' },
     ],
   },
   {
@@ -75,7 +79,27 @@ export const CONVERSATIONS: Conversation[] = [
       { who: 'bot', mood: 'surprised', text: 'Pilot! Sensors show you departed and returned. Statistically, that is my favourite outcome.' },
     ],
   },
+  {
+    id: 'bot-first-contract',
+    npc: 'bot',
+    priority: 30,
+    when: (s) => s.contracts >= 1,
+    lines: [
+      { who: 'bot', mood: 'happy', text: 'CONTRACT COMPLETE! I have added a gold star to your file. It is the only star in your file.' },
+      { who: 'bot', mood: 'neutral', text: 'New jobs go up after every sortie. Check the board!' },
+    ],
+  },
   // ---------------------------------------------------------------- Rook
+  {
+    id: 'rook-contract-done',
+    npc: 'rook',
+    priority: 40,
+    when: (s) => s.contractsFor('rook') >= 1,
+    lines: [
+      { who: 'rook', mood: 'happy', text: "Job done, and you came back in one piece. That's two things I like." },
+      { who: 'rook', mood: 'neutral', text: "Keep taking my contracts and I'll keep finding things worth shooting." },
+    ],
+  },
   {
     id: 'rook-intro',
     npc: 'rook',
@@ -165,6 +189,16 @@ export const CONVERSATIONS: Conversation[] = [
     ],
   },
 
+  {
+    id: 'juno-contract-done',
+    npc: 'juno',
+    priority: 40,
+    when: (s) => s.contractsFor('juno') >= 1,
+    lines: [
+      { who: 'juno', mood: 'happy', text: 'You actually did it! Darling, reliability is SO attractive.' },
+      { choices: [{ text: 'Just doing my job.', reply: [{ who: 'juno', mood: 'annoyed', text: 'Ugh, modest too. Stop it.' }] }, { text: 'Pay me in outfits?', reply: [{ who: 'juno', mood: 'happy', text: 'Salvage first. Outfits are for paying customers.' }] }] },
+    ],
+  },
   // ---------------------------------------------------------------- Pip
   {
     id: 'pip-intro',
@@ -184,6 +218,16 @@ export const CONVERSATIONS: Conversation[] = [
     lines: [
       { who: 'pip', mood: 'sad', text: 'Your ship came back in so many pieces. I counted! Four hundred and twelve!' },
       { who: 'pip', mood: 'happy', text: "Good news: I put them all back. Bad news: there's a spare bolt and I don't know where it goes." },
+    ],
+  },
+  {
+    id: 'pip-contract-done',
+    npc: 'pip',
+    priority: 40,
+    when: (s) => s.contractsFor('pip') >= 1,
+    lines: [
+      { who: 'pip', mood: 'surprised', text: 'You did my contract?! Nobody ever does my contracts!' },
+      { who: 'pip', mood: 'happy', text: "I'm putting your name on the good wrench. The GOOD one." },
     ],
   },
 ];

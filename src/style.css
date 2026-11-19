@@ -1102,3 +1102,30 @@ body.in-convo #guide-tag {
 #guide-tag.show {
   display: block;
 }
+
+/* ---- Contract result on the end screen ---- */
+#end-screen .contract {
+  margin: 4px 0 10px;
+  padding: 6px 14px;
+  border: 2px solid rgba(255, 154, 60, 0.5);
+  border-radius: 10px;
+  font-family: var(--display);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #e8dfcc;
+  text-align: center;
+}
+
+#end-screen .contract.done {
+  border-color: #ff9a3c;
+  color: #ffc58a;
+  box-shadow: 0 0 14px rgba(255, 154, 60, 0.35);
+}
+
+#end-screen .contract small {
+  display: block;
+  font-size: 10px;
+  opacity: 0.75;
+  letter-spacing: 0.06em;
+}

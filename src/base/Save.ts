@@ -1,5 +1,18 @@
 import type { ShipDesignId } from '../game/ShipDesigns';
 import type { Stats } from '../game/run/Upgrades';
+import { CONTRACT_TEMPLATES, type ContractClient, contractReward, type ContractType } from '../content/contracts';
+
+/** A job from the contract board, tied to one sector of your next sortie. */
+export interface Contract {
+  id: string;
+  type: ContractType;
+  client: ContractClient;
+  title: string;
+  text: string;
+  goal: string;
+  sector: number;
+  reward: number;
+}
 
 /** Everything that persists between runs (stored in this browser's local storage). */
 export interface SaveData {
@@ -19,6 +32,13 @@ export interface SaveData {
   deaths: number;
   /** Conversations already heard (see src/content/dialogue.ts). */
   seen: string[];
+  /** The contract board: offers on the board, the one you've taken, and how many you've finished. */
+  contracts: {
+    offers: Contract[];
+    active: Contract | null;
+    done: number;
+    byClient: Record<string, number>;
+  };
 }
 
 const KEY = 'star-rotor-save';
@@ -39,13 +59,39 @@ function fresh(): SaveData {
     wins: 0,
     deaths: 0,
     seen: [],
+    contracts: { offers: rollContracts(), active: null, done: 0, byClient: {} },
   };
+}
+
+/** Three fresh offers for the contract board: one from each crew member, different kinds. */
+export function rollContracts(): Contract[] {
+  const clients: ContractClient[] = ['rook', 'juno', 'pip'];
+  const types: ContractType[] = ['retrieve', 'hunt', 'uplink'].sort(() => Math.random() - 0.5) as ContractType[];
+  return clients.map((client, i) => {
+    const options = CONTRACT_TEMPLATES.filter((t) => t.client === client && t.type === types[i]);
+    const t = options[Math.floor(Math.random() * options.length)];
+    const sector = 2 + Math.floor(Math.random() * 5); // 2–6: never the first or the final sector
+    return {
+      id: `${t.type}-${client}-${Date.now().toString(36)}-${i}`,
+      type: t.type,
+      client,
+      title: t.title,
+      text: t.text.replaceAll('{sector}', String(sector)),
+      goal: t.goal,
+      sector,
+      reward: contractReward(t.type, sector),
+    };
+  });
 }
 
 export function loadSave(): SaveData {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { ...fresh(), ...JSON.parse(raw) };
+    if (raw) {
+      const loaded = { ...fresh(), ...JSON.parse(raw) } as SaveData;
+      if (!loaded.contracts.offers?.length) loaded.contracts.offers = rollContracts();
+      return loaded;
+    }
     // Carry over salvage banked before home base existed.
     const old = Number(localStorage.getItem(OLD_SALVAGE_KEY) ?? 0) || 0;
     return { ...fresh(), salvage: old };
