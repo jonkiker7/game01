@@ -485,18 +485,21 @@ function shaft(g: THREE.Group, parts: StationParts, m: Mats, h: Rect, level: num
   const cz = (h.z0 + h.z1) / 2;
   const wallMat = toon('#4a5272', { side: THREE.BackSide, map: shaftTexture() });
   // The shaft is a box seen from the inside (its faces point inward).
-  const box = new THREE.Mesh(new THREE.BoxGeometry(w - 0.02, depth, d - 0.02), wallMat);
-  box.position.set(cx, level - 0.6 - depth / 2, cz);
+  // Set a little inside the hole, in front of the floor slab's edges, so no faces overlap (z-fighting).
+  const inset = 0.15;
+  const top = level - 0.55;
+  const box = new THREE.Mesh(new THREE.BoxGeometry(w - inset * 2, depth, d - inset * 2), wallMat);
+  box.position.set(cx, top - depth / 2, cz);
   box.userData.noOutline = true;
   g.add(box);
   const lights = [glow(STATION.amber, {}, 1.3), glow(STATION.tealGlow, {}, 1.1)];
   // Bands of light ringing the shaft, further apart as it goes down (lower decks).
   for (let i = 0, y = level - 3; y > level - depth + 4; i++, y -= 4 + i) {
     for (const [px, pz, lw, ld] of [
-      [cx, h.z0 + 0.05, w - 0.6, 0.1],
-      [cx, h.z1 - 0.05, w - 0.6, 0.1],
-      [h.x0 + 0.05, cz, 0.1, d - 0.6],
-      [h.x1 - 0.05, cz, 0.1, d - 0.6],
+      [cx, h.z0 + 0.25, w - 0.6, 0.1],
+      [cx, h.z1 - 0.25, w - 0.6, 0.1],
+      [h.x0 + 0.25, cz, 0.1, d - 0.6],
+      [h.x1 - 0.25, cz, 0.1, d - 0.6],
     ] as const) {
       const band = new THREE.Mesh(new THREE.BoxGeometry(lw, 0.25, ld), lights[i % 2]);
       band.position.set(px, y, pz);
@@ -518,7 +521,7 @@ function shaft(g: THREE.Group, parts: StationParts, m: Mats, h: Rect, level: num
     const lift = new THREE.Mesh(new THREE.BoxGeometry(w - 0.6, 0.6, d - 0.6), m.navy);
     lift.position.set(cx, level - 16, cz);
     const stripe = new THREE.Mesh(new THREE.BoxGeometry(w - 0.4, 0.2, d - 0.4), m.orange);
-    stripe.position.set(cx, level - 15.8, cz);
+    stripe.position.set(cx, level - 16, cz); // a band around the lift's edge, below its top
     g.add(lift, stripe);
     for (const [ox, oz, s] of [[-1.2, -1, 1.6], [1.2, 0.8, 1.3], [0.2, -1.4, 1.1]] as const) {
       const crate = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), m.teal);
