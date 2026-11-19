@@ -20,7 +20,7 @@ function placeholder(id: CharacterId, mood: Mood): string {
   const key = `${id}:${mood}`;
   const hit = cache.get(key);
   if (hit) return hit;
-  const svg = id === 'pilot' ? pilotSvg(mood) : crewSvg(id, mood);
+  const svg = id === 'pilot' ? pilotSvg(mood) : id === 'bot' ? botSvg(mood) : crewSvg(id, mood);
   const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
   cache.set(key, url);
   return url;
@@ -59,7 +59,7 @@ function face(mood: Mood): string {
 }
 
 /** A waist-up crew member with a distinct silhouette per character. */
-function crewSvg(id: Exclude<CharacterId, 'pilot'>, mood: Mood): string {
+function crewSvg(id: 'rook' | 'juno' | 'pip', mood: Mood): string {
   const c = CHARACTERS[id];
   const skin = { rook: '#c98e66', juno: '#8d5a45', pip: '#f2c9a0' }[id];
   const hair = { rook: '#3a3448', juno: '#ff6fd0', pip: '#f2a23a' }[id];
@@ -106,6 +106,39 @@ function pilotSvg(mood: Mood): string {
     <path d="M100 220 Q200 150 300 220 Q300 310 200 320 Q100 310 100 220Z" fill="#1d2a3a" stroke="${INK}" stroke-width="8"/>
     <path d="M118 222 Q200 166 282 222" fill="none" stroke="${visorGlow}" stroke-width="10" stroke-linecap="round" opacity="0.9"/>
     <path d="M150 250 Q200 236 250 250" fill="none" stroke="${visorGlow}" stroke-width="5" stroke-linecap="round" opacity="0.5"/>
+    <text x="200" y="548" font-family="sans-serif" font-size="18" fill="#fff" fill-opacity="0.45" text-anchor="middle">PLACEHOLDER</text>
+  </svg>`;
+}
+
+/** BOLT: a retro robot with a CRT screen for a face (the expression is drawn on the screen). */
+function botSvg(mood: Mood): string {
+  const g = '#7dff9a';
+  const eyes = {
+    neutral: `<rect x="150" y="200" width="26" height="34" rx="4"/><rect x="224" y="200" width="26" height="34" rx="4"/>`,
+    happy: `<path d="M146 226 L163 206 L180 226" fill="none" stroke="${g}" stroke-width="10"/><path d="M220 226 L237 206 L254 226" fill="none" stroke="${g}" stroke-width="10"/>`,
+    annoyed: `<rect x="148" y="214" width="32" height="12"/><rect x="220" y="214" width="32" height="12"/>`,
+    surprised: `<rect x="144" y="194" width="38" height="44" fill="none" stroke="${g}" stroke-width="8"/><rect x="218" y="194" width="38" height="44" fill="none" stroke="${g}" stroke-width="8"/>`,
+    sad: `<rect x="150" y="214" width="26" height="22" rx="4"/><rect x="224" y="214" width="26" height="22" rx="4"/>`,
+  }[mood];
+  const mouth = {
+    neutral: `<rect x="170" y="262" width="60" height="8"/>`,
+    happy: `<path d="M160 258 L180 276 L220 276 L240 258" fill="none" stroke="${g}" stroke-width="9"/>`,
+    annoyed: `<path d="M164 270 L184 262 L204 270 L224 262 L240 270" fill="none" stroke="${g}" stroke-width="7"/>`,
+    surprised: `<rect x="186" y="254" width="28" height="28" fill="none" stroke="${g}" stroke-width="7"/>`,
+    sad: `<path d="M160 278 L180 262 L220 262 L240 278" fill="none" stroke="${g}" stroke-width="9"/>`,
+  }[mood];
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 560">
+    <defs><radialGradient id="g" cx="50%" cy="40%" r="60%"><stop offset="0" stop-color="#2fb5a0" stop-opacity="0.55"/><stop offset="1" stop-color="#2fb5a0" stop-opacity="0"/></radialGradient></defs>
+    <ellipse cx="200" cy="300" rx="200" ry="260" fill="url(#g)"/>
+    <path d="M60 560 Q70 410 140 390 L260 390 Q330 410 340 560Z" fill="#e8dfcc" stroke="${INK}" stroke-width="8"/>
+    <rect x="120" y="440" width="160" height="60" rx="10" fill="#26304a" stroke="${INK}" stroke-width="6"/>
+    <circle cx="150" cy="470" r="10" fill="#ffb347"/><circle cx="185" cy="470" r="10" fill="#ff4a4a"/><circle cx="220" cy="470" r="10" fill="#6ff7ff"/>
+    <rect x="176" y="350" width="48" height="50" fill="#26304a" stroke="${INK}" stroke-width="7"/>
+    <line x1="200" y1="110" x2="200" y2="70" stroke="${INK}" stroke-width="7"/><circle cx="200" cy="62" r="14" fill="#ff4a4a" stroke="${INK}" stroke-width="6"/>
+    <rect x="88" y="110" width="224" height="250" rx="40" fill="#e2733a" stroke="${INK}" stroke-width="9"/>
+    <rect x="72" y="190" width="20" height="70" rx="6" fill="#26304a" stroke="${INK}" stroke-width="6"/><rect x="308" y="190" width="20" height="70" rx="6" fill="#26304a" stroke="${INK}" stroke-width="6"/>
+    <rect x="118" y="160" width="164" height="150" rx="26" fill="#0d2a1e" stroke="${INK}" stroke-width="8"/>
+    <g fill="${g}">${eyes}${mouth}</g>
     <text x="200" y="548" font-family="sans-serif" font-size="18" fill="#fff" fill-opacity="0.45" text-anchor="middle">PLACEHOLDER</text>
   </svg>`;
 }

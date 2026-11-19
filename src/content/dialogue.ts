@@ -30,7 +30,8 @@ export interface LineSpoken {
 }
 
 export interface LineChoice {
-  choices: { text: string; reply?: Line[] }[];
+  /** `action` is a game event to fire when picked (e.g. 'guide:armory' shows a waypoint). */
+  choices: { text: string; reply?: Line[]; action?: string }[];
 }
 
 export type Line = LineSpoken | LineChoice;
@@ -53,6 +54,27 @@ export interface Conversation {
 }
 
 export const CONVERSATIONS: Conversation[] = [
+  // ---------------------------------------------------------------- BOLT (info desk robot)
+  // After any of these, BOLT always offers directions (see HomeBase: the choices are built there).
+  {
+    id: 'bot-intro',
+    npc: 'bot',
+    priority: 100,
+    lines: [
+      { who: 'bot', mood: 'happy', text: 'GREETINGS, PILOT {callsign}! Welcome to Halcyon Station, Deck 3. I am BOLT, your information unit.' },
+      { who: 'bot', mood: 'neutral', text: 'Halcyon has four hundred and twelve rooms. Most of them are sealed. Budget cuts. And the Bloom.' },
+      { who: 'bot', mood: 'happy', text: 'The rooms that ARE open are right off this concourse. Ask me where anything is!' },
+    ],
+  },
+  {
+    id: 'bot-after-run',
+    npc: 'bot',
+    priority: 20,
+    when: (s) => s.runs >= 1,
+    lines: [
+      { who: 'bot', mood: 'surprised', text: 'Pilot! Sensors show you departed and returned. Statistically, that is my favourite outcome.' },
+    ],
+  },
   // ---------------------------------------------------------------- Rook
   {
     id: 'rook-intro',
@@ -168,6 +190,7 @@ export const CONVERSATIONS: Conversation[] = [
 
 /** Short one-liners when a crew member has nothing new to say. */
 export const IDLE: Record<Exclude<CharacterId, 'pilot'>, string[]> = {
+  bot: ['HOW MAY I DIRECT YOU, PILOT?', 'Lost? Statistically likely. Ask me.', 'Beep. That was a friendly beep.'],
   rook: ['Got salvage? Then we have business.', 'Armor first. Always armor first.', "You're letting the cold in. Shop or fly."],
   juno: ["Darling, you're glowing. Or that's plasma burn.", 'Fashion is armor for the soul.', 'Stand up straight. Pilots slouch.'],
   pip: ['Ship is good to go! Probably!', "I named a wrench after you. It's my favorite wrench.", 'Bring me back something shiny!'],

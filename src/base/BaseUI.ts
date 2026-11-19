@@ -18,6 +18,8 @@ export class BaseUI {
     root.insertAdjacentHTML(
       'beforeend',
       `<div id="base-salvage"></div>
+       <div id="room-toast"><h3></h3><span></span></div>
+       <div id="guide-tag"></div>
        <div id="shop" class="overlay"><div class="panel"><div class="head"><h2></h2><span class="wallet"></span><button class="x" aria-label="Close">✕</button></div><div class="rows"></div><button class="close">DONE ▸</button></div></div>`,
     );
     this.shop = root.querySelector('#shop') as HTMLElement;
@@ -36,6 +38,27 @@ export class BaseUI {
 
   get busy(): boolean {
     return this.shop.classList.contains('visible');
+  }
+
+  private toastTimer = 0;
+
+  /** Big room name that fades in when you walk into a room. */
+  toast(title: string, sub: string): void {
+    const t = document.getElementById('room-toast')!;
+    t.querySelector('h3')!.textContent = title;
+    t.querySelector('span')!.textContent = sub;
+    t.classList.remove('show');
+    void t.offsetWidth;
+    t.classList.add('show');
+    window.clearTimeout(this.toastTimer);
+    this.toastTimer = window.setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  /** "Guiding to …" readout while BOLT's waypoint is active (null hides it). */
+  setGuide(text: string | null): void {
+    const g = document.getElementById('guide-tag')!;
+    g.textContent = text ?? '';
+    g.classList.toggle('show', !!text);
   }
 
   setSalvage(n: number): void {

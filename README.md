@@ -47,17 +47,26 @@ On iPhone, use Share → **Add to Home Screen** for full-screen play.
 
 ## Home base
 
-The game starts on a retro-futuristic **space station** hovering over the jungle planet. Walk your
-pilot around the deck with the left stick; the action button says **TALK** near a crew member and
-**LAUNCH** at your ship.
+The game starts on **Halcyon Station**, a huge retro-futuristic station orbiting the jungle planet.
+You see it from an isometric angle (like Diablo or the old Fallouts): rectangular rooms joined by
+corridors, and any wall between the camera and your pilot drops down so you can always see
+yourself. Many doors to the rest of the station are sealed (for now).
+
+You wake up in your **Pilot Quarters** (south-west). Walk with the left stick; the action button
+says **TALK** near someone and **LAUNCH** at your ship. The room's name shows as you walk in.
+
+- **Concourse:** the hub in the middle, with the **information desk** run by **BOLT**, a robot.
+  Ask BOLT where anyone is: picking a destination lights a green arrow at your feet that leads you
+  through the doorways, and a beacon over the destination.
+- **Armory** (west), **Boutique** (east), **Hangar Bay** (north, with your ship on the pad).
 
 - **Rook, Quartermaster:** permanent upgrades bought with salvage (hull plating, gun calibration,
   an extra missile, faster Nova and boost, more salvage). They apply to every sortie.
 - **Juno, Outfitter:** suits and helmets for your pilot (purely cosmetic).
 - **Pip, Mechanic:** buy and choose your ship (Manta, Valkyrie, Kestrel, Atlas).
 
-Board your ship to launch: a short cutscene flies you out of the hangar bay into a sortie. After
-the run, the summary banks your salvage and takes you back to the station. Progress is saved in the
+Board your ship to launch: a short cutscene flies you out of the hangar bay door into a sortie.
+After the run, the summary banks your salvage and you land back in the hangar. Progress is saved in the
 browser. Add `?sortie` to the URL to skip straight into a run (handy for testing).
 
 ## Conversations and portraits
@@ -148,7 +157,7 @@ npm run preview   # serve the production build
 - `src/game/Enemies.ts`: turret towers, drones, and spawning (enemies only fire while on screen)
 - `src/game/Effects.ts`: pooled smoke, explosions, shockwaves, sparks, embers, debris, and floating motes
 - `src/game/Hud.ts`: armor bar, salvage, objective, missile pips, messages, and damage/heal flashes
-- `src/base/`: home base: `HomeBase.ts` (scene, crew, launch cutscene), `Station.ts` (the deck and the view), `Pilot.ts` (the on-foot character), `BaseUI.ts` (dialogue and shops), `Save.ts` (progress, perks, outfits, ships)
+- `src/base/`: home base: `HomeBase.ts` (scene, crew, launch cutscene), `Layout.ts` (the floor plan: rooms, corridors, doors, key spots), `Station.ts` (builds the rooms, cutaway walls, decor and the view), `Robot.ts` (BOLT), `Pilot.ts` (the on-foot character), `BaseUI.ts` (dialogue and shops), `Save.ts` (progress, perks, outfits, ships)
 - `src/game/Mortars.ts`: tower plasma mortars with landing warnings
 - `src/game/Combat.ts`: every hit goes through here so elemental upgrades can react
 - `src/game/run/`: the roguelite run: `Run.ts` (sectors and flow), `Upgrades.ts` (stats and upgrade pool), `Arena.ts` (wall, reward orb, gates), `RunUI.ts` (upgrade cards and summary)
@@ -171,7 +180,7 @@ One-time setup: **Settings → Pages → Source: GitHub Actions**.
 3. ✅ Art pass: ink outlines, rim light, bloom, painted ground, particles, hit-stop
 4. ✅ Run structure: sectors, arenas, rewards, upgrade choices, gates, run summary, salvage
 5. ✅ Upgrades and weapons: Scatter/Rail guns, Cluster/Swarm missiles, Arc/Cryo/Plasma families and duos, Nova special
-6. ✅ Home base: space station hub, walkable pilot, crew with dialogue, permanent upgrades, outfits, ships, launch cutscene
+6. ✅ Home base: space station hub, walkable pilot, crew with dialogue, permanent upgrades, outfits, ships, launch cutscene; multi-room isometric station with BOLT's info desk
 7. Contracts: NPC missions that appear as special arenas in a sortie
 8. Bosses and new enemies
 9. Polish: audio, menus, saves, offline play

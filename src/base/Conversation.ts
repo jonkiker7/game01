@@ -57,6 +57,9 @@ export class ConversationUI {
     });
   }
 
+  /** Called with a choice's `action` (e.g. 'guide:armory') when the player picks it. */
+  onAction?: (action: string) => void;
+
   get active(): boolean {
     return this.el.classList.contains('visible');
   }
@@ -118,6 +121,7 @@ export class ConversationUI {
         line.choices.map((c) => ({
           text: c.text,
           run: () => {
+            if (c.action) this.onAction?.(c.action);
             // The pilot "says" the chosen option, then the replies follow.
             this.queue.unshift({ who: 'pilot', mood: 'neutral', text: c.text }, ...(c.reply ?? []));
             this.next();
