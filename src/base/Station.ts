@@ -30,12 +30,14 @@ export interface Collider {
   r: number;
 }
 
-/** A piece of wall that drops down when it's between the camera and the pilot. */
+/** A piece of wall that turns see-through when it's between the camera and the pilot. */
 export interface WallSegment {
   obj: THREE.Object3D;
   x: number;
   z: number;
-  cut: number; // current height scale (1 = full, small = cut away)
+  cut: number; // current opacity (1 = solid, lower = see-through)
+  /** The room or corridor ('c<n>') whose near-side (south or east) wall this is, if any. */
+  nearSideOf?: string;
 }
 
 /** A two-panel door that slides apart when you walk up to it. */
@@ -100,11 +102,12 @@ export function buildStation(scene: THREE.Scene): StationParts {
     for (const side of ['n', 's', 'e', 'w'] as Side[]) {
       const gaps = room.gaps.filter((x) => x.side === side);
       const windows = (room.windows ?? []).filter((x) => x.side === side);
-      buildWallLine(g, parts, m, room.rect, side, gaps, windows, () => [room.level, room.level], room.height);
-      for (const gap of gaps) doorway(g, parts, m, room.rect, side, gap.a, gap.b, room.level, room.height, room.id === 'hangar' && side === 'n');
+      const near = side === 's' || side === 'e' ? room.id : undefined;
+      buildWallLine(g, parts, m, room.rect, side, gaps, windows, () => [room.level, room.level], room.height, [], near);
+      for (const gap of gaps) doorway(g, parts, m, room.rect, side, gap.a, gap.b, room.level, room.height, room.id === 'hangar' && side === 'n', near);
     }
   }
-  for (const c of CORRIDORS) {
+  for (const [ci, c] of CORRIDORS.entries()) {
     const sides: Side[] = c.axis === 'ns' ? ['e', 'w'] : ['n', 's'];
     const levelsOver = (s0: number, s1: number): [number, number] => {
       const at = (u: number) => (c.axis === 'ns' ? corridorLevel(c, 0, u) : corridorLevel(c, u, 0));
@@ -114,7 +117,8 @@ export function buildStation(scene: THREE.Scene): StationParts {
     };
     const extra = c.stairs ? [c.stairs[0], c.stairs[1]] : [];
     for (const side of sides) {
-      buildWallLine(g, parts, m, c.rect, side, (c.gaps ?? []).filter((x) => x.side === side), [], levelsOver, WALL_H, extra);
+      const near = side === 's' || side === 'e' ? `c${ci}` : undefined;
+      buildWallLine(g, parts, m, c.rect, side, (c.gaps ?? []).filter((x) => x.side === side), [], levelsOver, WALL_H, extra, near);
     }
   }
   for (const d of SEALED) sealedDoor(g, parts, m, d.x, d.z, d.axis, d.label);
@@ -247,6 +251,7 @@ function buildWallLine(
   levels: (s0: number, s1: number) => [number, number],
   height: number,
   extraCuts: number[] = [],
+  nearSideOf?: string,
 ): void {
   const alongX = side === 'n' || side === 's';
   const start = alongX ? r.x0 : r.z0;
@@ -277,7 +282,7 @@ function buildWallLine(
       seg.position.set(x, lo, z);
       if (!alongX) seg.rotation.y = Math.PI / 2;
       g.add(seg);
-      parts.walls.push({ obj: seg, x, z, cut: 1 });
+      parts.walls.push({ obj: seg, x, z, cut: 1, nearSideOf });
     }
   }
 }
@@ -345,6 +350,7 @@ function doorway(
   level: number,
   roomH: number,
   bay: boolean,
+  nearSideOf?: string,
 ): void {
   const alongX = side === 'n' || side === 's';
   const fixed = side === 'n' ? r.z0 : side === 's' ? r.z1 : side === 'w' ? r.x0 : r.x1;
@@ -414,7 +420,7 @@ function doorway(
   if (!alongX) frame.rotation.y = Math.PI / 2;
   g.add(frame);
   // The bay door is on the far (north) side, so it never needs to cut away.
-  if (!bay) parts.walls.push({ obj: frame, x: frame.position.x, z: frame.position.z, cut: 1 });
+  if (!bay) parts.walls.push({ obj: frame, x: frame.position.x, z: frame.position.z, cut: 1, nearSideOf });
 }
 
 function sealedDoor(g: THREE.Group, parts: StationParts, m: Mats, x: number, z: number, axis: 'ns' | 'ew', text: string): void {

@@ -25,6 +25,14 @@ const CAM_FORWARD = new THREE.Vector2(-1, -1).normalize();
 const PAD = new THREE.Vector3(SPOTS.pad.x, heightAt(SPOTS.pad.x, SPOTS.pad.z), SPOTS.pad.z);
 const BAY_EXIT = new THREE.Vector3(SPOTS.bayExit.x, PAD.y + 30, SPOTS.bayExit.z);
 const DOOR_RANGE = 6; // doors slide open when you're this close
+const SEE_THROUGH = 0.15; // how solid a wall stays when it's faded out of your way
+
+/** A wall piece's own materials (so it can fade alone) and its ink outlines. */
+interface WallLook {
+  mats: { mat: THREE.Material; opacity: number; transparent: boolean }[];
+  lines: THREE.Object3D[];
+  faded: boolean;
+}
 const SHIP_YAW = 0.45; // parked nose-north, angled toward the camera a little
 
 export type Spawn = 'wake' | 'landed';
@@ -115,6 +123,7 @@ export class HomeBase {
   private readonly colliders: Collider[];
   private readonly walls: WallSegment[];
   private readonly doors: SlidingDoor[];
+  private readonly wallLooks: WallLook[] = [];
   private readonly spinners: THREE.Object3D[];
   private readonly holo: THREE.Object3D;
   private readonly planets: THREE.Object3D[];
@@ -153,6 +162,7 @@ export class HomeBase {
     this.colliders = built.colliders;
     this.walls = built.walls;
     this.doors = built.doors;
+    for (const w of this.walls) this.wallLooks.push(ownMaterials(w.obj));
     this.spinners = built.spinners;
     this.holo = built.holo;
     this.planets = built.planets;
@@ -336,20 +346,23 @@ export class HomeBase {
   }
 
   /**
-   * Cutaway walls: any wall between the camera and the pilot drops down to a stub, so you can
-   * always see yourself (and the room you're in), like the old isometric RPGs.
+   * See-through walls: any wall between the camera and the pilot fades to a ghost of itself,
+   * so you can always see yourself (and the room you're in) without losing the room's shape.
    */
   private updateWalls(dt: number, at: THREE.Vector3): void {
-    for (const w of this.walls) {
+    const here = areasAt(at.x, at.z);
+    this.walls.forEach((w, i) => {
       const ox = w.x - at.x;
       const oz = w.z - at.z;
       const front = (ox + oz) / Math.SQRT2; // toward the camera
       const side = (ox - oz) / Math.SQRT2;
-      const hide = front > 0.6 && front < 30 && Math.abs(side) < 26;
-      const goal = hide ? 0.12 : 1;
+      // Directly between you and the camera, or the near (south/east) walls of where you are.
+      const hide = (front > 0.6 && front < 30 && Math.abs(side) < 26) || (!!w.nearSideOf && here.includes(w.nearSideOf));
+      const goal = hide ? SEE_THROUGH : 1;
+      const before = w.cut;
       w.cut = w.cut < 0 ? goal : damp(w.cut, goal, 10, dt);
-      w.obj.scale.y = w.cut;
-    }
+      if (Math.abs(w.cut - before) > 1e-4 || before < 0) applyFade(this.wallLooks[i], w.cut);
+    });
   }
 
   private act(t: Target): void {
@@ -763,4 +776,46 @@ function newMarker(): THREE.Sprite {
   s.scale.set(1.4, 1.4, 1);
   s.renderOrder = 30;
   return s;
+}
+
+/** Give a wall piece its own copies of its materials (they're shared between walls). */
+function ownMaterials(root: THREE.Object3D): WallLook {
+  const look: WallLook = { mats: [], lines: [], faded: false };
+  const copies = new Map<THREE.Material, THREE.Material>();
+  root.traverse((o) => {
+    if (o.userData.isOutline) {
+      look.lines.push(o);
+      return;
+    }
+    const mesh = o as THREE.Mesh | THREE.Sprite;
+    if (!('material' in mesh) || !mesh.material || Array.isArray(mesh.material)) return;
+    const orig = mesh.material as THREE.Material;
+    let copy = copies.get(orig);
+    if (!copy) {
+      copy = orig.clone();
+      copies.set(orig, copy);
+      look.mats.push({ mat: copy, opacity: copy.opacity, transparent: copy.transparent });
+    }
+    mesh.material = copy;
+  });
+  return look;
+}
+
+/** Fade a wall piece: 1 = solid, lower = see-through. */
+function applyFade(look: WallLook, k: number): void {
+  const faded = k < 0.98;
+  for (const m of look.mats) {
+    m.mat.opacity = m.opacity * (faded ? k : 1);
+    const transparent = faded || m.transparent;
+    if (m.mat.transparent !== transparent) {
+      m.mat.transparent = transparent;
+      m.mat.needsUpdate = true; // three bakes "opaque" into the shader, so switch variants
+    }
+    // Faded walls don't hide what's behind them.
+    m.mat.depthWrite = !faded && !m.transparent;
+  }
+  if (faded !== look.faded) {
+    look.faded = faded;
+    for (const l of look.lines) l.visible = !faded;
+  }
 }
