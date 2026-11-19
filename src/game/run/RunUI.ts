@@ -76,7 +76,7 @@ export class RunUI {
     this.cardsEl.classList.add('visible');
   }
 
-  showEnd(s: RunSummary, restart: () => void): void {
+  showEnd(s: RunSummary, restart: () => void, buttonLabel = 'NEW SORTIE ▸'): void {
     this.endEl.innerHTML = `
       <h1 class="${s.won ? 'won' : 'lost'}">${s.won ? 'SORTIE COMPLETE' : 'SHOT DOWN'}</h1>
       <div class="stats">
@@ -85,8 +85,8 @@ export class RunUI {
         <div><b>⬢ ${s.salvage}</b><span>SALVAGE EARNED</span></div>
       </div>
       <div class="upgrades">${s.upgrades.length ? s.upgrades.map((u) => `<span>${u}</span>`).join('') : '<em>No upgrades taken</em>'}</div>
-      <div class="total">Salvage banked: ⬢ ${s.totalSalvage} <small>(spend it at home base, coming soon)</small></div>
-      <button class="again">NEW SORTIE ▸</button>`;
+      <div class="total">Salvage banked: ⬢ ${s.totalSalvage} <small>(spend it with the crew back on the station)</small></div>
+      <button class="again">${buttonLabel}</button>`;
     this.endEl.querySelector('.again')!.addEventListener('pointerup', (e) => {
       e.stopPropagation();
       this.endEl.classList.remove('visible');

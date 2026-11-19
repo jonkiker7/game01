@@ -4,6 +4,9 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import './style.css';
+import { BaseUI } from './base/BaseUI';
+import { HomeBase } from './base/HomeBase';
+import { applyPerks, loadSave, writeSave } from './base/Save';
 import { AimIndicator } from './game/AimIndicator';
 import { CameraRig } from './game/CameraRig';
 import { Effects } from './game/Effects';
@@ -25,6 +28,7 @@ import { Combat } from './game/Combat';
 import { Mortars } from './game/Mortars';
 import { ArenaVisual } from './game/run/Arena';
 import { Run } from './game/run/Run';
+import { defaultStats } from './game/run/Upgrades';
 import { RunUI } from './game/run/RunUI';
 import { Ship } from './game/Ship';
 import { isShipDesign } from './game/ShipDesigns';
@@ -81,7 +85,8 @@ const world = new World(scene);
 const effects = new Effects(scene, (x, z) => world.heightAt(x, z));
 // Pick the ship design with ?ship=a|b|c|d (see designs.html); defaults to the Manta.
 const shipParam = new URLSearchParams(location.search).get('ship');
-const ship = new Ship(scene, isShipDesign(shipParam) ? shipParam : 'b');
+const save = loadSave();
+const ship = new Ship(scene, isShipDesign(shipParam) ? shipParam : save.ship);
 const missiles = new MissileSystem(scene, world, effects);
 const aim = new AimIndicator(scene);
 // One bullet pool per gun type, each with its own look, speed and range.
@@ -117,13 +122,14 @@ const radar = new Radar($('hud'));
 
 // ?debug in the URL exposes game objects for automated tests and console tinkering.
 if (new URLSearchParams(location.search).has('debug')) {
-  Object.assign(window, { __game: { ship, enemies, missiles, pickups, combat, mortars, get run() { return run; }, chargeNova: () => (specialCharge = 1) } });
+  Object.assign(window, { __game: { ship, enemies, missiles, pickups, combat, mortars, save, get base() { return base; }, get run() { return run; }, chargeNova: () => (specialCharge = 1) } });
 }
 
 const rig = new CameraRig(window.innerWidth / window.innerHeight);
 rig.snapTo(ship.root.position);
 
 // ---------- The run (sortie) ----------
+const runUI = new RunUI($('hud'));
 let paused = false;
 const blips: Blip[] = [];
 const run = new Run({
@@ -131,7 +137,7 @@ const run = new Run({
   enemies,
   world,
   arena: new ArenaVisual(scene),
-  ui: new RunUI($('hud')),
+  ui: runUI,
   hud,
   clearField: () => {
     for (const g of allGuns) g.clear();
@@ -144,6 +150,18 @@ const run = new Run({
   snapCamera: () => rig.snapTo(ship.root.position),
   setPaused: (p) => (paused = p),
   resetRunState: () => (specialCharge = 0),
+  baseStats: () => {
+    const st = defaultStats();
+    applyPerks(st, save); // permanent upgrades bought from the Quartermaster
+    return st;
+  },
+  onFinish: (r) => {
+    save.salvage += r.salvage;
+    save.lastRun = { won: r.won, sectors: r.sectorsCleared, kills: r.kills };
+    save.runs++;
+    writeSave(save);
+    runUI.showEnd({ ...r, totalSalvage: save.salvage }, () => runUI.fade(() => goToBase()), 'RETURN TO STATION ▸');
+  },
   releaseInput: () => input.releaseAll(),
 });
 
@@ -152,7 +170,38 @@ const composer = new EffectComposer(
   renderer,
   new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 }),
 );
-composer.addPass(new RenderPass(scene, rig.camera));
+const renderPass = new RenderPass(scene, rig.camera);
+composer.addPass(renderPass);
+
+// ---------- Home base (the space station) ----------
+const baseUI = new BaseUI($('hud'));
+const base = new HomeBase(save, baseUI);
+type Mode = 'base' | 'run';
+let mode: Mode = 'base';
+const gunBtn = $('btn-gun');
+
+function setMode(m: Mode): void {
+  mode = m;
+  document.body.classList.toggle('mode-base', m === 'base');
+  renderPass.scene = m === 'base' ? base.scene : scene;
+  renderPass.camera = m === 'base' ? base.camera : rig.camera;
+  gunBtn.textContent = 'GUN';
+  gunBtn.classList.remove('idle');
+  input.releaseAll();
+}
+
+function goToBase(): void {
+  setMode('base');
+  base.enter();
+}
+
+// Boarding the ship at the base plays the launch cutscene, then fades into a sortie.
+base.onLaunch = () =>
+  runUI.fade(() => {
+    ship.setDesign(save.ship);
+    setMode('run');
+    run.start();
+  });
 // Only colours brighter than 1.2 (glows; not even sunlit white hulls) bloom, so the ground and models stay crisp.
 const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.75, 0.45, 1.2);
 composer.addPass(bloom);
@@ -337,6 +386,7 @@ function resize(): void {
   composer.setPixelRatio(ratio);
   composer.setSize(w, h);
   rig.setAspect(w / h);
+  base.setAspect(w / h);
 }
 
 function setQuality(q: Quality, remember: boolean): void {
@@ -402,6 +452,15 @@ renderer.setAnimationLoop((now: number) => {
   if (hitStop > 0) {
     hitStop -= realDt;
     dt = realDt * 0.05;
+  }
+
+  if (mode === 'base') {
+    base.update(realDt, input);
+    const label = base.actionLabel;
+    if (gunBtn.textContent !== (label ?? 'USE')) gunBtn.textContent = label ?? 'USE';
+    gunBtn.classList.toggle('idle', label === null);
+    present(realDt);
+    return;
   }
 
   if (paused) dt = 0; // upgrade screen is open: the world holds still
@@ -476,7 +535,13 @@ renderer.setAnimationLoop((now: number) => {
   radar.draw(ship.root.position.x, ship.root.position.z, ship.heading, blips, elapsed, { x: ac.x, z: ac.y, r: run.arenaRadius });
   hud.update(dt);
 
+  present(realDt);
+});
+
+/** Draw the frame (base or sortie), then housekeeping: input, fps readout, auto quality. */
+function present(realDt: number): void {
   if (quality === 'high') composer.render(realDt);
+  else if (mode === 'base') renderer.render(base.scene, base.camera);
   else renderer.render(scene, rig.camera);
   input.endFrame();
 
@@ -497,7 +562,12 @@ renderer.setAnimationLoop((now: number) => {
       qualityChosen = true;
     }
   }
-});
+}
 
-// Go!
-run.start();
+// Go! Start at the station (or straight into a sortie with ?sortie, handy for testing).
+if (new URLSearchParams(location.search).has('sortie')) {
+  setMode('run');
+  run.start();
+} else {
+  goToBase();
+}

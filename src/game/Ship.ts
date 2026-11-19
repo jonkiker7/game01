@@ -69,7 +69,7 @@ export class Ship {
   onDeath?: () => void;
 
   private readonly tilt = new THREE.Group(); // pitch + bank
-  private readonly parts: ShipParts;
+  private parts: ShipParts;
   private readonly engineMat = glow('#6ff7ff');
   private readonly shadow: THREE.Mesh;
   private pitch = 0;
@@ -86,6 +86,13 @@ export class Ship {
     this.root.scale.setScalar(0.85);
     this.shadow = this.buildShadow();
     scene.add(this.root, this.shadow);
+  }
+
+  /** Swap to a different ship design (chosen at the Mechanic in home base). */
+  setDesign(design: ShipDesignId): void {
+    this.tilt.clear();
+    this.parts = buildShipDesign(design, this.tilt, this.engineMat);
+    addOutlines(this.tilt);
   }
 
   get isBoosting(): boolean {
