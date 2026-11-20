@@ -8,6 +8,7 @@ import type { Blip } from '../Radar';
 import { HOVER_HEIGHT, type Ship } from '../Ship';
 import { LANDING_PAD, OUTPOSTS, type World } from '../World';
 import type { ContractTracker } from './Contracts';
+import { createMission, type Mission, MISSION_RADIUS, MISSION_TITLES, type MissionKind } from './Missions';
 import { type ArenaVisual, type Gate, REWARD_STYLE, type Reward } from './Arena';
 import type { RunUI } from './RunUI';
 import { defaultStats, PRIMARY_NAMES, rollUpgrades, rollWeapons, SECONDARY_NAMES, type Stats, type Upgrade, UPGRADES } from './Upgrades';
@@ -27,11 +28,13 @@ export interface RunResult {
   contract: { title: string; reward: number; done: boolean } | null;
 }
 /** Arena size per encounter: tower hunts are big (fly around and find them), swarms are tight. */
-const ARENA_RADIUS: Record<EncounterKind, number> = { outpost: 180, survive: 110, stronghold: 110, boss: 130 };
+const ARENA_RADIUS: Record<EncounterKind, number> = { outpost: 180, survive: 110, stronghold: 110, boss: 130, ...MISSION_RADIUS };
 const MAP_EDGE = 354; // keep arenas inside the playable map
 const SURVIVE_TIME = 40;
 
-type EncounterKind = 'outpost' | 'survive' | 'stronghold' | 'boss';
+type EncounterKind = 'outpost' | 'survive' | 'stronghold' | 'boss' | MissionKind;
+/** Encounters the rounds before the boss can be. */
+const ROUND_KINDS: EncounterKind[] = ['outpost', 'survive', 'rescue', 'defend', 'escort', 'sabotage', 'hold'];
 type Phase = 'fight' | 'reward' | 'choosing' | 'gates' | 'transition' | 'over';
 
 const TITLES: Record<EncounterKind, string> = {
@@ -39,9 +42,11 @@ const TITLES: Record<EncounterKind, string> = {
   survive: 'SURVIVE THE SWARM',
   stronghold: 'FINAL ASSAULT',
   boss: 'BOSS',
+  ...MISSION_TITLES,
 };
 
 interface Deps {
+  scene: THREE.Scene;
   ship: Ship;
   enemies: EnemyManager;
   world: World;
@@ -87,6 +92,8 @@ export class Run {
   pair: Species[] = [];
   /** The boss, during the final round. */
   boss: Boss | null = null;
+  /** The current round's mission (rescue, defend, …), if it's one of those. */
+  mission: Mission | null = null;
   private radius = ARENA_RADIUS.outpost;
   private center = new THREE.Vector2();
   private timer = 0;
@@ -123,6 +130,7 @@ export class Run {
     this.d.clearField();
     enemies.reset();
     this.d.contracts.begin(this.d.activeContract());
+    this.endMission();
     this.d.arena.hideGates();
     this.d.arena.hideReward();
     ship.reset(world, LANDING_PAD.x, LANDING_PAD.z, this.stats);
@@ -157,6 +165,12 @@ export class Run {
       // No waves: the boss calls in its own helpers.
       enemies.configure(bounds, hpMul, null);
       this.boss = enemies.spawnBoss(this.pickBoss(), cx, cz);
+    } else if (this.kind in MISSION_TITLES) {
+      // Missions: their own objective, with lighter waves of the zone's pair.
+      enemies.configure(bounds, hpMul, { types, max: 2 + Math.floor(s / 2), interval: 4.5 });
+      const { scene, world, enemies: em, hud: h, ship } = this.d;
+      this.mission = createMission(this.kind as MissionKind, { scene, world, enemies: em, hud: h, ship });
+      this.mission.begin(cx, cz, R, hpMul);
     } else if (this.kind === 'outpost') {
       enemies.configure(bounds, hpMul, { types, max: 2 + Math.floor(s / 2), interval: Math.max(3.5, 7 - s * 0.4) });
       // Spread across the big arena: you have to hunt them down (the radar points the way).
@@ -202,7 +216,13 @@ export class Run {
   /** What the next encounter will be (sets the arena size too). */
   private pickKind(): EncounterKind {
     const s = this.sector;
-    const kind: EncounterKind = s === SECTORS ? 'boss' : s === 1 ? 'outpost' : Math.random() < 0.6 ? 'outpost' : 'survive';
+    const forced = new URLSearchParams(location.search).get('mission') as EncounterKind | null;
+    const kind: EncounterKind =
+      s === SECTORS
+        ? 'boss'
+        : forced && ROUND_KINDS.includes(forced)
+          ? forced
+          : ROUND_KINDS[Math.floor(Math.random() * ROUND_KINDS.length)];
     this.radius = ARENA_RADIUS[kind];
     return kind;
   }
@@ -238,9 +258,18 @@ export class Run {
 
     switch (this.phase) {
       case 'fight': {
+        if (this.mission) {
+          this.mission.update(dt);
+          if (this.mission.failed) {
+            this.failEncounter();
+            break;
+          }
+        }
         const done = this.boss
           ? !this.boss.alive
-          : this.kind === 'survive'
+          : this.mission
+            ? this.mission.done
+            : this.kind === 'survive'
             ? (this.timer -= dt) <= 0
             : enemies.turretsLeft === 0;
         if (done && !this.d.contracts.blocking) this.clearEncounter();
@@ -284,6 +313,20 @@ export class Run {
     const y = this.d.ship.root.position.y;
     this.d.arena.showReward(this.reward, this.tmp.set(this.center.x, y, this.center.y));
     this.phase = 'reward';
+  }
+
+  /** A mission was failed (generator or convoy destroyed): no reward, straight to the gates. */
+  private failEncounter(): void {
+    const { enemies, hud } = this.d;
+    enemies.stopDrones();
+    enemies.destroyAll();
+    hud.show('OBJECTIVE FAILED · NO REWARD', 2.6);
+    this.openGates();
+  }
+
+  private endMission(): void {
+    this.mission?.cleanup();
+    this.mission = null;
   }
 
   private collectReward(): void {
@@ -358,6 +401,7 @@ export class Run {
     this.d.ui.fade(() => {
       const { arena, enemies, ship, world } = this.d;
       arena.hideGates();
+      this.endMission();
       this.d.contracts.leaveSector();
       this.d.clearField();
       enemies.reset();
@@ -404,6 +448,7 @@ export class Run {
     switch (this.phase) {
       case 'fight':
         if (this.boss) return `${head}\nDESTROY ${this.boss.name}`;
+        if (this.mission) return `${head}\n${this.mission.objective()}`;
         if (this.kind === 'survive') {
           if (this.timer <= 0 && this.d.contracts.blocking) return `${head}\nDESTROY THE ALPHA`;
           return `${head}\nSURVIVE · ${Math.ceil(Math.max(0, this.timer))}s`;
@@ -424,7 +469,9 @@ export class Run {
   /** What the radar should mark right now. */
   blips(out: Blip[]): void {
     out.length = 0;
-    if (this.phase === 'fight') {
+    if (this.phase === 'fight' && this.mission) {
+      this.mission.blips(out);
+    } else if (this.phase === 'fight') {
       for (const e of this.d.enemies.enemies) {
         if (!e.alive) continue;
         if (!e.elite && e.species !== 'mine' && (e.kind === 'turret' || this.kind === 'survive')) out.push({ x: e.root.position.x, z: e.root.position.z, kind: 'target' });
