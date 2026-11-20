@@ -23,7 +23,9 @@ export interface RunResult {
   /** The contract you took, and whether you finished it. */
   contract: { title: string; reward: number; done: boolean } | null;
 }
-const ARENA_RADIUS = 110;
+/** Arena size per encounter: tower hunts are big (fly around and find them), swarms are tight. */
+const ARENA_RADIUS: Record<EncounterKind, number> = { outpost: 180, survive: 110, stronghold: 110 };
+const MAP_EDGE = 354; // keep arenas inside the playable map
 const SURVIVE_TIME = 40;
 
 type EncounterKind = 'outpost' | 'survive' | 'stronghold';
@@ -77,6 +79,7 @@ export class Run {
   private readonly takenNames: string[] = [];
 
   private kind: EncounterKind = 'outpost';
+  private radius = ARENA_RADIUS.outpost;
   private center = new THREE.Vector2();
   private timer = 0;
   private overTimer = 0;
@@ -93,7 +96,7 @@ export class Run {
   }
 
   get arenaRadius(): number {
-    return ARENA_RADIUS;
+    return this.radius;
   }
 
   /** Start a brand new sortie from the landing zone. */
@@ -117,6 +120,7 @@ export class Run {
     ship.reset(world, LANDING_PAD.x, LANDING_PAD.z, this.stats);
     this.d.snapCamera();
     // The first arena is the outpost nearest the landing zone.
+    this.kind = this.pickKind();
     this.enter(0);
   }
 
@@ -124,17 +128,18 @@ export class Run {
   private enter(index: number): void {
     const { enemies, arena, hud } = this.d;
     this.used.add(index);
-    const [cx, cz] = OUTPOSTS[index];
+    const [cx, cz] = this.arenaAt(index);
+    const R = this.radius;
     this.center.set(cx, cz);
-    arena.setArena(cx, cz, ARENA_RADIUS, this.d.world.heightAt(cx, cz) + HOVER_HEIGHT);
+    arena.setArena(cx, cz, R, this.d.world.heightAt(cx, cz) + HOVER_HEIGHT);
 
     const s = this.sector;
-    this.kind = s === SECTORS ? 'stronghold' : s === 1 ? 'outpost' : Math.random() < 0.6 ? 'outpost' : 'survive';
-    const bounds = { x: cx, z: cz, r: ARENA_RADIUS };
+    const bounds = { x: cx, z: cz, r: R };
     const hpMul = 1 + 0.15 * (s - 1);
     if (this.kind === 'outpost') {
       enemies.configure(bounds, hpMul, { max: 1 + Math.floor(s / 2), interval: Math.max(3.5, 7 - s * 0.4) });
-      enemies.spawnTurrets(cx, cz, Math.min(3 + s, 9), 12, 44);
+      // Spread across the big arena: you have to hunt them down (the radar points the way).
+      enemies.spawnTurrets(cx, cz, Math.min(4 + s, 9), 30, R - 25);
     } else if (this.kind === 'survive') {
       enemies.configure(bounds, hpMul, { max: 3 + Math.floor(s / 2), interval: 2.4 });
       enemies.spawnTurrets(cx, cz, 3, 14, 36);
@@ -144,9 +149,24 @@ export class Run {
       enemies.spawnTurrets(cx, cz, 6, 8, 20);
       enemies.spawnTurrets(cx, cz, 8, 32, 50);
     }
-    this.d.contracts.enterSector(s, cx, cz, ARENA_RADIUS);
+    this.d.contracts.enterSector(s, cx, cz, R);
     this.phase = 'fight';
     hud.show(s === SECTORS ? `FINAL SECTOR · ${TITLES[this.kind]}` : `SECTOR ${s} · ${TITLES[this.kind]}`, 2.6);
+  }
+
+  /** What the next encounter will be (sets the arena size too). */
+  private pickKind(): EncounterKind {
+    const s = this.sector;
+    const kind: EncounterKind = s === SECTORS ? 'stronghold' : s === 1 ? 'outpost' : Math.random() < 0.6 ? 'outpost' : 'survive';
+    this.radius = ARENA_RADIUS[kind];
+    return kind;
+  }
+
+  /** The arena's centre for an outpost, nudged inward so the whole arena fits on the map. */
+  private arenaAt(index: number): [number, number] {
+    const lim = MAP_EDGE - this.radius;
+    const [x, z] = OUTPOSTS[index];
+    return [THREE.MathUtils.clamp(x, -lim, lim), THREE.MathUtils.clamp(z, -lim, lim)];
   }
 
   /** Called when the player destroys an enemy. */
@@ -166,7 +186,7 @@ export class Run {
 
   update(dt: number): void {
     const { ship, enemies, arena } = this.d;
-    if (this.phase !== 'over' && this.phase !== 'transition') ship.confine(this.center.x, this.center.y, ARENA_RADIUS - 3);
+    if (this.phase !== 'over' && this.phase !== 'transition') ship.confine(this.center.x, this.center.y, this.radius - 3);
     if (this.phase !== 'transition') this.d.contracts.update(dt, ship);
 
     switch (this.phase) {
@@ -263,7 +283,7 @@ export class Run {
   /** Two gates on the far side of the arena, each showing the next encounter's reward. */
   private openGates(): void {
     const y = this.d.ship.root.position.y;
-    const edge = ARENA_RADIUS - 24;
+    const edge = this.radius - 24;
     if (this.sector + 1 === SECTORS) {
       this.gates = [{ x: this.center.x, z: this.center.y - edge, reward: 'final' }];
     } else {
@@ -297,9 +317,10 @@ export class Run {
         .sort((p, q) => p.d - q.d)
         .slice(0, 3);
       const pick = next[Math.floor(Math.random() * next.length)].i;
-      const [cx, cz] = OUTPOSTS[pick];
+      this.kind = this.pickKind();
+      const [cx, cz] = this.arenaAt(pick);
       // Enter from the south edge of the new arena, facing north.
-      ship.teleport(world, cx, cz + ARENA_RADIUS - 14);
+      ship.teleport(world, cx, cz + this.radius - 14);
       ship.invulnerable = Math.max(ship.invulnerable, 1.5);
       this.d.snapCamera();
       this.enter(pick);

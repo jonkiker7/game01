@@ -492,7 +492,7 @@ export class EnemyManager {
       if (this.droneTimer <= 0) {
         this.droneTimer = this.drones.interval;
         const alive = this.enemies.filter((e) => e.kind === 'drone' && !e.elite).length;
-        if (alive < this.drones.max) this.spawnDrone();
+        if (alive < this.drones.max) this.spawnDrone(ship);
       }
     }
   }
@@ -609,10 +609,30 @@ export class EnemyManager {
     return e;
   }
 
-  /** A drone arriving from a random point on the arena's edge. */
-  private spawnDrone(): void {
-    const a = this.rand() * Math.PI * 2;
-    const r = this.arena.r - 4;
-    this.register(new Drone(this.hpMul), this.arena.x + Math.cos(a) * r, this.arena.z + Math.sin(a) * r);
+  /**
+   * A drone arriving from just off-screen around the ship (inside the arena), so in big arenas
+   * they still find you quickly.
+   */
+  private spawnDrone(ship: Ship): void {
+    const p = ship.root.position;
+    let x = 0;
+    let z = 0;
+    for (let tries = 0; tries < 8; tries++) {
+      const a = this.rand() * Math.PI * 2;
+      const r = 75 + this.rand() * 20;
+      x = p.x + Math.cos(a) * r;
+      z = p.z + Math.sin(a) * r;
+      if (Math.hypot(x - this.arena.x, z - this.arena.z) < this.arena.r - 4) break;
+    }
+    // Still outside after a few tries: pull it in to the arena's edge.
+    const dx = x - this.arena.x;
+    const dz = z - this.arena.z;
+    const d = Math.hypot(dx, dz);
+    if (d > this.arena.r - 4) {
+      x = this.arena.x + (dx / d) * (this.arena.r - 4);
+      z = this.arena.z + (dz / d) * (this.arena.r - 4);
+    }
+    this.register(new Drone(this.hpMul), x, z);
   }
+
 }
