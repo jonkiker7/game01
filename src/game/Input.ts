@@ -1,4 +1,4 @@
-export type ButtonName = 'gun' | 'missile' | 'boost' | 'special';
+export type ButtonName = 'gun' | 'missile' | 'boost' | 'special' | 'rollL' | 'rollR';
 /** Buttons that double as aiming sticks (hold and drag). */
 export type AimButton = 'gun' | 'missile';
 
@@ -27,6 +27,8 @@ const KEY_BUTTONS: Record<string, ButtonName> = {
   KeyL: 'boost',
   Space: 'boost',
   KeyU: 'special',
+  KeyQ: 'rollL',
+  KeyE: 'rollR',
 };
 
 /**
@@ -34,7 +36,7 @@ const KEY_BUTTONS: Record<string, ButtonName> = {
  * - Left half of the screen: a floating stick that appears under your thumb.
  * - Right side: buttons (each tracked by its own finger, so you can hold GUN while tapping BOOST).
  *   GUN and MSL double as aiming sticks: hold one and drag your thumb toward where you want to shoot.
- * - Keyboard for testing on a computer: WASD/arrows, J gun, K missile, L/Space boost.
+ * - Keyboard for testing on a computer: WASD/arrows, J gun, K missile, L/Space boost, Q/E barrel rolls.
  */
 export class Input {
   private stickX = 0;
@@ -44,7 +46,7 @@ export class Input {
   private stickOriginY = 0;
   private readonly stickRadius = 60;
 
-  private readonly touchHeld: Record<ButtonName, boolean> = { gun: false, missile: false, boost: false, special: false };
+  private readonly touchHeld: Record<ButtonName, boolean> = { gun: false, missile: false, boost: false, special: false, rollL: false, rollR: false };
   private readonly keys = new Set<string>();
   private readonly pressed = new Set<ButtonName>();
   private readonly released = new Set<ButtonName>();
