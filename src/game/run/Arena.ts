@@ -8,7 +8,7 @@ export const REWARD_STYLE: Record<Reward, { color: string; label: string }> = {
   weapon: { color: '#e0b3ff', label: '⚔ ARMORY' },
   repair: { color: '#5dff8a', label: '✚ REPAIR' },
   salvage: { color: '#6ff7ff', label: '⬢ SALVAGE' },
-  final: { color: '#ff5a7a', label: '☠ STRONGHOLD' },
+  final: { color: '#ff5a7a', label: '☠ BOSS' },
 };
 
 export interface Gate {

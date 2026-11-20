@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { Contract } from '../../base/Save';
 import { type Enemy, type EnemyManager, type Species, ZONE_SPECIES } from '../Enemies';
 import { SPECIES_NAMES } from '../EnemyTypes';
+import { type Boss, BOSS_NAMES, type BossId } from '../Bosses';
 import type { Hud } from '../Hud';
 import type { Blip } from '../Radar';
 import { HOVER_HEIGHT, type Ship } from '../Ship';
@@ -11,7 +12,8 @@ import { type ArenaVisual, type Gate, REWARD_STYLE, type Reward } from './Arena'
 import type { RunUI } from './RunUI';
 import { defaultStats, PRIMARY_NAMES, rollUpgrades, rollWeapons, SECONDARY_NAMES, type Stats, type Upgrade, UPGRADES } from './Upgrades';
 
-export const SECTORS = 7;
+/** Rounds per sortie, the last one being the boss (2 rounds, then the boss). */
+export const SECTORS = 3;
 
 /** How a sortie ended. */
 export interface RunResult {
@@ -25,17 +27,18 @@ export interface RunResult {
   contract: { title: string; reward: number; done: boolean } | null;
 }
 /** Arena size per encounter: tower hunts are big (fly around and find them), swarms are tight. */
-const ARENA_RADIUS: Record<EncounterKind, number> = { outpost: 180, survive: 110, stronghold: 110 };
+const ARENA_RADIUS: Record<EncounterKind, number> = { outpost: 180, survive: 110, stronghold: 110, boss: 130 };
 const MAP_EDGE = 354; // keep arenas inside the playable map
 const SURVIVE_TIME = 40;
 
-type EncounterKind = 'outpost' | 'survive' | 'stronghold';
+type EncounterKind = 'outpost' | 'survive' | 'stronghold' | 'boss';
 type Phase = 'fight' | 'reward' | 'choosing' | 'gates' | 'transition' | 'over';
 
 const TITLES: Record<EncounterKind, string> = {
   outpost: 'DESTROY THE OUTPOST',
   survive: 'SURVIVE THE SWARM',
   stronghold: 'FINAL ASSAULT',
+  boss: 'BOSS',
 };
 
 interface Deps {
@@ -65,7 +68,7 @@ interface Deps {
 }
 
 /**
- * One sortie: a chain of arena encounters ending in a stronghold. Clear an encounter, collect
+ * One sortie: a chain of arena encounters ending in a boss fight. Clear an encounter, collect
  * its reward (an upgrade choice, repairs or salvage), then fly through one of the gates, each
  * showing the reward waiting at the end of the next encounter.
  */
@@ -82,6 +85,8 @@ export class Run {
   private kind: EncounterKind = 'outpost';
   /** This zone's two enemy types. */
   pair: Species[] = [];
+  /** The boss, during the final round. */
+  boss: Boss | null = null;
   private radius = ARENA_RADIUS.outpost;
   private center = new THREE.Vector2();
   private timer = 0;
@@ -122,9 +127,16 @@ export class Run {
     this.d.arena.hideReward();
     ship.reset(world, LANDING_PAD.x, LANDING_PAD.z, this.stats);
     this.d.snapCamera();
+    // `?boss=flyer|tank|titan` (or `?boss`) skips straight to a boss fight, for testing.
+    const bossTest = new URLSearchParams(location.search).has('boss');
+    if (bossTest) this.sector = SECTORS;
     // The first arena is the outpost nearest the landing zone.
     this.kind = this.pickKind();
     this.enter(0);
+    if (bossTest) {
+      ship.teleport(world, this.center.x, this.center.y + this.radius - 14);
+      this.d.snapCamera();
+    }
   }
 
   /** Begin the encounter at OUTPOSTS[index] for the current sector. */
@@ -139,8 +151,13 @@ export class Run {
     const s = this.sector;
     const bounds = { x: cx, z: cz, r: R };
     const hpMul = 1 + 0.15 * (s - 1);
-    const types = (this.pair = this.pickPair());
-    if (this.kind === 'outpost') {
+    const types = (this.pair = this.kind === 'boss' ? [] : this.pickPair());
+    this.boss = null;
+    if (this.kind === 'boss') {
+      // No waves: the boss calls in its own helpers.
+      enemies.configure(bounds, hpMul, null);
+      this.boss = enemies.spawnBoss(this.pickBoss(), cx, cz);
+    } else if (this.kind === 'outpost') {
       enemies.configure(bounds, hpMul, { types, max: 2 + Math.floor(s / 2), interval: Math.max(3.5, 7 - s * 0.4) });
       // Spread across the big arena: you have to hunt them down (the radar points the way).
       enemies.spawnTurrets(cx, cz, Math.min(4 + s, 9), 30, R - 25);
@@ -155,7 +172,7 @@ export class Run {
     }
     this.d.contracts.enterSector(s, cx, cz, R);
     this.phase = 'fight';
-    hud.show(s === SECTORS ? `FINAL SECTOR · ${TITLES[this.kind]}` : `SECTOR ${s} · ${TITLES[this.kind]}`, 2.6);
+    hud.show(this.boss ? `BOSS · ${this.boss.name}` : `SECTOR ${s} · ${TITLES[this.kind]}`, 2.6);
   }
 
   /**
@@ -174,10 +191,18 @@ export class Run {
     return [a, b];
   }
 
+  /** Which boss: `?boss=flyer|tank|titan` for testing, otherwise one at random. */
+  private pickBoss(): BossId {
+    const forced = new URLSearchParams(location.search).get('boss') as BossId | null;
+    if (forced && forced in BOSS_NAMES) return forced;
+    const ids = Object.keys(BOSS_NAMES) as BossId[];
+    return ids[Math.floor(Math.random() * ids.length)];
+  }
+
   /** What the next encounter will be (sets the arena size too). */
   private pickKind(): EncounterKind {
     const s = this.sector;
-    const kind: EncounterKind = s === SECTORS ? 'stronghold' : s === 1 ? 'outpost' : Math.random() < 0.6 ? 'outpost' : 'survive';
+    const kind: EncounterKind = s === SECTORS ? 'boss' : s === 1 ? 'outpost' : Math.random() < 0.6 ? 'outpost' : 'survive';
     this.radius = ARENA_RADIUS[kind];
     return kind;
   }
@@ -208,10 +233,16 @@ export class Run {
     const { ship, enemies, arena } = this.d;
     if (this.phase !== 'over' && this.phase !== 'transition') ship.confine(this.center.x, this.center.y, this.radius - 3);
     if (this.phase !== 'transition') this.d.contracts.update(dt, ship);
+    const showBoss = this.boss && this.boss.alive && this.phase === 'fight';
+    this.d.hud.setBoss(showBoss ? this.boss!.name : null, this.boss?.healthFraction ?? 0);
 
     switch (this.phase) {
       case 'fight': {
-        const done = this.kind === 'survive' ? (this.timer -= dt) <= 0 : enemies.turretsLeft === 0;
+        const done = this.boss
+          ? !this.boss.alive
+          : this.kind === 'survive'
+            ? (this.timer -= dt) <= 0
+            : enemies.turretsLeft === 0;
         if (done && !this.d.contracts.blocking) this.clearEncounter();
         break;
       }
@@ -242,7 +273,7 @@ export class Run {
     enemies.stopDrones();
     enemies.destroyAll();
     if (this.sector === SECTORS) {
-      hud.show('STRONGHOLD DESTROYED', 3);
+      hud.show(this.boss ? `${this.boss.name} DESTROYED` : 'STRONGHOLD DESTROYED', 3);
       this.won = true;
       this.phase = 'over';
       this.overTimer = 2.5;
@@ -372,6 +403,7 @@ export class Run {
     const head = this.sector === SECTORS ? 'FINAL SECTOR' : `SECTOR ${this.sector}/${SECTORS}`;
     switch (this.phase) {
       case 'fight':
+        if (this.boss) return `${head}\nDESTROY ${this.boss.name}`;
         if (this.kind === 'survive') {
           if (this.timer <= 0 && this.d.contracts.blocking) return `${head}\nDESTROY THE ALPHA`;
           return `${head}\nSURVIVE · ${Math.ceil(Math.max(0, this.timer))}s`;
