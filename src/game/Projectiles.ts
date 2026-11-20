@@ -285,7 +285,7 @@ export class EnemyShots {
    * Fires a shot along (dirX, dirZ). Shots from the ground climb steadily so they reach
    * `targetY` (the ship's altitude) after about `travel` units, then fly level.
    */
-  fire(from: THREE.Vector3, dirX: number, dirZ: number, speed: number, targetY: number, travel: number): void {
+  fire(from: THREE.Vector3, dirX: number, dirZ: number, speed: number, targetY: number, travel: number, damage = ORB_DAMAGE, life = 4): void {
     const climb = targetY - from.y;
     const vy = climb > 0 ? (climb * speed) / Math.max(travel, 6) : 0;
     this.pool.add({
@@ -296,8 +296,8 @@ export class EnemyShots {
       vy,
       vz: dirZ * speed,
       ceiling: Math.max(targetY, from.y),
-      life: 4,
-      damage: ORB_DAMAGE,
+      life,
+      damage,
     });
   }
 

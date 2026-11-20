@@ -1,171 +1,26 @@
 import * as THREE from 'three';
 import type { Effects } from './Effects';
-import { addOutlines, GLOW, glow, rimToon } from './materials';
+import {
+  ATTACK_RANGE,
+  type Ctx,
+  Enemy,
+  ENEMY_ARMOR,
+  ENEMY_BODY,
+  ENEMY_GLOW,
+  type Species,
+  TOWER_RANGE,
+  TOWER_STONE,
+} from './EnemyBase';
+import { addOutlines, GLOW, glow } from './materials';
 import { approachAngle, mulberry32, wrapAngle } from './math';
 import type { Mortars } from './Mortars';
-import type { EnemyShots, Hittable } from './Projectiles';
+import type { EnemyShots } from './Projectiles';
 import { HOVER_HEIGHT, type Ship } from './Ship';
 import type { World } from './World';
 
-const ENEMY_BODY = '#3b1d4a';
-const ENEMY_ARMOR = '#6a2f63';
-const ENEMY_GLOW = '#ff2e63';
-const TOWER_STONE = '#4a2f5e';
-/** Enemies only attack inside this distance, which roughly matches what's visible on screen. */
-const ATTACK_RANGE = 36;
-/** Towers lob mortars from much farther away (the landing ring warns you where they'll hit). */
-const TOWER_RANGE = 75;
+import { Crawler, Lancer, Mine, MineLayer, Pulsar, Sniper, Swarmer } from './EnemyTypes';
 
-interface Ctx {
-  ship: Ship;
-  shots: EnemyShots;
-  mortars: Mortars;
-  world: World;
-  dt: number;
-  /** True if this enemy's gun is on screen. Enemies only shoot when you can see them. */
-  onScreen: (e: Enemy) => boolean;
-}
-
-export abstract class Enemy implements Hittable {
-  readonly root = new THREE.Group();
-  abstract readonly radius: number;
-  abstract readonly hitBottom: number;
-  abstract readonly hitTop: number;
-  abstract readonly aimHeight: number;
-  abstract readonly kind: 'turret' | 'drone';
-  alive = true;
-  /** A contract target (the "alpha"): bigger, tougher, marked on the radar. */
-  elite = false;
-  protected hp: number;
-  protected flash = 0;
-  protected readonly mats: THREE.MeshToonMaterial[] = [];
-  /** Every toon material, for status tints (chilled blue, burning orange). */
-  private readonly allMats: THREE.MeshToonMaterial[] = [];
-  protected time = Math.random() * 10;
-
-  // ---- Status effects (from Cryo and Plasma upgrades) ----
-  /** Seconds left chilled (slowed), and chill stacks building toward a freeze. */
-  chilled = 0;
-  private chillStacks = 0;
-  /** Seconds left frozen solid (can't move or shoot). */
-  frozen = 0;
-  /** Burning: damage per second and seconds left. */
-  burnDps = 0;
-  burnTime = 0;
-  private ice: THREE.Mesh | null = null;
-
-  constructor(readonly maxHp: number) {
-    this.hp = maxHp;
-  }
-
-  /** Set by the manager so a kill can trigger effects/score. */
-  onKilled?: (e: Enemy) => void;
-
-  damage(amount: number): void {
-    if (!this.alive) return;
-    this.hp -= amount;
-    this.flash = 0.08;
-    if (this.hp <= 0) {
-      this.alive = false;
-      this.onKilled?.(this);
-    }
-  }
-
-  get burning(): boolean {
-    return this.burnTime > 0;
-  }
-
-  /** Add chill stacks; 5 stacks freezes the enemy. */
-  chill(stacks: number): void {
-    if (!this.alive) return;
-    this.chilled = 2.5;
-    this.chillStacks += stacks;
-    if (this.chillStacks >= 5) {
-      this.chillStacks = 0;
-      this.freeze(1.6);
-    }
-  }
-
-  freeze(seconds: number): void {
-    if (!this.alive) return;
-    this.frozen = Math.max(this.frozen, seconds);
-    this.chilled = Math.max(this.chilled, seconds + 1);
-  }
-
-  ignite(dps: number, seconds: number): void {
-    if (!this.alive) return;
-    this.burnDps = Math.max(this.burnDps, dps);
-    this.burnTime = Math.max(this.burnTime, seconds);
-  }
-
-  update(ctx: Ctx): void {
-    const dt = ctx.dt;
-    this.time += dt;
-    this.flash = Math.max(0, this.flash - dt);
-
-    // Burning: damage over time (in small ticks, without the white hit flash).
-    if (this.burnTime > 0) {
-      this.burnTime -= dt;
-      this.hp -= this.burnDps * dt;
-      if (this.hp <= 0 && this.alive) {
-        this.alive = false;
-        this.onKilled?.(this);
-        return;
-      }
-      if (this.burnTime <= 0) this.burnDps = 0;
-    }
-    this.frozen = Math.max(0, this.frozen - dt);
-    this.chilled = Math.max(0, this.chilled - dt);
-    if (this.chilled <= 0) this.chillStacks = 0;
-
-    // Status tint: frozen pale blue, chilled blue, burning flickering orange; hits flash white.
-    let r = 0;
-    let g = 0;
-    let b = 0;
-    if (this.frozen > 0) [r, g, b] = [0.35, 0.7, 0.95];
-    else if (this.chilled > 0) [r, g, b] = [0.08, 0.28, 0.55];
-    if (this.burnTime > 0) {
-      const k = 0.55 + Math.sin(this.time * 22) * 0.25;
-      r = Math.max(r, 0.95 * k);
-      g = Math.max(g, 0.35 * k);
-      b = Math.max(b, 0.05 * k);
-    }
-    for (const m of this.allMats) m.emissive.setRGB(r, g, b);
-    if (this.flash > 0) for (const m of this.mats) m.emissive.setRGB(1, 1, 1);
-
-    // Ice shell while frozen.
-    if (this.frozen > 0 && !this.ice) {
-      this.ice = new THREE.Mesh(
-        new THREE.IcosahedronGeometry(this.radius * 1.25, 1),
-        glow('#c8f6ff', { transparent: true, opacity: 0.4, depthWrite: false }, 1.2),
-      );
-      this.ice.position.y = this.aimHeight + (this.kind === 'turret' ? 0.8 : 0);
-      this.root.add(this.ice);
-    }
-    if (this.ice) this.ice.visible = this.frozen > 0;
-
-    // Frozen enemies don't act; chilled ones act at a slower pace.
-    if (this.frozen > 0) return;
-    this.think(this.chilled > 0 ? { ...ctx, dt: dt * 0.55 } : ctx);
-  }
-
-  protected abstract think(ctx: Ctx): void;
-
-  /** @param flashes whether this part flashes white when hit (towers only flash their gun). */
-  protected mat(color: string, flashes = true): THREE.MeshToonMaterial {
-    const m = rimToon(color, ENEMY_GLOW, 0.75);
-    this.allMats.push(m);
-    if (flashes) this.mats.push(m);
-    return m;
-  }
-
-  protected distanceTo(ship: Ship): { dx: number; dz: number; dist: number } {
-    const dx = ship.root.position.x - this.root.position.x;
-    const dz = ship.root.position.z - this.root.position.z;
-    return { dx, dz, dist: Math.hypot(dx, dz) };
-  }
-}
-
+export { Enemy, type Species } from './EnemyBase';
 /**
  * Turret tower: a stone pillar with the gun on top, about halfway up to the ship.
  * Tracks you and fires a fan of three orbs.
@@ -175,6 +30,7 @@ const TOWER_HEIGHT = (HOVER_HEIGHT - 6.5) / 2; // platform top (13 units); the g
 class Turret extends Enemy {
   readonly radius = 2.6;
   readonly kind = 'turret';
+  readonly species = 'turret';
   // Bullets hit the gun and platform on top (what looks like the tower's head on screen).
   readonly hitBottom = TOWER_HEIGHT - 1.5;
   readonly hitTop = TOWER_HEIGHT + 5;
@@ -187,6 +43,9 @@ class Turret extends Enemy {
 
   constructor(hpMul = 1) {
     super(70 * hpMul);
+    this.salvage = 6;
+    this.weight = 0;
+    this.dropChance = 0.35;
     const H = TOWER_HEIGHT;
     const stone = this.mat(TOWER_STONE, false);
     const armor = this.mat(ENEMY_ARMOR, false);
@@ -260,6 +119,7 @@ class Turret extends Enemy {
 class Drone extends Enemy {
   readonly radius: number;
   readonly kind = 'drone';
+  readonly species = 'drone';
   readonly hitBottom: number;
   readonly hitTop: number;
   readonly aimHeight = 0;
@@ -365,11 +225,40 @@ class Drone extends Enemy {
 
 const CULL_DISTANCE = 130;
 
-/** How drones arrive during an encounter. */
+/** How enemies arrive during an encounter. */
 export interface DroneWaves {
-  max: number; // most drones alive at once
+  /** The enemy types this zone uses (each arrival picks one at random). */
+  types: Species[];
+  max: number; // most enemies alive at once (by weight: a swarm bug counts a quarter)
   interval: number; // seconds between arrivals
 }
+
+/** Make a new enemy of a given species. */
+export function createEnemy(species: Species, hpMul: number): Enemy {
+  switch (species) {
+    case 'swarmer':
+      return new Swarmer(hpMul);
+    case 'lancer':
+      return new Lancer(hpMul);
+    case 'crawler':
+      return new Crawler(hpMul);
+    case 'sniper':
+      return new Sniper(hpMul);
+    case 'minelayer':
+      return new MineLayer(hpMul);
+    case 'pulsar':
+      return new Pulsar(hpMul);
+    case 'mine':
+      return new Mine();
+    case 'turret':
+      return new Turret(hpMul);
+    default:
+      return new Drone(hpMul);
+  }
+}
+
+/** The mobile species a zone can draw its pair from. */
+export const ZONE_SPECIES: Species[] = ['drone', 'swarmer', 'lancer', 'crawler', 'sniper', 'minelayer', 'pulsar'];
 
 /** A circular arena the fight is confined to. */
 export interface ArenaBounds {
@@ -384,7 +273,7 @@ export interface ArenaBounds {
  */
 export class EnemyManager {
   readonly enemies: Enemy[] = [];
-  onKill?: (kind: 'turret' | 'drone', pos: THREE.Vector3, enemy: Enemy) => void;
+  onKill?: (kind: Enemy['kind'], pos: THREE.Vector3, enemy: Enemy) => void;
 
   /** Enemy health multiplier (later sectors are tougher). */
   hpMul = 1;
@@ -470,12 +359,13 @@ export class EnemyManager {
       this.probe.y += e.aimHeight;
       return this.frustum.containsPoint(this.probe);
     };
-    const ctx: Ctx = { ship, shots, mortars, world: this.world, dt, onScreen };
+    const spawn = (e: Enemy, x: number, z: number) => this.register(e, x, z);
+    const ctx: Ctx = { ship, shots, mortars, world: this.world, dt, onScreen, effects: this.effects, spawn };
     const sp = ship.root.position;
     for (const e of this.enemies) {
       const far = Math.hypot(e.root.position.x - sp.x, e.root.position.z - sp.z) > CULL_DISTANCE;
       e.root.visible = !far;
-      if (e.alive && (!far || e.kind === 'drone')) e.update(ctx);
+      if (e.alive && (!far || e.kind !== 'turret')) e.update(ctx);
     }
     // Remove destroyed enemies.
     for (let i = this.enemies.length - 1; i >= 0; i--) {
@@ -486,13 +376,17 @@ export class EnemyManager {
       }
     }
 
-    // Drone waves arrive from the arena's edge.
-    if (this.drones && ship.alive) {
+    // Waves arrive from just off-screen.
+    if (this.drones && ship.alive && this.drones.types.length > 0) {
       this.droneTimer -= dt;
       if (this.droneTimer <= 0) {
         this.droneTimer = this.drones.interval;
-        const alive = this.enemies.filter((e) => e.kind === 'drone' && !e.elite).length;
-        if (alive < this.drones.max) this.spawnDrone(ship);
+        let used = 0;
+        for (const e of this.enemies) if (e.alive && !e.elite) used += e.weight;
+        if (used < this.drones.max) {
+          const types = this.drones.types;
+          this.spawnWave(ship, types[Math.floor(this.rand() * types.length)]);
+        }
       }
     }
   }
@@ -610,10 +504,10 @@ export class EnemyManager {
   }
 
   /**
-   * A drone arriving from just off-screen around the ship (inside the arena), so in big arenas
+   * An enemy arriving from just off-screen around the ship (inside the arena), so in big arenas
    * they still find you quickly.
    */
-  private spawnDrone(ship: Ship): void {
+  private spawnWave(ship: Ship, species: Species): void {
     const p = ship.root.position;
     let x = 0;
     let z = 0;
@@ -632,7 +526,12 @@ export class EnemyManager {
       x = this.arena.x + (dx / d) * (this.arena.r - 4);
       z = this.arena.z + (dz / d) * (this.arena.r - 4);
     }
-    this.register(new Drone(this.hpMul), x, z);
+    if (species === 'swarmer') {
+      // Swarmers come as a pack.
+      for (let i = 0; i < 5; i++) this.register(new Swarmer(this.hpMul), x + (this.rand() - 0.5) * 8, z + (this.rand() - 0.5) * 8);
+      return;
+    }
+    this.register(createEnemy(species, this.hpMul), x, z);
   }
 
 }

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { Contract } from '../../base/Save';
-import type { Enemy, EnemyManager } from '../Enemies';
+import { type Enemy, type EnemyManager, type Species, ZONE_SPECIES } from '../Enemies';
+import { SPECIES_NAMES } from '../EnemyTypes';
 import type { Hud } from '../Hud';
 import type { Blip } from '../Radar';
 import { HOVER_HEIGHT, type Ship } from '../Ship';
@@ -79,6 +80,8 @@ export class Run {
   private readonly takenNames: string[] = [];
 
   private kind: EncounterKind = 'outpost';
+  /** This zone's two enemy types. */
+  pair: Species[] = [];
   private radius = ARENA_RADIUS.outpost;
   private center = new THREE.Vector2();
   private timer = 0;
@@ -136,22 +139,39 @@ export class Run {
     const s = this.sector;
     const bounds = { x: cx, z: cz, r: R };
     const hpMul = 1 + 0.15 * (s - 1);
+    const types = (this.pair = this.pickPair());
     if (this.kind === 'outpost') {
-      enemies.configure(bounds, hpMul, { max: 1 + Math.floor(s / 2), interval: Math.max(3.5, 7 - s * 0.4) });
+      enemies.configure(bounds, hpMul, { types, max: 2 + Math.floor(s / 2), interval: Math.max(3.5, 7 - s * 0.4) });
       // Spread across the big arena: you have to hunt them down (the radar points the way).
       enemies.spawnTurrets(cx, cz, Math.min(4 + s, 9), 30, R - 25);
     } else if (this.kind === 'survive') {
-      enemies.configure(bounds, hpMul, { max: 3 + Math.floor(s / 2), interval: 2.4 });
+      enemies.configure(bounds, hpMul, { types, max: 3 + Math.floor(s / 2), interval: 2.4 });
       enemies.spawnTurrets(cx, cz, 3, 14, 36);
       this.timer = SURVIVE_TIME;
     } else {
-      enemies.configure(bounds, hpMul, { max: 4, interval: 4 });
+      enemies.configure(bounds, hpMul, { types, max: 4, interval: 4 });
       enemies.spawnTurrets(cx, cz, 6, 8, 20);
       enemies.spawnTurrets(cx, cz, 8, 32, 50);
     }
     this.d.contracts.enterSector(s, cx, cz, R);
     this.phase = 'fight';
     hud.show(s === SECTORS ? `FINAL SECTOR · ${TITLES[this.kind]}` : `SECTOR ${s} · ${TITLES[this.kind]}`, 2.6);
+  }
+
+  /**
+   * Two enemy types for this zone, at random (towers don't count: they're the objective).
+   * For testing, `?enemies=swarmer,sniper` in the URL forces a pair (or a single type).
+   */
+  private pickPair(): Species[] {
+    const forced = new URLSearchParams(location.search).get('enemies');
+    if (forced) {
+      const list = forced.split(',').filter((x): x is Species => ZONE_SPECIES.includes(x as Species));
+      if (list.length > 0) return list;
+    }
+    const pool = [...ZONE_SPECIES];
+    const a = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
+    const b = pool[Math.floor(Math.random() * pool.length)];
+    return [a, b];
   }
 
   /** What the next encounter will be (sets the arena size too). */
@@ -170,10 +190,10 @@ export class Run {
   }
 
   /** Called when the player destroys an enemy. */
-  onKill(kind: 'turret' | 'drone', enemy?: Enemy): void {
+  onKill(_kind: Enemy['kind'], enemy: Enemy): void {
     this.kills++;
-    if (enemy) this.d.contracts.onKill(enemy);
-    this.salvage += Math.round((kind === 'turret' ? 6 : 3) * this.stats.salvageMul);
+    this.d.contracts.onKill(enemy);
+    this.salvage += Math.round(enemy.salvage * this.stats.salvageMul);
   }
 
   /** Called when the ship is destroyed: the run is over. */
@@ -343,7 +363,8 @@ export class Run {
   /** What the HUD should say under the radar. */
   objective(): string {
     const line = this.d.contracts.objectiveLine(this.sector);
-    const text = this.baseObjective();
+    let text = this.baseObjective();
+    if (this.phase === 'fight' && this.pair.length) text += `\nVS ${this.pair.map((p) => SPECIES_NAMES[p]).join(' + ')}`;
     return line && this.phase !== 'over' ? `${text}\n${line}` : text;
   }
 
@@ -374,7 +395,7 @@ export class Run {
     if (this.phase === 'fight') {
       for (const e of this.d.enemies.enemies) {
         if (!e.alive) continue;
-        if (!e.elite && (e.kind === 'turret' || this.kind === 'survive')) out.push({ x: e.root.position.x, z: e.root.position.z, kind: 'target' });
+        if (!e.elite && e.species !== 'mine' && (e.kind === 'turret' || this.kind === 'survive')) out.push({ x: e.root.position.x, z: e.root.position.z, kind: 'target' });
       }
     } else if (this.phase === 'reward') {
       const r = this.d.arena.rewardPosition;

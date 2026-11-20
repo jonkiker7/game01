@@ -133,6 +133,26 @@ shot down the run ends; the summary screen shows your progress and banks your sa
 The radar marks whatever the current step is about (towers, drones, the reward, or the gates) and
 shows the arena wall as a dashed circle.
 
+## Enemies
+
+Each zone uses **two enemy types**, picked at random (towers don't count: they're the objective).
+The pair is shown under the radar ("VS SWARMERS + SNIPERS").
+
+| Enemy | Where | What it does / how to beat it |
+| --- | --- | --- |
+| **Drone** | air | Circles you and fires 3-shot bursts. |
+| **Tower** | ground | Lobs plasma bombs; a red ring marks where they'll land. |
+| **Swarmer** | air | Packs of 5 small bugs. They stop and glow hot, then dive and explode on contact. Keep moving. |
+| **Lancer** | air | Paints a red lane, shudders, then dashes down it. Dodge sideways (barrel rolls are great here). |
+| **Shield Crawler** | ground | Tank with a front energy shield that blocks gunfire. Flank it, or use missiles (they get through). |
+| **Sniper** | air | Hangs back, tracks you with a laser, then the laser freezes and flickers: move before it fires. |
+| **Mine Layer** | air | Loops around you dropping mines that arm after a second (red halo). Shoot them or steer around. |
+| **Pulsar** | ground | Pylon that sprays rotating spirals of slow shots. Weave through the gaps, or kill it between spirals. |
+
+For testing, `?enemies=swarmer,sniper` forces a zone's pair (or one type: `?enemies=lancer`). Names:
+drone, swarmer, lancer, crawler, sniper, minelayer, pulsar. On a very slow test machine,
+`?dtmax=0.3` lets the game keep real time (it runs the logic in small steps per frame).
+
 ## Weapons, upgrades and Nova
 
 - **Gun slot:** Machine Gun (default), **Scatter Cannon** (6-pellet short-range blasts) or

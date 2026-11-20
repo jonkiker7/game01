@@ -55,7 +55,8 @@ export class Combat {
       e.ignite(igniteBlast ? 10 + 4 * s.plasmaWarheads : 5 + 3 * s.plasmaRounds, igniteBlast ? 4 : 3);
     }
 
-    e.damage(dmg);
+    // Gunfire can be blocked by shields; missiles and explosions get through.
+    e.damage(dmg, source !== 'gun' && source !== 'arc');
     this.onDamage?.(dmg);
 
     // Arc: chain lightning onward.
