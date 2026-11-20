@@ -32,7 +32,7 @@ import { ContractTracker } from './game/run/Contracts';
 import { Run } from './game/run/Run';
 import { defaultStats } from './game/run/Upgrades';
 import { RunUI } from './game/run/RunUI';
-import { Ship } from './game/Ship';
+import { ROLL_COOLDOWN, Ship } from './game/Ship';
 import { isShipDesign } from './game/ShipDesigns';
 import { JUNGLE, World } from './game/World';
 
@@ -232,7 +232,7 @@ const input = new Input({
   stickZone: $('stick-zone'),
   stickBase: $('stick-base'),
   stickKnob: $('stick-knob'),
-  buttons: { gun: $('btn-gun'), missile: $('btn-missile'), boost: $('btn-boost'), special: $('btn-special') },
+  buttons: { gun: $('btn-gun'), missile: $('btn-missile'), boost: $('btn-boost'), special: $('btn-special'), rollL: $('btn-roll-l'), rollR: $('btn-roll-r') },
 });
 
 // ---------- Events ----------
@@ -243,6 +243,10 @@ ship.onBoost = () => {
   rig.kick(12, 0.6);
   input.vibrate(30);
   effects.boostBurst(ship.root.position);
+};
+ship.onRoll = () => {
+  rig.kick(6, 0.4);
+  input.vibrate(18);
 };
 ship.onFullCharge = () => input.vibrate(15);
 ship.onMissileEmpty = () => {
@@ -452,6 +456,7 @@ let perfTime = 0;
 let perfFrames = 0;
 let elapsed = 0;
 const boostBtn = $('btn-boost');
+const rollBtns = [$('btn-roll-l'), $('btn-roll-r')];
 const specialBtn = $('btn-special');
 const aimLead = new THREE.Vector2();
 let frames = 0;
@@ -540,6 +545,7 @@ renderer.setAnimationLoop((now: number) => {
   rig.update(dt, ship.root.position, ship.velocity, aimLead);
 
   boostBtn.style.setProperty('--cd', String(ship.boostCooldown / ship.stats.boostCooldown));
+  for (const b of rollBtns) b.style.setProperty('--cd', String(ship.rollCooldown / ROLL_COOLDOWN));
   hud.setArmor(ship.armor, ship.stats.maxArmor);
   hud.setMissiles(ship.missiles, ship.missileRecharge, ship.stats.missileMax);
   hud.setSalvage(run.salvage);

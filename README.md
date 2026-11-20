@@ -12,6 +12,7 @@ classic 16-bit isometric helicopter shooters, with a painterly toon look.
 | Machine gun (hold, drag to aim) | **GUN** button, used as an aiming stick | J (fires straight ahead) |
 | Missile (hold to charge, drag to aim, release to fire) | **MSL** button, used as an aiming stick | K (fires straight ahead) |
 | Boost (dash) | **BOOST** button | L / Space |
+| Barrel roll left / right | **↺ ROLL** / **↻ ROLL** buttons beside BOOST | Q / E |
 | Nova (special) | **NOVA** button, when charged | U |
 
 Both weapon buttons are twin-stick style: hold and drag your thumb toward a target and the ship
@@ -35,7 +36,10 @@ left, the button dims and won't charge.
 Destroyed enemies sometimes drop a **green healing orb** that floats up to flying height. Fly
 into it to restore 25 armor (orbs pull toward you when you're close, and fade after 15 seconds).
 
-Boosting makes you briefly invulnerable, so you can dash through enemy shots.
+Boosting makes you briefly invulnerable, so you can dash through enemy shots. **Barrel rolls**
+are a quick sideways dodge relative to the way the ship is facing: a full spin with a moment of
+invulnerability. They have their own short cooldown (0.9 s), separate from boost, so you can chain
+boost and rolls.
 
 **Graphics quality:** tap the fps counter at the top to switch between HIGH (with bloom glow) and
 LOW (faster, for older phones). The game drops to LOW automatically if HIGH runs below 45 fps.

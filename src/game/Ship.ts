@@ -15,6 +15,10 @@ const AIM_TURN_RATE = 12; // the ship snaps quickly toward where you're aiming
 const BOOST_SPEED = 160;
 const BOOST_TIME = 0.38; // seconds of dash
 const BOOST_INVULNERABLE = 0.45; // dodge through enemy shots while dashing
+const ROLL_SPEED = 95; // sideways dash speed of a barrel roll
+const ROLL_TIME = 0.42; // seconds per roll (one full spin)
+export const ROLL_COOLDOWN = 0.9; // separate from boost, so boost and rolls can chain
+const ROLL_INVULNERABLE = 0.4;
 export const HOVER_HEIGHT = 32.5; // well above the jungle canopy
 
 // ---- Weapons ----
@@ -37,6 +41,9 @@ export class Ship {
   readonly velocity = new THREE.Vector2(); // (x, z) world units/second
   heading = 0;
   boostCooldown = 0;
+  rollCooldown = 0;
+  private rollTimer = 0;
+  private rollDir = 0; // -1 left, +1 right
 
   readonly radius = 1.7;
   readonly hitBottom = -2;
@@ -57,6 +64,7 @@ export class Ship {
   aimHeading = 0;
 
   onBoost?: () => void;
+  onRoll?: (dir: number) => void;
   onFullCharge?: () => void;
   onMissile?: (charge: number, heading: number) => void;
   /** Pressed MSL with no missiles left. */
@@ -145,6 +153,8 @@ export class Ship {
       // Drain button events while the wreck burns (the run decides what happens next).
       input.consumePress('missile');
       input.consumePress('boost');
+      input.consumePress('rollL');
+      input.consumePress('rollR');
       return;
     }
 
@@ -168,6 +178,25 @@ export class Ship {
       this.boostCooldown = this.stats.boostCooldown;
       this.invulnerable = Math.max(this.invulnerable, BOOST_INVULNERABLE);
       this.onBoost?.();
+    }
+
+    // --- Barrel roll: a quick sideways dodge (relative to the ship's facing) with a full spin ---
+    this.rollCooldown = Math.max(0, this.rollCooldown - dt);
+    const rollL = input.consumePress('rollL');
+    const rollR = input.consumePress('rollR');
+    if ((rollL || rollR) && this.rollCooldown <= 0 && this.boostTimer <= 0) {
+      this.rollDir = rollR ? 1 : -1;
+      const rx = Math.cos(this.heading) * this.rollDir; // the ship's right (or left)
+      const rz = -Math.sin(this.heading) * this.rollDir;
+      // Keep the forward momentum, add a hard sideways kick.
+      const fx = -Math.sin(this.heading);
+      const fz = -Math.cos(this.heading);
+      const forward = Math.max(0, this.velocity.x * fx + this.velocity.y * fz);
+      this.velocity.set(fx * forward + rx * ROLL_SPEED, fz * forward + rz * ROLL_SPEED);
+      this.rollTimer = ROLL_TIME;
+      this.rollCooldown = ROLL_COOLDOWN;
+      this.invulnerable = Math.max(this.invulnerable, ROLL_INVULNERABLE);
+      this.onRoll?.(this.rollDir);
     }
 
     // --- Missile ammo: refills one at a time, each taking stats.missileRecharge seconds ---
@@ -214,6 +243,9 @@ export class Ship {
     if (this.boostTimer > 0) {
       this.boostTimer -= dt;
       this.velocity.multiplyScalar(Math.exp(-1.5 * dt));
+    } else if (this.rollTimer > 0) {
+      this.rollTimer -= dt;
+      this.velocity.multiplyScalar(Math.exp(-2.2 * dt));
     } else {
       const k = 1 - Math.exp(-ACCEL * dt);
       const top = MAX_SPEED * this.stats.speedMul * speedScale;
@@ -255,7 +287,13 @@ export class Ship {
     const sideSpeed = this.velocity.x * -fz + this.velocity.y * fx;
     this.pitch = damp(this.pitch, clamp(-forwardSpeed * 0.022, -0.55, 0.55), 6, dt);
     this.roll = damp(this.roll, clamp(-sideSpeed * 0.03, -0.6, 0.6), 6, dt);
-    this.tilt.rotation.set(this.pitch, 0, this.roll);
+    // A barrel roll spins the ship once around its nose (eased so it snaps out of the spin).
+    let spin = 0;
+    if (this.rollTimer > 0) {
+      const u = 1 - this.rollTimer / ROLL_TIME;
+      spin = -this.rollDir * Math.PI * 2 * (1 - (1 - u) * (1 - u));
+    }
+    this.tilt.rotation.set(this.pitch, 0, this.roll + spin);
 
     this.updateVisuals(dt, ground);
   }
@@ -268,6 +306,8 @@ export class Ship {
     this.missiles = stats.missileMax;
     this.missileRecharge = 0;
     this.boostCooldown = 0;
+    this.rollCooldown = 0;
+    this.rollTimer = 0;
     this.isCharging = false;
     this.charge = 0;
     this.invulnerable = SPAWN_INVULNERABLE;
