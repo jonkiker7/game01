@@ -14,7 +14,7 @@ import { Effects } from './game/Effects';
 import { EnemyManager } from './game/Enemies';
 import { Hud } from './game/Hud';
 import { Input } from './game/Input';
-import { DROP_CHANCE, Pickups } from './game/Pickups';
+import { Pickups } from './game/Pickups';
 import { type Blip, Radar } from './game/Radar';
 import {
   MISSILE_LOCK_ANGLE,
@@ -225,6 +225,8 @@ composer.addPass(new OutputPass());
 
 // ---------- Hit-stop: freeze for a split second on big impacts (Hades does this a lot) ----------
 let hitStop = 0;
+// Longest frame step. `?dtmax=0.3` (testing only) lets very slow test browsers keep real time.
+const MAX_DT = Number(new URLSearchParams(location.search).get('dtmax')) || 1 / 20;
 const freeze = (seconds: number) => (hitStop = Math.max(hitStop, seconds));
 
 const input = new Input({
@@ -319,12 +321,13 @@ enemies.onKill = (kind, pos, enemy) => {
   run.onKill(kind, enemy);
   combat.onKill(enemy, pos, world.heightAt(pos.x, pos.z));
   // Sometimes a wreck drops a healing orb that floats up to flying height.
-  if (Math.random() < DROP_CHANCE[kind] + ship.stats.dropBonus) {
+  if (Math.random() < enemy.dropChance + ship.stats.dropBonus) {
     enemies.projectToPlane(pos, pickupTarget);
     pickups.drop(pos, pickupTarget);
   }
-  freeze(kind === 'turret' ? 0.08 : 0.05);
-  rig.kick(0, kind === 'turret' ? 1 : 0.6);
+  const big = kind !== 'drone';
+  freeze(big ? 0.08 : 0.05);
+  rig.kick(0, big ? 1 : 0.6);
   input.vibrate(30);
 };
 
@@ -463,27 +466,8 @@ let frames = 0;
 let fpsTimer = 0;
 let last = performance.now();
 
-renderer.setAnimationLoop((now: number) => {
-  const realDt = Math.min((now - last) / 1000, 1 / 20); // clamp so a hiccup doesn't teleport the ship
-  last = now;
-  elapsed += realDt;
-
-  // Hit-stop: the world pauses for a moment, but the screen keeps rendering.
-  let dt = realDt;
-  if (hitStop > 0) {
-    hitStop -= realDt;
-    dt = realDt * 0.05;
-  }
-
-  if (mode === 'base') {
-    base.update(realDt, input);
-    const label = base.actionLabel;
-    if (gunBtn.textContent !== (label ?? 'USE')) gunBtn.textContent = label ?? 'USE';
-    gunBtn.classList.toggle('idle', label === null);
-    present(realDt);
-    return;
-  }
-
+/** One step of the sortie's game logic (movement, enemies, shots, effects). */
+function simulate(dt: number): void {
   if (paused) dt = 0; // upgrade screen is open: the world holds still
 
   if (!paused) {
@@ -534,6 +518,34 @@ renderer.setAnimationLoop((now: number) => {
   effects.update(dt, rig.lookTarget);
   aim.update(dt, ship, ship.isCharging ? missileLock(ship.charge, ship.aimHeading) : null);
   world.update(dt);
+}
+
+renderer.setAnimationLoop((now: number) => {
+  const realDt = Math.min((now - last) / 1000, MAX_DT); // clamp so a hiccup doesn't teleport the ship
+  last = now;
+  elapsed += realDt;
+
+  // Hit-stop: the world pauses for a moment, but the screen keeps rendering.
+  let dt = realDt;
+  if (hitStop > 0) {
+    hitStop -= realDt;
+    dt = realDt * 0.05;
+  }
+
+  if (mode === 'base') {
+    base.update(realDt, input);
+    const label = base.actionLabel;
+    if (gunBtn.textContent !== (label ?? 'USE')) gunBtn.textContent = label ?? 'USE';
+    gunBtn.classList.toggle('idle', label === null);
+    present(realDt);
+    return;
+  }
+
+  // Very slow test browsers (`?dtmax=`) run the game logic in small steps per frame, so fast
+  // things still collide properly; normal play is always one step per frame.
+  const steps = MAX_DT > 1 / 20 ? Math.max(1, Math.ceil(dt / (1 / 30))) : 1;
+  for (let i = 0; i < steps; i++) simulate(dt / steps);
+  if (paused) dt = 0;
 
   // While charging a missile, lean the camera toward the target so it stays on screen.
   if (ship.isCharging) {

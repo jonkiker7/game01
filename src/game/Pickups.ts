@@ -10,7 +10,6 @@ const RISE_TIME = 0.7; // seconds to float up from the wreck to flying height
 const COLLECT_RADIUS = 3;
 const MAGNET_RADIUS = 9; // orbs drift toward the ship inside this distance
 /** Chance that a destroyed enemy drops a healing orb. */
-export const DROP_CHANCE = { turret: 0.35, drone: 0.25 };
 
 interface Pickup {
   obj: THREE.Group;
