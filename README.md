@@ -117,7 +117,20 @@ outpost, fenced in by a glowing energy wall:
 
 - **Destroy the outpost:** hunt down every tower in a big arena (the radar points the way).
 - **Survive the swarm:** hold out for 40 seconds against heavy waves in a tight arena.
+- **Rescue the crew:** fly over stranded escape pods (gold beams) to pick up crew, 2 at a time,
+  and drop them at the landing zone (green ring). Save all 4.
+- **Defend the generator:** keep it alive for 45 seconds. Saboteurs fly straight for it and
+  drill in; shoot them off.
+- **Escort the convoy:** guard a crawler crossing the arena. Saboteurs latch on and stall it.
+- **Sabotage the fortress:** destroy 3 power pylons to drop its shield (it shells you meanwhile),
+  then destroy the fortress.
+- **Hold the zones:** stay inside each of 3 gold rings until it's captured (8 s; progress drains
+  slowly if you leave).
 - **Boss (round 3):** one of three bosses (below). Destroy it to complete the sortie.
+
+Each round before the boss is one of these at random. If you lose the generator or the convoy,
+the round ends without its reward. To test one, add `?sortie&mission=rescue` (or `defend`,
+`escort`, `sabotage`, `hold`, `outpost`, `survive`) to the URL.
 
 Clearing a sector drops a **reward orb** in the middle of the arena. Fly into it:
 

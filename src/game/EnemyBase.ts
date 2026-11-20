@@ -29,7 +29,7 @@ export interface Ctx {
 }
 
 /** Every enemy species (see EnemyTypes.ts for the newer ones). */
-export type Species = 'turret' | 'drone' | 'swarmer' | 'lancer' | 'crawler' | 'sniper' | 'minelayer' | 'pulsar' | 'mine' | 'boss' | 'bosspart';
+export type Species = 'turret' | 'drone' | 'swarmer' | 'lancer' | 'crawler' | 'sniper' | 'minelayer' | 'pulsar' | 'mine' | 'boss' | 'bosspart' | 'saboteur' | 'pylon' | 'fortress';
 
 export abstract class Enemy implements Hittable {
   readonly root = new THREE.Group();

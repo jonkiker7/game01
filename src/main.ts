@@ -136,6 +136,7 @@ let paused = false;
 const blips: Blip[] = [];
 const contracts = new ContractTracker(scene, world, enemies, hud);
 const run = new Run({
+  scene,
   contracts,
   activeContract: () => save.contracts.active,
   ship,

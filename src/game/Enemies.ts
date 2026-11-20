@@ -496,6 +496,12 @@ export class EnemyManager {
     this.scene.add(e.root);
   }
 
+  /** Add any enemy at (x, z) (missions use this for their own units). */
+  add(e: Enemy, x: number, z: number): Enemy {
+    this.register(e, x, z);
+    return e;
+  }
+
   /** A boss in the middle of the arena. */
   spawnBoss(id: BossId, x: number, z: number): Boss {
     const b = createBoss(id, this.hpMul);
