@@ -70,7 +70,7 @@ export function rollContracts(): Contract[] {
   return clients.map((client, i) => {
     const options = CONTRACT_TEMPLATES.filter((t) => t.client === client && t.type === types[i]);
     const t = options[Math.floor(Math.random() * options.length)];
-    const sector = 2 + Math.floor(Math.random() * 5); // 2–6: never the first or the final sector
+    const sector = 1 + Math.floor(Math.random() * 2); // 1–2: the rounds before the boss
     return {
       id: `${t.type}-${client}-${Date.now().toString(36)}-${i}`,
       type: t.type,
@@ -89,7 +89,13 @@ export function loadSave(): SaveData {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const loaded = { ...fresh(), ...JSON.parse(raw) } as SaveData;
-      if (!loaded.contracts.offers?.length) loaded.contracts.offers = rollContracts();
+      // Sorties got shorter (2 rounds, then the boss): move old contracts into range.
+      if (!loaded.contracts.offers?.length || loaded.contracts.offers.some((o) => o.sector > 2)) loaded.contracts.offers = rollContracts();
+      const a = loaded.contracts.active;
+      if (a && a.sector > 2) {
+        a.sector = 2;
+        a.text = a.text.replace(/sector \d+/, 'sector 2');
+      }
       return loaded;
     }
     // Carry over salvage banked before home base existed.

@@ -112,12 +112,12 @@ post contracts have things to say once you've finished one. Contract writing liv
 
 ## Sorties (roguelite runs)
 
-Each run is a **sortie** of 7 sectors. Every sector is an arena around a jungle outpost, fenced
-in by a glowing energy wall:
+Each run is a **sortie**: 2 rounds, then a **boss**. Every round is an arena around a jungle
+outpost, fenced in by a glowing energy wall:
 
-- **Destroy the outpost:** take out every turret tower while drones keep arriving.
-- **Survive the swarm:** hold out for 40 seconds against heavy drone waves.
-- **Final assault (sector 7):** a big stronghold. Destroy it to complete the sortie.
+- **Destroy the outpost:** hunt down every tower in a big arena (the radar points the way).
+- **Survive the swarm:** hold out for 40 seconds against heavy waves in a tight arena.
+- **Boss (round 3):** one of three bosses (below). Destroy it to complete the sortie.
 
 Clearing a sector drops a **reward orb** in the middle of the arena. Fly into it:
 
@@ -132,6 +132,24 @@ shot down the run ends; the summary screen shows your progress and banks your sa
 
 The radar marks whatever the current step is about (towers, drones, the reward, or the gates) and
 shows the arena wall as a dashed circle.
+
+## Bosses
+
+A health bar shows across the top. Every attack has a tell, and below half health each boss enters
+**phase 2**: faster attacks and more helpers.
+
+- **Skyreaver** (flying gunship): rotating bullet spirals; paints a wide red lane and charges down
+  it; missile volleys that land in warning rings; calls in swarmers (and drones in phase 2).
+- **Juggernaut** (giant tank): its core is shielded until you destroy both **side cannons**, which
+  fire bomb barrages. The main gun paints a red lane, locks, then fires a beam; it stomps out
+  expanding **shockwave rings** (roll or boost through them); brings Shield Crawlers.
+- **Jungle Titan** (rooted plant colossus): only its **open pod** (glowing gold) can be hurt, and
+  the weak spot moves between three pods. Tentacles burst up through red rings; spore clouds
+  linger and hurt while you're inside; seed spirals from the open pod; calls in swarmers (and a
+  Pulsar in phase 2).
+
+To test a boss right away, add `?sortie&boss=flyer` (or `tank`, `titan`; plain `?boss` picks one
+at random) to the URL.
 
 ## Enemies
 
@@ -225,5 +243,5 @@ One-time setup: **Settings → Pages → Source: GitHub Actions**.
 5. ✅ Upgrades and weapons: Scatter/Rail guns, Cluster/Swarm missiles, Arc/Cryo/Plasma families and duos, Nova special
 6. ✅ Home base: space station hub, walkable pilot, crew with dialogue, permanent upgrades, outfits, ships, launch cutscene; multi-room isometric station with BOLT's info desk
 7. ✅ Contracts: BOLT's contract board, retrieve / hunt / uplink objectives in sorties
-8. Bosses and new enemies
+8. ✅ Bosses and new enemies: six enemy types (two per zone), three bosses, 2-round sorties
 9. Polish: audio, menus, saves, offline play

@@ -22,7 +22,8 @@ export class Hud {
        <div id="salvage"></div>
        <div id="objective"></div>
        <div id="message"></div>
-       <div id="damage"></div>`,
+       <div id="damage"></div>
+       <div id="boss-bar"><div class="name"></div><div class="bar"><div class="fill"></div></div></div>`,
     );
     this.armorFill = root.querySelector('#armor .fill') as HTMLElement;
     this.objective = root.querySelector('#objective') as HTMLElement;
@@ -110,6 +111,19 @@ export class Hud {
   }
 
   /** The current mission objective, shown under the radar. */
+  private bossShown = '';
+
+  /** The boss's name and health bar across the top (null hides it). */
+  setBoss(name: string | null, fraction = 1): void {
+    const el = document.getElementById('boss-bar')!;
+    if ((name ?? '') !== this.bossShown) {
+      this.bossShown = name ?? '';
+      el.classList.toggle('visible', !!name);
+      (el.querySelector('.name') as HTMLElement).textContent = name ?? '';
+    }
+    if (name) (el.querySelector('.fill') as HTMLElement).style.transform = `scaleX(${Math.max(0, fraction)})`;
+  }
+
   setObjective(text: string): void {
     if (text === this.lastObjective) return;
     this.lastObjective = text;

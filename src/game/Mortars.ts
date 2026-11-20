@@ -20,6 +20,8 @@ interface Mortar {
   duration: number;
   from: THREE.Vector3;
   to: THREE.Vector3;
+  radius: number;
+  damage: number;
 }
 
 /**
@@ -63,19 +65,30 @@ export class Mortars {
       marker.visible = false;
       marker.renderOrder = 5;
       scene.add(obj, marker);
-      this.items.push({ obj, core, halo, marker, fill, active: false, t: 0, duration: 1, from: new THREE.Vector3(), to: new THREE.Vector3() });
+      this.items.push({ obj, core, halo, marker, fill, active: false, t: 0, duration: 1, from: new THREE.Vector3(), to: new THREE.Vector3(), radius: BLAST_RADIUS, damage: DAMAGE });
     }
   }
 
   /** Lob a mortar from `from` at the ship (aiming a little ahead of where it's going). */
   fire(from: THREE.Vector3, ship: Ship): void {
+    const s = ship.root.position;
+    this.fireAt(from, s.x + ship.velocity.x * LEAD, s.y, s.z + ship.velocity.y * LEAD);
+  }
+
+  /**
+   * Lob a mortar at a spot at flying height `y` (bosses use this for volleys), with its own
+   * blast radius, damage and flight time if given.
+   */
+  fireAt(from: THREE.Vector3, x: number, y: number, z: number, radius = BLAST_RADIUS, damage = DAMAGE, duration?: number): void {
     const m = this.items.find((x) => !x.active);
     if (!m) return;
-    const s = ship.root.position;
     m.from.copy(from);
-    m.to.set(s.x + ship.velocity.x * LEAD, s.y, s.z + ship.velocity.y * LEAD);
+    m.to.set(x, y, z);
+    m.radius = radius;
+    m.damage = damage;
+    m.marker.scale.setScalar(radius / BLAST_RADIUS);
     const dist = Math.hypot(m.to.x - from.x, m.to.z - from.z);
-    m.duration = THREE.MathUtils.clamp(dist / SPEED, 0.65, 2);
+    m.duration = duration ?? THREE.MathUtils.clamp(dist / SPEED, 0.65, 2);
     m.t = 0;
     m.active = true;
     m.obj.visible = true;
@@ -111,10 +124,10 @@ export class Mortars {
         m.active = false;
         m.obj.visible = false;
         m.marker.visible = false;
-        this.effects.explosion(m.to, BLAST_RADIUS * 0.9, groundY(m.to.x, m.to.z));
+        this.effects.explosion(m.to, m.radius * 0.9, groundY(m.to.x, m.to.z));
         const s = ship.root.position;
         // Hit if any part of the ship is inside the ring.
-        if (Math.hypot(s.x - m.to.x, s.z - m.to.z) < BLAST_RADIUS + ship.radius) ship.damage(DAMAGE);
+        if (Math.hypot(s.x - m.to.x, s.z - m.to.z) < m.radius + ship.radius) ship.damage(m.damage);
       }
     }
   }

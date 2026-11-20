@@ -18,6 +18,7 @@ import type { EnemyShots } from './Projectiles';
 import { HOVER_HEIGHT, type Ship } from './Ship';
 import type { World } from './World';
 
+import { type Boss, type BossId, createBoss, setDroneFactory } from './Bosses';
 import { Crawler, Lancer, Mine, MineLayer, Pulsar, Sniper, Swarmer } from './EnemyTypes';
 
 export { Enemy, type Species } from './EnemyBase';
@@ -257,6 +258,8 @@ export function createEnemy(species: Species, hpMul: number): Enemy {
   }
 }
 
+setDroneFactory(() => new Drone(1));
+
 /** The mobile species a zone can draw its pair from. */
 export const ZONE_SPECIES: Species[] = ['drone', 'swarmer', 'lancer', 'crawler', 'sniper', 'minelayer', 'pulsar'];
 
@@ -491,6 +494,13 @@ export class EnemyManager {
     };
     this.enemies.push(e);
     this.scene.add(e.root);
+  }
+
+  /** A boss in the middle of the arena. */
+  spawnBoss(id: BossId, x: number, z: number): Boss {
+    const b = createBoss(id, this.hpMul);
+    this.register(b, x, z);
+    return b;
   }
 
   /** The contract's alpha drone: a big, tough drone arriving from the arena's edge. */
