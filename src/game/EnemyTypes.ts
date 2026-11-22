@@ -35,6 +35,19 @@ const facing = (dx: number, dz: number) => Math.atan2(-dx, -dz);
 
 // ---------------------------------------------------------------- Swarmer
 
+/** Swarmer tuning (softened: slower, clearer wind-up, less damage). */
+const SWARM = {
+  chaseSpeed: 26, // was 34
+  diveRange: 26, // starts a dive when this close (was 30)
+  windup: 0.85, // seconds of glowing tell before diving (was 0.5)
+  diveSpeed: 44, // was 70
+  diveTime: 1, // seconds a dive lasts (was 0.75)
+  hitRadius: 2.4, // contact distance (was 2.9)
+  damage: 4, // per bug that hits (was 8)
+  restMin: 2.4, // seconds between dives: 2.4 to 4.4 (was 1.4 to 3)
+  restExtra: 2,
+};
+
 export class Swarmer extends Enemy {
   readonly radius = 1.2;
   readonly kind = 'drone';
@@ -43,7 +56,7 @@ export class Swarmer extends Enemy {
   readonly hitTop = 1.8;
   readonly aimHeight = 0;
   private state: 'chase' | 'aim' | 'dive' = 'chase';
-  private timer = 1 + Math.random() * 1.5;
+  private timer = 1.5 + Math.random() * 3; // staggered, so the pack doesn't all dive at once
   private readonly vel = new THREE.Vector2();
   private readonly dir = new THREE.Vector2();
   private readonly offset = Math.random() * Math.PI * 2;
@@ -79,34 +92,34 @@ export class Swarmer extends Enemy {
       const a = this.offset + this.time * 1.4;
       const tx = ship.root.position.x + Math.cos(a) * 14 - p.x;
       const tz = ship.root.position.z + Math.sin(a) * 14 - p.z;
-      steer(this.vel, tx * 2, tz * 2, 34, 3, dt);
+      steer(this.vel, tx * 2, tz * 2, SWARM.chaseSpeed, 3, dt);
       this.timer -= dt;
-      if (this.timer <= 0 && ship.alive && dist < 30) {
+      if (this.timer <= 0 && ship.alive && dist < SWARM.diveRange) {
         this.state = 'aim';
-        this.timer = 0.5;
+        this.timer = SWARM.windup;
       }
     } else if (this.state === 'aim') {
       // Tell: stop, glow hot, and point at the ship.
-      steer(this.vel, 0, 0, 34, 8, dt);
+      steer(this.vel, 0, 0, SWARM.chaseSpeed, 8, dt);
       this.root.rotation.y = facing(dx, dz);
       this.timer -= dt;
       if (this.timer <= 0) {
         this.dir.set(dx / Math.max(dist, 0.01), dz / Math.max(dist, 0.01));
-        this.vel.copy(this.dir).multiplyScalar(70);
+        this.vel.copy(this.dir).multiplyScalar(SWARM.diveSpeed);
         this.state = 'dive';
-        this.timer = 0.75;
+        this.timer = SWARM.diveTime;
       }
     } else {
       this.timer -= dt;
-      if (ship.alive && ship.invulnerable <= 0 && dist < 2.9) {
-        ship.damage(8);
+      if (ship.alive && ship.invulnerable <= 0 && dist < SWARM.hitRadius) {
+        ship.damage(SWARM.damage);
         this.alive = false; // explodes on contact (no salvage)
         effects.explosion(p, 2.6, world.heightAt(p.x, p.z));
         return;
       }
       if (this.timer <= 0) {
         this.state = 'chase';
-        this.timer = 1.4 + Math.random() * 1.6;
+        this.timer = SWARM.restMin + Math.random() * SWARM.restExtra;
       }
     }
     p.x += this.vel.x * dt;
