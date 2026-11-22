@@ -69,7 +69,7 @@ export abstract class Boss extends Enemy {
   }
 
   /** Damage passed on from a part (goes straight to health, past any shield on the core). */
-  takeShared(amount: number, blast: boolean): void {
+  takeShared(amount: number, blast: boolean, _part?: BossPart): void {
     Enemy.prototype.damage.call(this, amount, blast);
   }
 
@@ -103,8 +103,10 @@ export class BossPart extends Enemy {
   readonly hitTop: number;
   readonly aimHeight: number;
   shielded = false;
-  /** Damage goes to this boss instead of the part's own health. */
+  /** Damage goes to this boss instead of the part's own health… */
   shared: Boss | null = null;
+  /** …scaled by this (a weak spot takes extra, an armored bit less). */
+  sharedMul = 1;
   readonly look = new THREE.Group();
   /** Free-form data for the boss that owns it (which side, its angle, …). */
   data: Record<string, unknown> = {};
@@ -130,7 +132,7 @@ export class BossPart extends Enemy {
     if (!this.alive || this.shielded) return;
     if (this.shared) {
       this.flash = 0.08;
-      this.shared.takeShared(amount, blast);
+      this.shared.takeShared(amount * this.sharedMul, blast, this);
       return;
     }
     super.damage(amount, blast);
@@ -624,6 +626,8 @@ export class Juggernaut extends Boss {
 // ---------------------------------------------------------------- Jungle Titan (rooted plant)
 
 const POD_R = 13;
+const TITAN_ARMORED = 0.35; // damage taken by the trunk and closed pods
+const TITAN_WEAK_SPOT = 1.5; // damage taken by the open pod
 const POD_H = 11;
 
 interface Slam {
@@ -672,7 +676,7 @@ export class JungleTitan extends Boss {
   private readonly cloudMat = glow('#b6ff5a', { transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending }, 1);
 
   constructor(hpMul = 1) {
-    super(1800 * hpMul);
+    super(1200 * hpMul);
     this.salvage = 150;
     this.weight = 0;
     this.dropChance = 0;
@@ -707,8 +711,10 @@ export class JungleTitan extends Boss {
     addOutlines(this.root);
   }
 
-  /** The trunk itself is too tough to hurt: only the open pod is a weak spot. */
-  damage(_amount: number, _blast = false): void {}
+  /** The trunk is tough: it takes a fraction of the damage. The open pod is the weak spot. */
+  damage(amount: number, blast = false): void {
+    Enemy.prototype.damage.call(this, amount * TITAN_ARMORED, blast);
+  }
 
   protected setupParts(ctx: Ctx): void {
     for (let i = 0; i < 3; i++) {
@@ -738,15 +744,16 @@ export class JungleTitan extends Boss {
     this.podDamage = 0;
     for (const [k, pod] of this.pods.entries()) {
       const open = k === i;
-      pod.shielded = !open;
+      pod.sharedMul = open ? TITAN_WEAK_SPOT : TITAN_ARMORED;
       const shell = pod.data.shell as THREE.Mesh;
       shell.scale.set(open ? 0.75 : 1, open ? 0.6 : 1.2, open ? 0.75 : 1);
       shell.position.y = open ? -1.2 : 0;
     }
   }
 
-  takeShared(amount: number, blast: boolean): void {
+  takeShared(amount: number, blast: boolean, part?: BossPart): void {
     super.takeShared(amount, blast);
+    if (part !== this.pods[this.openPod]) return;
     this.podDamage += amount;
     // A pod that's taken a beating snaps shut and another one opens.
     if (this.podDamage > this.maxHp * 0.12) this.setOpen((this.openPod + 1 + Math.floor(Math.random() * 2)) % 3);
