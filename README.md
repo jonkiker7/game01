@@ -173,7 +173,7 @@ The pair is shown under the radar ("VS SWARMERS + SNIPERS").
 | --- | --- | --- |
 | **Drone** | air | Circles you and fires 3-shot bursts. |
 | **Tower** | ground | Lobs plasma bombs; a red ring marks where they'll land. |
-| **Swarmer** | air | Packs of 5 small bugs. They stop and glow hot, then dive and explode on contact. Keep moving. |
+| **Swarmer** | air | Packs of 5 small bugs. One at a time they stop and glow hot (almost a second), then dive and explode on contact. Keep moving. |
 | **Lancer** | air | Paints a red lane, shudders, then dashes down it. Dodge sideways (barrel rolls are great here). |
 | **Shield Crawler** | ground | Tank with a front energy shield that blocks gunfire. Flank it, or use missiles (they get through). |
 | **Sniper** | air | Hangs back, tracks you with a laser, then the laser freezes and flickers: move before it fires. |
