@@ -156,8 +156,8 @@ A health bar shows across the top. Every attack has a tell, and below half healt
 - **Juggernaut** (giant tank): its core is shielded until you destroy both **side cannons**, which
   fire bomb barrages. The main gun paints a red lane, locks, then fires a beam; it stomps out
   expanding **shockwave rings** (roll or boost through them); brings Shield Crawlers.
-- **Jungle Titan** (rooted plant colossus): only its **open pod** (glowing gold) can be hurt, and
-  the weak spot moves between three pods. Tentacles burst up through red rings; spore clouds
+- **Jungle Titan** (rooted plant colossus): its **open pod** (glowing gold) is the weak spot and
+  takes 150% damage; the trunk and closed pods only take 35%. The weak spot moves between three pods. Tentacles burst up through red rings; spore clouds
   linger and hurt while you're inside; seed spirals from the open pod; calls in swarmers (and a
   Pulsar in phase 2).
 

@@ -214,6 +214,10 @@ export class Bullets {
   ): void {
     this.pool.update(dt, (s) => {
       this.ray.set(s.x - camera.x, s.y - camera.y, s.z - camera.z).normalize();
+      // A bullet over several enemies on screen hits the one it's most squarely on (so you can
+      // shoot a boss's weak spot even when the bigger body overlaps it).
+      let best: Hittable | null = null;
+      let bestScore = Infinity;
       for (const t of targets) {
         if (!t.alive) continue;
         const tp = t.root.position;
@@ -224,12 +228,25 @@ export class Bullets {
             if (!set) this.pierced.set(s, (set = new Set()));
             if (set.has(t)) continue;
             set.add(t);
+            if (this.onHit) this.onHit(t, s.damage);
+            else t.damage(s.damage);
+            this.effects.spark(this.closest, this.style.color, 1.6);
+            continue;
           }
-          if (this.onHit) this.onHit(t, s.damage);
-          else t.damage(s.damage);
-          this.effects.spark(this.closest, this.style.color, this.style.pierce ? 1.6 : 1);
-          if (!this.style.pierce) return true;
+          const score = hit / t.radius;
+          if (score < bestScore) {
+            bestScore = score;
+            best = t;
+          }
         }
+      }
+      if (best) {
+        const tp = best.root.position;
+        rayToVerticalSegment(camera, this.ray, tp.x, tp.z, tp.y + best.hitBottom, tp.y + best.hitTop, this.closest);
+        if (this.onHit) this.onHit(best, s.damage);
+        else best.damage(s.damage);
+        this.effects.spark(this.closest, this.style.color, 1);
+        return true;
       }
       // Bullets that reach the ground kick up a spark and stop.
       const gy = groundY(s.x, s.z);
