@@ -74,17 +74,18 @@ let qualityChosen = savedQuality() !== null; // if the player picked one, don't 
 // ---------- Scene & lighting ----------
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(JUNGLE.sky);
-scene.fog = new THREE.Fog(JUNGLE.sky, 120, 270);
+scene.fog = new THREE.Fog(JUNGLE.sky, 80, 285);
 
-const hemi = new THREE.HemisphereLight(JUNGLE.hemiSky, JUNGLE.hemiGround, 1.1);
+const hemi = new THREE.HemisphereLight(JUNGLE.hemiSky, JUNGLE.hemiGround, 0.8);
 scene.add(hemi);
-const sun = new THREE.DirectionalLight('#fff1d6', 2.3);
+const sun = new THREE.DirectionalLight('#ffdcc4', 4.25);
 sun.position.set(-40, 60, 25);
 scene.add(sun);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 const sunShadows = new SunShadows(sun, scene);
-sunShadows.darkness = 0.6;
+sunShadows.setDirection(79, 57); // compass direction the light comes from, and height above the horizon
+sunShadows.darkness = 1;
 sunShadows.enabled = quality === 'high';
 const rim = new THREE.DirectionalLight('#5fd8ff', 0.9); // cool back light for colour contrast
 rim.position.set(30, 20, -40);
