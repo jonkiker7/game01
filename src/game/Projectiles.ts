@@ -260,12 +260,18 @@ export class Bullets {
 }
 
 const ORB_DAMAGE = 7;
-const PLAYER_HIT_RADIUS = 1.7;
+/**
+ * How close (on screen, at the ship's depth) a shot must pass to hit: the ship's body is about
+ * 3.4 units across to each side (fans included), plus the shot's own glowing core.
+ */
+const PLAYER_HIT_RADIUS = 3.2;
 
 /** Enemy shots: slow, glowing orbs you can see coming and dodge. */
 export class EnemyShots {
   private readonly pool: ShotPool;
   private readonly tmp = new THREE.Vector3();
+  private readonly ray = new THREE.Vector3();
+  private readonly closest = new THREE.Vector3();
 
   constructor(
     scene: THREE.Scene,
@@ -318,18 +324,27 @@ export class EnemyShots {
     });
   }
 
-  update(dt: number, player: Hittable & { invulnerable: number }): void {
+  /**
+   * Hits are judged by what you see: a shot hits when, on screen, it overlaps the ship (the line
+   * from the camera through the shot passes within the ship's size of its body). Each shot is
+   * also checked halfway back along its last step, so fast shots can't skip past.
+   */
+  update(dt: number, player: Hittable & { invulnerable: number }, camera: THREE.Vector3): void {
     const p = player.root.position;
     this.pool.update(dt, (s) => {
       if (!player.alive || player.invulnerable > 0) return false;
-      const dx = p.x - s.x;
-      const dz = p.z - s.z;
-      if (dx * dx + dz * dz < PLAYER_HIT_RADIUS * PLAYER_HIT_RADIUS) {
-        player.damage(s.damage);
-        this.effects.spark(this.tmp.set(s.x, s.y, s.z), '#ff6b8f', 1.5);
-        return true;
+      for (const back of [0, 0.5]) {
+        this.tmp.set(s.x - s.vx * dt * back, s.y - s.vy * dt * back, s.z - s.vz * dt * back);
+        this.ray.subVectors(this.tmp, camera).normalize();
+        const d = rayToVerticalSegment(camera, this.ray, p.x, p.z, p.y - 0.5, p.y + 1.2, this.closest); // the ship's actual height
+        if (d < PLAYER_HIT_RADIUS) {
+          player.damage(s.damage);
+          this.effects.spark(this.tmp.set(s.x, s.y, s.z), '#ff6b8f', 1.5);
+          return true;
+        }
       }
       return false;
     });
   }
+
 }

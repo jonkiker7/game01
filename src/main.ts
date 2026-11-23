@@ -125,7 +125,7 @@ const radar = new Radar($('hud'));
 
 // ?debug in the URL exposes game objects for automated tests and console tinkering.
 if (new URLSearchParams(location.search).has('debug')) {
-  Object.assign(window, { __game: { ship, enemies, missiles, pickups, combat, mortars, save, get base() { return base; }, get run() { return run; }, chargeNova: () => (specialCharge = 1) } });
+  Object.assign(window, { __game: { ship, enemies, enemyShots, missiles, pickups, combat, mortars, save, get base() { return base; }, get run() { return run; }, chargeNova: () => (specialCharge = 1) } });
 }
 
 const rig = new CameraRig(window.innerWidth / window.innerHeight);
@@ -511,7 +511,7 @@ function simulate(dt: number): void {
   mortars.update(dt, ship, (x, z) => world.heightAt(x, z));
   cameraPos.setFromMatrixPosition(rig.camera.matrixWorld);
   for (const g of allGuns) g.update(dt, enemies.enemies, (x, z) => world.heightAt(x, z), cameraPos);
-  enemyShots.update(dt, ship);
+  enemyShots.update(dt, ship, cameraPos.setFromMatrixPosition(rig.camera.matrixWorld));
   pickups.update(dt, ship);
   missiles.update(dt, enemies.enemies, cameraPos.setFromMatrixPosition(rig.camera.matrixWorld));
   if (ship.isBoosting && ship.alive) {
