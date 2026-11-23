@@ -24,6 +24,8 @@ export interface Ctx {
   /** True if this enemy's gun is on screen. Enemies only shoot when you can see them. */
   onScreen: (e: Enemy) => boolean;
   effects: Effects;
+  /** For big moments (bosses announcing things). */
+  hud?: { show: (text: string, seconds?: number) => void };
   /** Add a new enemy (e.g. a mine) at (x, z). */
   spawn: (e: Enemy, x: number, z: number) => void;
 }

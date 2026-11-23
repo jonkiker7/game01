@@ -88,6 +88,8 @@ export class Run {
   private readonly takenNames: string[] = [];
 
   private kind: EncounterKind = 'outpost';
+  /** Last round's type (so the next one is different). */
+  private lastRoundKind: EncounterKind | null = null;
   /** This zone's two enemy types. */
   pair: Species[] = [];
   /** The boss, during the final round. */
@@ -121,6 +123,7 @@ export class Run {
     this.levels.clear();
     this.takenNames.length = 0;
     this.sector = 1;
+    this.lastRoundKind = null;
     this.kills = 0;
     this.salvage = 0;
     this.won = false;
@@ -205,6 +208,14 @@ export class Run {
     return [a, b];
   }
 
+  /** A random round type, never the same as the previous round's. */
+  private randomRoundKind(): EncounterKind {
+    const options = ROUND_KINDS.filter((k) => k !== this.lastRoundKind);
+    const kind = options[Math.floor(Math.random() * options.length)];
+    this.lastRoundKind = kind;
+    return kind;
+  }
+
   /** Which boss: `?boss=flyer|tank|titan` for testing, otherwise one at random. */
   private pickBoss(): BossId {
     const forced = new URLSearchParams(location.search).get('boss') as BossId | null;
@@ -222,7 +233,7 @@ export class Run {
         ? 'boss'
         : forced && ROUND_KINDS.includes(forced)
           ? forced
-          : ROUND_KINDS[Math.floor(Math.random() * ROUND_KINDS.length)];
+          : this.randomRoundKind();
     this.radius = ARENA_RADIUS[kind];
     return kind;
   }
@@ -447,7 +458,7 @@ export class Run {
     const head = this.sector === SECTORS ? 'FINAL SECTOR' : `SECTOR ${this.sector}/${SECTORS}`;
     switch (this.phase) {
       case 'fight':
-        if (this.boss) return `${head}\nDESTROY ${this.boss.name}`;
+        if (this.boss) return `${head}\n${this.boss.objectiveLine()}`;
         if (this.mission) return `${head}\n${this.mission.objective()}`;
         if (this.kind === 'survive') {
           if (this.timer <= 0 && this.d.contracts.blocking) return `${head}\nDESTROY THE ALPHA`;
@@ -469,7 +480,9 @@ export class Run {
   /** What the radar should mark right now. */
   blips(out: Blip[]): void {
     out.length = 0;
-    if (this.phase === 'fight' && this.mission) {
+    if (this.phase === 'fight' && this.boss) {
+      if (this.boss.alive) this.boss.blips(out);
+    } else if (this.phase === 'fight' && this.mission) {
       this.mission.blips(out);
     } else if (this.phase === 'fight') {
       for (const e of this.d.enemies.enemies) {

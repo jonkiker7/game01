@@ -214,8 +214,8 @@ export class Bullets {
   ): void {
     this.pool.update(dt, (s) => {
       this.ray.set(s.x - camera.x, s.y - camera.y, s.z - camera.z).normalize();
-      // A bullet over several enemies on screen hits the one it's most squarely on (so you can
-      // shoot a boss's weak spot even when the bigger body overlaps it).
+      // A bullet over several enemies on screen hits the one whose centre it's closest to (so you
+      // can shoot a boss's cannon or weak spot even when the bigger body overlaps it).
       let best: Hittable | null = null;
       let bestScore = Infinity;
       for (const t of targets) {
@@ -233,7 +233,7 @@ export class Bullets {
             this.effects.spark(this.closest, this.style.color, 1.6);
             continue;
           }
-          const score = hit / t.radius;
+          const score = hit; // closest on screen to the bullet's line wins (a small part beats a big body behind it)
           if (score < bestScore) {
             bestScore = score;
             best = t;

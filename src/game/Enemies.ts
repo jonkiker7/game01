@@ -278,6 +278,8 @@ export class EnemyManager {
   readonly enemies: Enemy[] = [];
   onKill?: (kind: Enemy['kind'], pos: THREE.Vector3, enemy: Enemy) => void;
 
+  /** Banner messages (set by main), for bosses announcing things. */
+  hud?: Ctx['hud'];
   /** Enemy health multiplier (later sectors are tougher). */
   hpMul = 1;
   private drones: DroneWaves | null = null;
@@ -363,7 +365,7 @@ export class EnemyManager {
       return this.frustum.containsPoint(this.probe);
     };
     const spawn = (e: Enemy, x: number, z: number) => this.register(e, x, z);
-    const ctx: Ctx = { ship, shots, mortars, world: this.world, dt, onScreen, effects: this.effects, spawn };
+    const ctx: Ctx = { ship, shots, mortars, world: this.world, dt, onScreen, effects: this.effects, spawn, hud: this.hud };
     const sp = ship.root.position;
     for (const e of this.enemies) {
       const far = Math.hypot(e.root.position.x - sp.x, e.root.position.z - sp.z) > CULL_DISTANCE;
