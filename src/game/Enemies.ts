@@ -19,6 +19,7 @@ import { HOVER_HEIGHT, type Ship } from './Ship';
 import type { World } from './World';
 
 import { type Boss, type BossId, createBoss, setDroneFactory } from './Bosses';
+import { castShadows } from './Shadows';
 import { Crawler, Lancer, Mine, MineLayer, Pulsar, Sniper, Swarmer } from './EnemyTypes';
 
 export { Enemy, type Species } from './EnemyBase';
@@ -483,6 +484,8 @@ export class EnemyManager {
 
   private register(e: Enemy, x: number, z: number): void {
     e.root.position.set(x, this.world.heightAt(x, z), z);
+    // Things standing on the ground cast real shadows; flyers keep it simple (see Shadows.ts).
+    if (e.kind !== 'drone') castShadows(e.root);
     e.onKilled = (dead) => {
       const pos = this.tmp.copy(dead.root.position);
       const ground = this.world.heightAt(pos.x, pos.z);

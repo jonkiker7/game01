@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "lil-gui": "^0.20.0",
     "three": "^0.187.0"
   },
   "devDependencies": {

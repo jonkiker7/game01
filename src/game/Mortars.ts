@@ -1,12 +1,11 @@
 import * as THREE from 'three';
 import type { Effects } from './Effects';
 import { glow } from './materials';
+import { TUNING } from './Tuning';
 import type { Ship } from './Ship';
 
 const MAX = 24;
-const BLAST_RADIUS = 20; // matches the red warning ring
-const DAMAGE = 14;
-const SPEED = 34; // twice the original 17 // units per second across the ground
+const RING_SIZE = 20; // the warning ring is built at this size and scaled to each blast
 const LEAD = 0.35; // seconds of the ship's velocity to aim ahead by
 
 interface Mortar {
@@ -40,8 +39,8 @@ export class Mortars {
     const coreGeo = new THREE.SphereGeometry(1.6, 16, 12);
     const haloGeo = new THREE.SphereGeometry(3.2, 16, 12);
     const outlineGeo = new THREE.SphereGeometry(2.05, 16, 12);
-    const ringGeo = new THREE.RingGeometry(BLAST_RADIUS - 1, BLAST_RADIUS, 96);
-    const discGeo = new THREE.CircleGeometry(BLAST_RADIUS, 96);
+    const ringGeo = new THREE.RingGeometry(RING_SIZE - 1, RING_SIZE, 96);
+    const discGeo = new THREE.CircleGeometry(RING_SIZE, 96);
     for (let i = 0; i < MAX; i++) {
       const obj = new THREE.Group();
       const core = new THREE.Mesh(coreGeo, glow('#ffb36b', {}, 2));
@@ -65,7 +64,7 @@ export class Mortars {
       marker.visible = false;
       marker.renderOrder = 5;
       scene.add(obj, marker);
-      this.items.push({ obj, core, halo, marker, fill, active: false, t: 0, duration: 1, from: new THREE.Vector3(), to: new THREE.Vector3(), radius: BLAST_RADIUS, damage: DAMAGE });
+      this.items.push({ obj, core, halo, marker, fill, active: false, t: 0, duration: 1, from: new THREE.Vector3(), to: new THREE.Vector3(), radius: TUNING.towerBombs.radius, damage: TUNING.towerBombs.damage });
     }
   }
 
@@ -79,16 +78,24 @@ export class Mortars {
    * Lob a mortar at a spot at flying height `y` (bosses use this for volleys), with its own
    * blast radius, damage and flight time if given.
    */
-  fireAt(from: THREE.Vector3, x: number, y: number, z: number, radius = BLAST_RADIUS, damage = DAMAGE, duration?: number): void {
+  fireAt(
+    from: THREE.Vector3,
+    x: number,
+    y: number,
+    z: number,
+    radius = TUNING.towerBombs.radius,
+    damage = TUNING.towerBombs.damage,
+    duration?: number,
+  ): void {
     const m = this.items.find((x) => !x.active);
     if (!m) return;
     m.from.copy(from);
     m.to.set(x, y, z);
     m.radius = radius;
     m.damage = damage;
-    m.marker.scale.setScalar(radius / BLAST_RADIUS);
+    m.marker.scale.setScalar(radius / RING_SIZE);
     const dist = Math.hypot(m.to.x - from.x, m.to.z - from.z);
-    m.duration = duration ?? THREE.MathUtils.clamp(dist / SPEED, 0.65, 2);
+    m.duration = duration ?? THREE.MathUtils.clamp(dist / TUNING.towerBombs.speed, 0.65, 2);
     m.t = 0;
     m.active = true;
     m.obj.visible = true;

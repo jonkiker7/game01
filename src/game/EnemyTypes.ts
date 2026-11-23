@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { type Ctx, Enemy, ENEMY_ARMOR, ENEMY_BODY, ENEMY_GLOW } from './EnemyBase';
+import { TUNING } from './Tuning';
 import { addOutlines, GLOW, glow } from './materials';
 import { approachAngle } from './math';
 import { HOVER_HEIGHT } from './Ship';
@@ -35,18 +36,8 @@ const facing = (dx: number, dz: number) => Math.atan2(-dx, -dz);
 
 // ---------------------------------------------------------------- Swarmer
 
-/** Swarmer tuning (softened: slower, clearer wind-up, less damage). */
-const SWARM = {
-  chaseSpeed: 26, // was 34
-  diveRange: 26, // starts a dive when this close (was 30)
-  windup: 0.85, // seconds of glowing tell before diving (was 0.5)
-  diveSpeed: 44, // was 70
-  diveTime: 1, // seconds a dive lasts (was 0.75)
-  hitRadius: 2.4, // contact distance (was 2.9)
-  damage: 4, // per bug that hits (was 8)
-  restMin: 2.4, // seconds between dives: 2.4 to 4.4 (was 1.4 to 3)
-  restExtra: 2,
-};
+/** Swarmer tuning lives in Tuning.ts (and the ?dev panel). */
+const SWARM = TUNING.swarmers;
 
 export class Swarmer extends Enemy {
   readonly radius = 1.2;
