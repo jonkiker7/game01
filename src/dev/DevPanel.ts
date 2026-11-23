@@ -36,6 +36,7 @@ const LOOK_DEFAULTS = {
   fogEnd: 285,
   shadows: true,
   shadowDarkness: 1,
+  shadowArea: 150,
   glowStrength: 0.75,
   glowSpread: 0.45,
   glowThreshold: 1.2,
@@ -70,6 +71,7 @@ export function openDevPanel(h: DevHooks): void {
     fog.far = look.fogEnd;
     h.shadows.enabled = look.shadows && h.isHigh();
     h.shadows.darkness = look.shadowDarkness;
+    h.shadows.area = look.shadowArea;
     h.bloom.strength = look.glowStrength;
     h.bloom.radius = look.glowSpread;
     h.bloom.threshold = look.glowThreshold;
@@ -106,6 +108,7 @@ export function openDevPanel(h: DevHooks): void {
   const shade = gui.addFolder('Shadows (HIGH quality)');
   shade.add(look, 'shadows').name('on').onChange(changed);
   shade.add(look, 'shadowDarkness', 0, 1, 0.05).name('darkness').onChange(changed);
+  shade.add(look, 'shadowArea', 60, 250, 5).name('area (bigger = blurrier)').onChange(changed);
 
   const post = gui.addFolder('Glow and vignette');
   post.add(look, 'glowStrength', 0, 3, 0.05).name('glow strength').onChange(changed);

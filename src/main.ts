@@ -134,7 +134,7 @@ const radar = new Radar($('hud'));
 
 // ?debug in the URL exposes game objects for automated tests and console tinkering.
 if (new URLSearchParams(location.search).has('debug')) {
-  Object.assign(window, { __game: { ship, enemies, enemyShots, missiles, pickups, combat, mortars, save, get base() { return base; }, get run() { return run; }, chargeNova: () => (specialCharge = 1) } });
+  Object.assign(window, { __game: { get rig() { return rig; }, ship, enemies, enemyShots, missiles, pickups, combat, mortars, save, get base() { return base; }, get run() { return run; }, chargeNova: () => (specialCharge = 1) } });
 }
 
 const rig = new CameraRig(window.innerWidth / window.innerHeight);
