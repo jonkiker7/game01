@@ -18,8 +18,13 @@ export function castShadows(root: THREE.Object3D): void {
   });
 }
 
-/** How much area around the player the shadows cover (bigger = blurrier). */
-const AREA = 85;
+/** Half the width of the shadowed area (bigger = covers more of the screen, but blurrier). */
+const AREA = 150;
+/**
+ * The camera tilts forward, so it sees far more ground ahead (up the screen) than behind:
+ * the shadowed area is shifted forward to match.
+ */
+const AHEAD = 45;
 
 /**
  * Follows the ship with the sun's shadow camera, so shadows stay sharp wherever you fly
@@ -27,28 +32,36 @@ const AREA = 85;
  */
 export class SunShadows {
   private readonly offset: THREE.Vector3;
-  private readonly snap: number;
+  private snap: number;
 
   constructor(
     private readonly sun: THREE.DirectionalLight,
     scene: THREE.Scene,
   ) {
-    this.offset = sun.position.clone();
+    // Keep the sun far back along its direction so tall things at the far edges still fit.
+    this.offset = sun.position.clone().setLength(260);
     scene.add(sun.target);
     const s = sun.shadow;
     s.mapSize.set(2048, 2048);
     const cam = s.camera as THREE.OrthographicCamera;
-    cam.left = -AREA;
-    cam.right = AREA;
-    cam.top = AREA;
-    cam.bottom = -AREA;
-    cam.near = 1;
-    cam.far = 260;
-    cam.updateProjectionMatrix();
+    cam.near = 20;
+    cam.far = 520;
     s.bias = -0.0006;
     s.normalBias = 0.6;
+    this.snap = 0;
+    this.area = AREA;
+  }
+
+  /** Half-width of the shadowed area, in world units. */
+  set area(half: number) {
+    const cam = this.sun.shadow.camera as THREE.OrthographicCamera;
+    cam.left = -half;
+    cam.right = half;
+    cam.top = half;
+    cam.bottom = -half;
+    cam.updateProjectionMatrix();
     // Move in whole shadow-map texels so the edges don't shimmer as you fly.
-    this.snap = (AREA * 2) / s.mapSize.x;
+    this.snap = (half * 2) / this.sun.shadow.mapSize.x;
   }
 
   /** Sun direction: compass angle (degrees, 0 = from the south) and height above the horizon. */
@@ -70,7 +83,7 @@ export class SunShadows {
 
   follow(x: number, z: number): void {
     const sx = Math.round(x / this.snap) * this.snap;
-    const sz = Math.round(z / this.snap) * this.snap;
+    const sz = Math.round((z - AHEAD) / this.snap) * this.snap;
     this.sun.target.position.set(sx, 0, sz);
     this.sun.position.set(sx + this.offset.x, this.offset.y, sz + this.offset.z);
   }
