@@ -1210,7 +1210,7 @@ body.in-convo #guide-tag {
   background: radial-gradient(
     ellipse at center,
     rgba(12, 4, 22, 0) var(--vig-size, 52%),
-    rgba(12, 4, 22, var(--vig, 0.5)) 100%
+    rgba(12, 4, 22, var(--vig, 0.7)) 100%
   );
 }
 

@@ -26,20 +26,20 @@ const KEY = 'star-rotor-dev';
 
 /** Current defaults (must match the game's starting values). */
 const LOOK_DEFAULTS = {
-  sunIntensity: 2.3,
-  sunColor: '#fff1d6',
-  sunAngle: -58, // compass direction the sunlight comes from
-  sunHeight: 52, // degrees above the horizon (lower = longer shadows)
-  skyLight: 1.1,
+  sunIntensity: 4.25,
+  sunColor: '#ffdcc4',
+  sunAngle: 79, // compass direction the sunlight comes from
+  sunHeight: 57, // degrees above the horizon (lower = longer shadows)
+  skyLight: 0.8,
   rimLight: 0.9,
-  fogStart: 120,
-  fogEnd: 270,
+  fogStart: 80,
+  fogEnd: 285,
   shadows: true,
-  shadowDarkness: 0.6,
+  shadowDarkness: 1,
   glowStrength: 0.75,
   glowSpread: 0.45,
   glowThreshold: 1.2,
-  vignette: 0.5,
+  vignette: 0.7,
   vignetteSize: 52,
 };
 
