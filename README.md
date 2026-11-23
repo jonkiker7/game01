@@ -128,7 +128,7 @@ outpost, fenced in by a glowing energy wall:
   slowly if you leave).
 - **Boss (round 3):** one of three bosses (below). Destroy it to complete the sortie.
 
-Each round before the boss is one of these at random. If you lose the generator or the convoy,
+Each round before the boss is one of these at random (never the same type twice in a row). If you lose the generator or the convoy,
 the round ends without its reward. To test one, add `?sortie&mission=rescue` (or `defend`,
 `escort`, `sabotage`, `hold`, `outpost`, `survive`) to the URL.
 
@@ -153,8 +153,9 @@ A health bar shows across the top. Every attack has a tell, and below half healt
 
 - **Skyreaver** (flying gunship): rotating bullet spirals; paints a wide red lane and charges down
   it; missile volleys that land in warning rings; calls in swarmers (and drones in phase 2).
-- **Juggernaut** (giant tank): its core is shielded until you destroy both **side cannons**, which
-  fire bomb barrages. The main gun paints a red lane, locks, then fires a beam; it stomps out
+- **Juggernaut** (giant tank): shoot the two **side cannons** (marked with spinning gold reticles,
+  and gold on the radar); they fire bomb barrages. While they stand, the core's shield lets only
+  15% of your damage through; once both are gone the core is exposed. The main gun paints a red lane, locks, then fires a beam; it stomps out
   expanding **shockwave rings** (roll or boost through them); brings Shield Crawlers.
 - **Jungle Titan** (rooted plant colossus): its **open pod** (glowing gold) is the weak spot and
   takes 150% damage; the trunk and closed pods only take 35%. The weak spot moves between three pods. Tentacles burst up through red rings; spore clouds

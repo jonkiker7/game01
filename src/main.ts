@@ -102,6 +102,7 @@ const enemyShots = new EnemyShots(scene, effects);
 const mortars = new Mortars(scene, effects);
 const enemies = new EnemyManager(scene, world, effects);
 const hud = new Hud($('hud'));
+enemies.hud = hud;
 const pickups = new Pickups(scene, effects);
 const pickupTarget = new THREE.Vector3();
 // All hits go through Combat so Arc / Cryo / Plasma upgrades can react.

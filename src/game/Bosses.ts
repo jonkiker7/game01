@@ -3,6 +3,7 @@ import { type Ctx, Enemy, ENEMY_ARMOR, ENEMY_BODY, ENEMY_GLOW } from './EnemyBas
 import { Crawler, Pulsar, Swarmer } from './EnemyTypes';
 import { addOutlines, GLOW, glow, rimToon, toon } from './materials';
 import { approachAngle } from './math';
+import type { Blip } from './Radar';
 import { HOVER_HEIGHT, type Ship } from './Ship';
 
 /*
@@ -44,6 +45,16 @@ export abstract class Boss extends Enemy {
 
   get phase2(): boolean {
     return this.healthFraction < 0.5;
+  }
+
+  /** What to tell the player to do (the line under the radar). */
+  objectiveLine(): string {
+    return `DESTROY ${this.name}`;
+  }
+
+  /** Radar marks: the boss, plus any parts worth shooting. */
+  blips(out: Blip[]): void {
+    out.push({ x: this.root.position.x, z: this.root.position.z, kind: 'target' });
   }
 
   /** Called once on the first update (parts need the boss to be in the world first). */
@@ -356,6 +367,7 @@ function makeDrone(_ctx: Ctx): Enemy {
 // ---------------------------------------------------------------- Juggernaut (tank)
 
 const TANK_H = 7; // hull top
+const TANK_SHIELDED = 0.15; // damage that gets through the core's shield while the cannons stand
 
 export class Juggernaut extends Boss {
   readonly id = 'tank';
@@ -387,6 +399,7 @@ export class Juggernaut extends Boss {
   private readonly tmp = new THREE.Vector3();
   private readonly legs: THREE.Object3D[] = [];
   private shieldFlash = 0;
+  private cannonsShown = 2;
 
   constructor(hpMul = 1) {
     super(1500 * hpMul);
@@ -446,7 +459,7 @@ export class Juggernaut extends Boss {
 
   protected setupParts(ctx: Ctx): void {
     for (const s of [-1, 1]) {
-      const c = new BossPart(320 * (this.maxHp / 1500), 2.6, -1.5, 3, true);
+      const c = new BossPart(320 * (this.maxHp / 1500), 3.4, -2, 4, true);
       const base = new THREE.Mesh(new THREE.CylinderGeometry(2, 2.4, 1.6, 8), c.material(ENEMY_BODY));
       const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 4.2, 8), c.material(ENEMY_ARMOR));
       barrel.rotation.x = Math.PI / 2.6;
@@ -455,6 +468,25 @@ export class Juggernaut extends Boss {
       eye.position.set(0, 1.2, 0.8);
       c.look.add(base, barrel, eye);
       addOutlines(c.look);
+      // "Shoot here": a spinning gold reticle at flying height above each cannon.
+      const reticle = new THREE.Group();
+      const ringMesh = new THREE.Mesh(
+        new THREE.RingGeometry(3.6, 4.3, 32),
+        glow('#ffd36b', { transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false }, 1.5),
+      );
+      ringMesh.rotation.x = -Math.PI / 2;
+      reticle.add(ringMesh);
+      for (let k = 0; k < 4; k++) {
+        const tick = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.1, 1.8), glow('#ffd36b', {}, 1.6));
+        const a = (k / 4) * Math.PI * 2;
+        tick.position.set(Math.cos(a) * 5.2, 0, Math.sin(a) * 5.2);
+        tick.rotation.y = -a + Math.PI / 2;
+        reticle.add(tick);
+      }
+      reticle.position.y = 0.4; // hugging the cannon itself, so it reads as "shoot this"
+      reticle.traverse((o) => (o.userData.noOutline = true));
+      reticle.name = 'reticle';
+      c.look.add(reticle);
       c.data = { side: s };
       this.cannons.push(c);
       this.addPart(ctx, c);
@@ -470,12 +502,25 @@ export class Juggernaut extends Boss {
     return this.exposed || this.healthFraction < 0.5;
   }
 
+  /** While the cannons stand, the shield lets only a little damage through to the core. */
   damage(amount: number, blast = false): void {
     if (!this.exposed) {
       this.shieldFlash = 0.12;
+      super.damage(amount * TANK_SHIELDED, blast);
       return;
     }
     super.damage(amount, blast);
+  }
+
+  objectiveLine(): string {
+    const left = this.cannons.filter((c) => c.alive).length;
+    return left > 0 ? `SHOOT THE SIDE CANNONS · ${left} LEFT` : 'CORE EXPOSED · DESTROY IT';
+  }
+
+  blips(out: Blip[]): void {
+    const live = this.cannons.filter((c) => c.alive);
+    if (live.length > 0) for (const c of live) out.push({ x: c.root.position.x, z: c.root.position.z, kind: 'reward', color: '#ffd36b' });
+    else out.push({ x: this.root.position.x, z: this.root.position.z, kind: 'target' });
   }
 
   private placeParts(): void {
@@ -500,6 +545,16 @@ export class Juggernaut extends Boss {
     this.stateTime += dt;
     this.shieldFlash = Math.max(0, this.shieldFlash - dt);
     this.shield.visible = !this.exposed;
+    // Spin the cannons' reticles; announce each cannon going down and the core opening.
+    for (const c of this.cannons) {
+      const r = c.look.getObjectByName('reticle');
+      if (r) r.rotation.y += dt * 1.5;
+    }
+    const live = this.cannons.filter((c) => c.alive).length;
+    if (live < this.cannonsShown) {
+      ctx.hud?.show(live > 0 ? 'CANNON DESTROYED · 1 LEFT' : 'SHIELD DOWN · HIT THE CORE', 2.4);
+      this.cannonsShown = live;
+    }
     this.shieldMat.opacity = 0.22 + (this.shieldFlash > 0 ? 0.4 : 0);
     this.coreMat.color.set('#ffb03a').multiplyScalar(GLOW * (this.exposed ? 1.6 + Math.sin(this.time * 8) * 0.4 : 0.7));
 
