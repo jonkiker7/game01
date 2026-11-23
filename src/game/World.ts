@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { castShadows } from './Shadows';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GLOW, glow, outlineInstanced, toon } from './materials';
 import { fbm, mulberry32, smoothstep, valueNoise } from './math';
@@ -77,6 +78,7 @@ export class World {
     this.buildSpores(this.placer(0, 6, 0.5));
     this.buildBorder();
     this.padRing = this.buildLandingPad();
+    castShadows(this.group);
     scene.add(this.group);
   }
 
@@ -130,7 +132,10 @@ export class World {
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geo.computeVertexNormals();
 
-    this.group.add(new THREE.Mesh(geo, toon('#ffffff', { vertexColors: true, map: paintedTexture() })));
+    const ground = new THREE.Mesh(geo, toon('#ffffff', { vertexColors: true, map: paintedTexture() }));
+    ground.receiveShadow = true; // trees, towers and ground enemies cast onto it (HIGH quality)
+    ground.userData.noCast = true;
+    this.group.add(ground);
   }
 
   // ---------------------------------------------------------------- placement

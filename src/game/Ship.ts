@@ -3,21 +3,18 @@ import type { Input } from './Input';
 import { addOutlines, GLOW, glow } from './materials';
 import { approachAngle, clamp, damp } from './math';
 import { defaultStats, type Stats } from './run/Upgrades';
+import { TUNING } from './Tuning';
 import { buildShipDesign, type ShipDesignId, type ShipParts } from './ShipDesigns';
 import type { World } from './World';
 
-// ---- Handling (tweak these to change how the ship feels) ----
-const MAX_SPEED = 52; // units per second at full stick (scaled by stats.speedMul)
+// ---- Handling (speeds and rolls are in Tuning.ts; tweak these for the rest of the feel) ----
 const ACCEL = 3.6; // how quickly the ship reaches the stick's speed (higher = snappier)
 const TURN_RATE = 6.5; // radians/second when turning to face the stick direction
 const TURN_RATE_FIRING = 1.3; // slow turning while firing without aiming, so you can strafe
 const AIM_TURN_RATE = 12; // the ship snaps quickly toward where you're aiming
-const BOOST_SPEED = 160;
 const BOOST_TIME = 0.38; // seconds of dash
 const BOOST_INVULNERABLE = 0.45; // dodge through enemy shots while dashing
-const ROLL_SPEED = 95; // sideways dash speed of a barrel roll
 const ROLL_TIME = 0.42; // seconds per roll (one full spin)
-export const ROLL_COOLDOWN = 0.9; // separate from boost, so boost and rolls can chain
 const ROLL_INVULNERABLE = 0.4;
 export const HOVER_HEIGHT = 32.5; // well above the jungle canopy
 
@@ -173,7 +170,7 @@ export class Ship {
         bx = dirX / mag;
         bz = dirZ / mag;
       }
-      this.velocity.set(bx * BOOST_SPEED, bz * BOOST_SPEED);
+      this.velocity.set(bx * TUNING.ship.boostSpeed, bz * TUNING.ship.boostSpeed);
       this.boostTimer = BOOST_TIME;
       this.boostCooldown = this.stats.boostCooldown;
       this.invulnerable = Math.max(this.invulnerable, BOOST_INVULNERABLE);
@@ -192,9 +189,9 @@ export class Ship {
       const fx = -Math.sin(this.heading);
       const fz = -Math.cos(this.heading);
       const forward = Math.max(0, this.velocity.x * fx + this.velocity.y * fz);
-      this.velocity.set(fx * forward + rx * ROLL_SPEED, fz * forward + rz * ROLL_SPEED);
+      this.velocity.set(fx * forward + rx * TUNING.ship.rollSpeed, fz * forward + rz * TUNING.ship.rollSpeed);
       this.rollTimer = ROLL_TIME;
-      this.rollCooldown = ROLL_COOLDOWN;
+      this.rollCooldown = TUNING.ship.rollCooldown;
       this.invulnerable = Math.max(this.invulnerable, ROLL_INVULNERABLE);
       this.onRoll?.(this.rollDir);
     }
@@ -248,7 +245,7 @@ export class Ship {
       this.velocity.multiplyScalar(Math.exp(-2.2 * dt));
     } else {
       const k = 1 - Math.exp(-ACCEL * dt);
-      const top = MAX_SPEED * this.stats.speedMul * speedScale;
+      const top = TUNING.ship.maxSpeed * this.stats.speedMul * speedScale;
       this.velocity.x += (dirX * top - this.velocity.x) * k;
       this.velocity.y += (dirZ * top - this.velocity.y) * k;
     }

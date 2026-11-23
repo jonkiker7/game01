@@ -41,6 +41,17 @@ are a quick sideways dodge relative to the way the ship is facing: a full spin w
 invulnerability. They have their own short cooldown (0.9 s), separate from boost, so you can chain
 boost and rolls.
 
+**Shadows and vignette:** on HIGH quality the sun casts real shadows from trees, plants, rocks,
+towers, ground enemies and ground bosses (flying things keep a simple shadow right below them, which
+helps you aim). LOW skips real shadows. A soft vignette darkens the screen edges on both.
+
+**Dev panel:** add `?dev` to the URL (e.g. `?dev&sortie`) for a **DEV** panel at the top. Its
+sliders cover lighting (sun brightness/colour/direction/height, sky and rim light, fog), shadows,
+glow (bloom) and the vignette, plus gameplay numbers (ship speeds and rolls, tower bombs,
+swarmers). Changes apply live and are remembered on that device while `?dev` is on.
+**📋 Copy settings** copies them so they can be made the game's defaults; **↺ Reset** goes back.
+Gameplay defaults live in `src/game/Tuning.ts`.
+
 **Graphics quality:** tap the fps counter at the top to switch between HIGH (with bloom glow) and
 LOW (faster, for older phones). The game drops to LOW automatically if HIGH runs below 45 fps.
 You can also force it with `?quality=low` or `?quality=high` in the URL. Adding `?debug` exposes

@@ -32,7 +32,9 @@ import { ContractTracker } from './game/run/Contracts';
 import { Run } from './game/run/Run';
 import { defaultStats } from './game/run/Upgrades';
 import { RunUI } from './game/run/RunUI';
-import { ROLL_COOLDOWN, Ship } from './game/Ship';
+import { Ship } from './game/Ship';
+import { TUNING } from './game/Tuning';
+import { SunShadows } from './game/Shadows';
 import { isShipDesign } from './game/ShipDesigns';
 import { JUNGLE, World } from './game/World';
 
@@ -74,10 +76,16 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(JUNGLE.sky);
 scene.fog = new THREE.Fog(JUNGLE.sky, 120, 270);
 
-scene.add(new THREE.HemisphereLight(JUNGLE.hemiSky, JUNGLE.hemiGround, 1.1));
+const hemi = new THREE.HemisphereLight(JUNGLE.hemiSky, JUNGLE.hemiGround, 1.1);
+scene.add(hemi);
 const sun = new THREE.DirectionalLight('#fff1d6', 2.3);
 sun.position.set(-40, 60, 25);
 scene.add(sun);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFShadowMap;
+const sunShadows = new SunShadows(sun, scene);
+sunShadows.darkness = 0.6;
+sunShadows.enabled = quality === 'high';
 const rim = new THREE.DirectionalLight('#5fd8ff', 0.9); // cool back light for colour contrast
 rim.position.set(30, 20, -40);
 scene.add(rim);
@@ -223,6 +231,13 @@ base.onLaunch = () =>
 // Only colours brighter than 1.2 (glows; not even sunlit white hulls) bloom, so the ground and models stay crisp.
 const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.75, 0.45, 1.2);
 composer.addPass(bloom);
+
+// Developer panel: `?dev` in the URL adds sliders for lighting, shadows, glow and tuning.
+if (new URLSearchParams(location.search).has('dev')) {
+  import('./dev/DevPanel').then(({ openDevPanel }) =>
+    openDevPanel({ sun, hemi, rim, scene, bloom, shadows: sunShadows, isHigh: () => quality === 'high' }),
+  );
+}
 composer.addPass(new OutputPass());
 
 // ---------- Hit-stop: freeze for a split second on big impacts (Hades does this a lot) ----------
@@ -416,6 +431,7 @@ function resize(): void {
 
 function setQuality(q: Quality, remember: boolean): void {
   quality = q;
+  sunShadows.enabled = q === 'high'; // real shadows on HIGH; LOW keeps just the blob shadows
   if (remember) {
     qualityChosen = true;
     try {
@@ -557,9 +573,10 @@ renderer.setAnimationLoop((now: number) => {
     aimLead.set(0, 0);
   }
   rig.update(dt, ship.root.position, ship.velocity, aimLead);
+  sunShadows.follow(rig.lookTarget.x, rig.lookTarget.z);
 
   boostBtn.style.setProperty('--cd', String(ship.boostCooldown / ship.stats.boostCooldown));
-  for (const b of rollBtns) b.style.setProperty('--cd', String(ship.rollCooldown / ROLL_COOLDOWN));
+  for (const b of rollBtns) b.style.setProperty('--cd', String(ship.rollCooldown / TUNING.ship.rollCooldown));
   hud.setArmor(ship.armor, ship.stats.maxArmor);
   hud.setMissiles(ship.missiles, ship.missileRecharge, ship.stats.missileMax);
   hud.setSalvage(run.salvage);

@@ -1201,3 +1201,27 @@ body.in-convo #guide-tag {
   transform-origin: left center;
   transition: transform 0.15s;
 }
+
+/* ---- Vignette: darkens the screen edges (strength and size are tunable in ?dev) ---- */
+#vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(12, 4, 22, 0) var(--vig-size, 52%),
+    rgba(12, 4, 22, var(--vig, 0.5)) 100%
+  );
+}
+
+/* ---- Dev panel (?dev) ---- */
+#dev-panel {
+  position: fixed;
+  top: calc(6px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  max-height: 88vh;
+  z-index: 50;
+  --width: 270px;
+  font-size: 12px;
+}
