@@ -37,7 +37,7 @@ Destroyed enemies sometimes drop a **green healing orb** that floats up to flyin
 into it to restore 25 armor (orbs pull toward you when you're close, and fade after 15 seconds).
 
 Boosting makes you briefly invulnerable, so you can dash through enemy shots. **Barrel rolls**
-are a quick sideways dodge relative to the way the ship is facing: a full spin with a moment of
+are a quick dodge to screen left or right, whichever way the ship is facing: a full spin with a moment of
 invulnerability. They have their own short cooldown (0.9 s), separate from boost, so you can chain
 boost and rolls.
 

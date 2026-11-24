@@ -181,19 +181,17 @@ export class Ship {
       this.onBoost?.();
     }
 
-    // --- Barrel roll: a quick sideways dodge (relative to the ship's facing) with a full spin ---
+    // --- Barrel roll: a quick dodge to screen left or right (whichever way the ship faces) ---
     this.rollCooldown = Math.max(0, this.rollCooldown - dt);
     const rollL = input.consumePress('rollL');
     const rollR = input.consumePress('rollR');
     if ((rollL || rollR) && this.rollCooldown <= 0 && this.boostTimer <= 0) {
-      this.rollDir = rollR ? 1 : -1;
-      const rx = Math.cos(this.heading) * this.rollDir; // the ship's right (or left)
-      const rz = -Math.sin(this.heading) * this.rollDir;
-      // Keep the forward momentum, add a hard sideways kick.
-      const fx = -Math.sin(this.heading);
-      const fz = -Math.cos(this.heading);
-      const forward = Math.max(0, this.velocity.x * fx + this.velocity.y * fz);
-      this.velocity.set(fx * forward + rx * TUNING.ship.rollSpeed, fz * forward + rz * TUNING.ship.rollSpeed);
+      const screenDir = rollR ? 1 : -1; // world +X is screen right
+      // Keep the up/down (screen) momentum, add a hard sideways kick.
+      this.velocity.set(screenDir * TUNING.ship.rollSpeed, this.velocity.y);
+      // Spin toward the side of the ship that's moving: ship-right is (cos h, -sin h) in world.
+      const towardShipRight = screenDir * Math.cos(this.heading);
+      this.rollDir = towardShipRight >= 0 ? 1 : -1;
       this.rollTimer = ROLL_TIME;
       this.rollCooldown = TUNING.ship.rollCooldown;
       this.invulnerable = Math.max(this.invulnerable, ROLL_INVULNERABLE);
