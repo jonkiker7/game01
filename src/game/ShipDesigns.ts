@@ -37,6 +37,8 @@ export interface ShipParts {
    * `side` is -1 (left) or +1 (right); scale the object's Y by how hard it's firing.
    */
   thrusters: { obj: THREE.Object3D; side: number }[];
+  /** Rear engine flames; scale Z with throttle (1 = cruising length). */
+  flames: THREE.Object3D[];
 }
 
 // White / pale blue-grey hull, strong blue accents, dark mechanical parts, cyan glows.
@@ -70,7 +72,7 @@ export function buildShipDesign(id: ShipDesignId, root: THREE.Group, engineMat: 
     glow: glow(COLORS.glow),
     canopy: glow(COLORS.canopy),
     engine: engineMat,
-    parts: { spinners: [], engines: [], muzzles: [], pulses: [], flashMats: [], thrusters: [] },
+    parts: { spinners: [], engines: [], muzzles: [], pulses: [], flashMats: [], thrusters: [], flames: [] },
   };
   kit.parts.flashMats.push(kit.hull, kit.panel, kit.accent, kit.dark);
   ({ a: valkyrie, b: starRotor, c: kestrel, d: atlas })[id](root, kit);
@@ -339,6 +341,20 @@ function engine(t: THREE.Group, k: Kit, x: number, y: number, z: number, r: numb
   e.position.set(x, y, z);
   t.add(e);
   k.parts.engines.push(e);
+  // A flame streaming out the back; its length follows the throttle (see Ship.updateVisuals).
+  const flame = new THREE.Group();
+  flame.position.set(x, y, z + 0.02);
+  const outer = new THREE.Mesh(new THREE.ConeGeometry(r * 1.6, 1, 12, 1, true), k.engine);
+  const core = new THREE.Mesh(new THREE.ConeGeometry(r * 0.8, 0.6, 10), glow('#e8ffff', {}, 1.7));
+  for (const [m, len] of [[outer, 1], [core, 0.6]] as const) {
+    m.rotation.x = Math.PI / 2; // tip pointing backwards (+Z)
+    m.position.z = len / 2;
+    m.userData.noOutline = true;
+    flame.add(m);
+  }
+  flame.scale.set(1, 1, 0.01);
+  t.add(flame);
+  k.parts.flames.push(flame);
 }
 
 function add(t: THREE.Group, geo: THREE.BufferGeometry, mat: THREE.Material, x = 0, y = 0, z = 0): THREE.Mesh {

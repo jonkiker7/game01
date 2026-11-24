@@ -80,6 +80,8 @@ export class Ship {
   private pitch = 0;
   private roll = 0;
   private lastHeading = 0;
+  private throttle = 0; // how far the stick is pushed (0..1)
+  private flameLen = 0;
   private turnRate = 0; // radians/second, + = turning left
   private sideSpeed = 0; // + = sliding right
   private readonly thrust = [0, 0]; // left, right side thrusters (0..1)
@@ -164,6 +166,7 @@ export class Ship {
     const dirX = move.x;
     const dirZ = -move.y;
     const mag = Math.hypot(dirX, dirZ);
+    this.throttle = Math.min(1, mag);
 
     // --- Boost: a short dash toward the stick (or straight ahead if centered) ---
     this.boostCooldown = Math.max(0, this.boostCooldown - dt);
@@ -356,6 +359,13 @@ export class Ship {
     const boostGlow = this.isBoosting ? 1 : 0;
     this.engineMat.color.setRGB(0.44 + boostGlow * 0.56, 0.97, 1).multiplyScalar(GLOW * (1 + boostGlow * 0.6));
     for (const e of this.parts.engines) e.scale.setScalar(damp(e.scale.x, 1 + boostGlow * 0.9, 12, dt));
+    // Rear flames: a short idle flicker, longer the harder you push the stick, longest on boost.
+    const wantLen = this.isBoosting ? 6.5 : 0.6 + this.throttle * 3.2;
+    this.flameLen = damp(this.flameLen, wantLen, wantLen > this.flameLen ? 14 : 6, dt);
+    for (const [i, f] of this.parts.flames.entries()) {
+      const flicker = 0.88 + Math.sin(this.time * 47 + i * 1.7) * 0.12;
+      f.scale.set(1 + boostGlow * 0.3, 1 + boostGlow * 0.3, Math.max(0.01, this.flameLen * flicker));
+    }
 
     // Side thrusters: the side opposite a turn fires (pushing the nose around); rolls and
     // sideways drift fire the side doing the pushing; boosts fire both.
