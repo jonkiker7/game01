@@ -8,7 +8,7 @@ import type { Blip } from '../Radar';
 import { HOVER_HEIGHT, type Ship } from '../Ship';
 import { LANDING_PAD, OUTPOSTS, type World } from '../World';
 import type { ContractTracker } from './Contracts';
-import { createMission, type Mission, MISSION_RADIUS, MISSION_TITLES, type MissionKind } from './Missions';
+import { createMission, type Mission, type MissionDeps, MISSION_RADIUS, MISSION_TITLES, type MissionKind } from './Missions';
 import { type ArenaVisual, type Gate, REWARD_STYLE, type Reward } from './Arena';
 import type { RunUI } from './RunUI';
 import { defaultStats, PRIMARY_NAMES, rollUpgrades, rollWeapons, SECONDARY_NAMES, type Stats, type Upgrade, UPGRADES } from './Upgrades';
@@ -35,7 +35,7 @@ const SURVIVE_TIME = 40;
 type EncounterKind = 'outpost' | 'survive' | 'stronghold' | 'boss' | MissionKind;
 /** Encounters the rounds before the boss can be. */
 const ROUND_KINDS: EncounterKind[] = ['outpost', 'survive', 'rescue', 'defend', 'escort', 'sabotage', 'hold'];
-type Phase = 'fight' | 'reward' | 'choosing' | 'gates' | 'transition' | 'over';
+type Phase = 'fight' | 'failed' | 'reward' | 'choosing' | 'gates' | 'transition' | 'over';
 
 const TITLES: Record<EncounterKind, string> = {
   outpost: 'DESTROY THE OUTPOST',
@@ -47,6 +47,7 @@ const TITLES: Record<EncounterKind, string> = {
 
 interface Deps {
   scene: THREE.Scene;
+  effects: MissionDeps['effects'];
   ship: Ship;
   enemies: EnemyManager;
   world: World;
@@ -100,6 +101,7 @@ export class Run {
   private center = new THREE.Vector2();
   private timer = 0;
   private overTimer = 0;
+  private failTimer = 0;
   private won = false;
   private reward: Reward = 'upgrade';
   private gates: Gate[] = [];
@@ -171,8 +173,8 @@ export class Run {
     } else if (this.kind in MISSION_TITLES) {
       // Missions: their own objective, with lighter waves of the zone's pair.
       enemies.configure(bounds, hpMul, { types, max: 2 + Math.floor(s / 2), interval: 4.5 });
-      const { scene, world, enemies: em, hud: h, ship } = this.d;
-      this.mission = createMission(this.kind as MissionKind, { scene, world, enemies: em, hud: h, ship });
+      const { scene, world, enemies: em, hud: h, ship, effects } = this.d;
+      this.mission = createMission(this.kind as MissionKind, { scene, effects, world, enemies: em, hud: h, ship });
       this.mission.begin(cx, cz, R, hpMul);
     } else if (this.kind === 'outpost') {
       enemies.configure(bounds, hpMul, { types, max: 2 + Math.floor(s / 2), interval: Math.max(3.5, 7 - s * 0.4) });
@@ -264,8 +266,11 @@ export class Run {
     const { ship, enemies, arena } = this.d;
     if (this.phase !== 'over' && this.phase !== 'transition') ship.confine(this.center.x, this.center.y, this.radius - 3);
     if (this.phase !== 'transition') this.d.contracts.update(dt, ship);
-    const showBoss = this.boss && this.boss.alive && this.phase === 'fight';
-    this.d.hud.setBoss(showBoss ? this.boss!.name : null, this.boss?.healthFraction ?? 0);
+    // Health bar across the top: the boss, or what a mission has you protecting.
+    const guard = this.phase === 'fight' ? this.mission?.healthBar() : null;
+    if (this.boss && this.boss.alive && this.phase === 'fight') this.d.hud.setBoss(this.boss.name, this.boss.healthFraction);
+    else if (guard) this.d.hud.setBoss(guard.name, guard.fraction);
+    else this.d.hud.setBoss(null);
 
     switch (this.phase) {
       case 'fight': {
@@ -286,6 +291,13 @@ export class Run {
         if (done && !this.d.contracts.blocking) this.clearEncounter();
         break;
       }
+      case 'failed':
+        this.failTimer -= dt;
+        if (this.failTimer <= 0) {
+          this.openGates();
+          this.d.hud.show('NO REWARD · CHOOSE YOUR PATH', 2.2);
+        }
+        break;
       case 'reward': {
         const p = ship.root.position;
         const r = arena.rewardPosition;
@@ -327,12 +339,19 @@ export class Run {
   }
 
   /** A mission was failed (generator or convoy destroyed): no reward, straight to the gates. */
+  /**
+   * A mission was failed (generator or convoy destroyed): it blows up, a red banner holds for
+   * a few seconds, no reward orb appears, and then the gates open.
+   */
   private failEncounter(): void {
     const { enemies, hud } = this.d;
     enemies.stopDrones();
     enemies.destroyAll();
-    hud.show('OBJECTIVE FAILED · NO REWARD', 2.6);
-    this.openGates();
+    this.mission?.onFail();
+    hud.show(this.mission?.failText ?? 'OBJECTIVE FAILED', 3.4);
+    hud.flashDamage();
+    this.phase = 'failed';
+    this.failTimer = 3.6;
   }
 
   private endMission(): void {
@@ -472,6 +491,8 @@ export class Run {
         return `${head}\nCHOOSE AN UPGRADE`;
       case 'gates':
         return `${head}\nCHOOSE YOUR PATH`;
+      case 'failed':
+        return `${head}\nMISSION FAILED`;
       default:
         return head;
     }

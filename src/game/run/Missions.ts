@@ -36,6 +36,7 @@ const CYAN = '#6ff7ff';
 
 export interface MissionDeps {
   scene: THREE.Scene;
+  effects: { explosion: (pos: THREE.Vector3, size: number, groundY: number) => void };
   world: World;
   enemies: EnemyManager;
   hud: Hud;
@@ -105,6 +106,7 @@ export class Saboteur extends Enemy {
   readonly hitTop = 2;
   readonly aimHeight = 0;
   latched = false;
+  private placed = false;
   private readonly drill: THREE.Mesh;
 
   constructor(
@@ -134,18 +136,27 @@ export class Saboteur extends Enemy {
     const dz = t.z - p.z;
     const d = Math.hypot(dx, dz);
     this.root.rotation.y = approachAngle(this.root.rotation.y, Math.atan2(-dx, -dz), 5 * dt);
-    this.latched = d < 4.5;
-    if (!this.latched) {
-      p.x += (dx / d) * 17 * dt;
-      p.z += (dz / d) * 17 * dt;
-      p.y = world.heightAt(p.x, p.z) + HOVER_HEIGHT - 3 + Math.sin(this.time * 4) * 0.4;
+    // Glide down toward the target as it gets close (no snapping from flying height).
+    const cruise = world.heightAt(p.x, p.z) + HOVER_HEIGHT - 3 + Math.sin(this.time * 4) * 0.4;
+    const perch = t.y + 1.5;
+    const descend = Math.min(1, Math.max(0, (d - 4.5) / 28)); // 1 = far (cruising), 0 = at the target
+    const wantY = perch + (cruise - perch) * descend;
+    if (!this.placed) {
+      this.placed = true; // arrive already at flying height
+      p.y = wantY;
+    }
+    p.y += (wantY - p.y) * (1 - Math.exp(-6 * dt));
+    this.latched = d < 4.5 && Math.abs(p.y - perch) < 2;
+    if (d > 4.5) {
+      const step = Math.min(d - 4, 17 * dt);
+      p.x += (dx / d) * step;
+      p.z += (dz / d) * step;
     } else {
-      // Drill in: sit on the target and drain it.
-      p.x = t.x - (dx / Math.max(d, 0.01)) * 4;
-      p.z = t.z - (dz / Math.max(d, 0.01)) * 4;
-      p.y = t.y + 1.5;
+      // Ride along with the target (the convoy keeps moving) and drill in.
+      p.x = t.x - (dx / Math.max(d, 0.01)) * Math.min(d, 4.2);
+      p.z = t.z - (dz / Math.max(d, 0.01)) * Math.min(d, 4.2);
       this.drill.rotation.z += dt * 30;
-      this.onDrain(6 * dt);
+      if (this.latched) this.onDrain(6 * dt);
     }
   }
 }
@@ -292,6 +303,17 @@ export abstract class Mission {
   /** The objective line(s) under the radar. */
   abstract objective(): string;
   abstract blips(out: Blip[]): void;
+
+  /** A health bar to show across the top (what you're protecting), or null. */
+  healthBar(): { name: string; fraction: number } | null {
+    return null;
+  }
+
+  /** The banner when it's failed. */
+  failText = 'OBJECTIVE FAILED';
+
+  /** Called once when failed (blow up what you were protecting). */
+  onFail(): void {}
 
   /** Remove everything this mission placed in the world. */
   cleanup(): void {
@@ -447,6 +469,18 @@ class Defend extends Mission {
     this.hurt = 0.2;
   }
 
+  failText = 'GENERATOR DESTROYED · MISSION FAILED';
+
+  healthBar(): { name: string; fraction: number } {
+    return { name: 'GENERATOR', fraction: Math.max(0, this.hp) / 100 };
+  }
+
+  onFail(): void {
+    this.d.effects.explosion(this.pos, 14, this.d.world.heightAt(this.cx, this.cz));
+    this.group.visible = false;
+    for (const s of this.saboteurs) s.alive = false;
+  }
+
   objective(): string {
     return `${this.title}\nHOLD ${Math.ceil(Math.max(0, this.timer))}s · GENERATOR ${Math.max(0, Math.ceil(this.hp))}%`;
   }
@@ -545,6 +579,18 @@ class Escort extends Mission {
   private drain(amount: number): void {
     this.hp -= amount * 0.8;
     this.hurt = 0.2;
+  }
+
+  failText = 'CONVOY DESTROYED · MISSION FAILED';
+
+  healthBar(): { name: string; fraction: number } {
+    return { name: 'CONVOY', fraction: Math.max(0, this.hp) / 100 };
+  }
+
+  onFail(): void {
+    this.d.effects.explosion(this.convoyTarget(), 12, this.pos.y);
+    this.convoy.visible = false;
+    for (const s of this.saboteurs) s.alive = false;
   }
 
   objective(): string {
