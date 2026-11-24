@@ -140,7 +140,9 @@ outpost, fenced in by a glowing energy wall:
 - **Boss (round 3):** one of three bosses (below). Destroy it to complete the sortie.
 
 Each round before the boss is one of these at random (never the same type twice in a row). If you lose the generator or the convoy,
-the round ends without its reward. To test one, add `?sortie&mission=rescue` (or `defend`,
+the round ends without its reward: what you were protecting has a health bar across the top, and
+if it reaches zero it blows up, a red MISSION FAILED banner holds for a few seconds, no reward orb
+appears, and then the gates open. To test one, add `?sortie&mission=rescue` (or `defend`,
 `escort`, `sabotage`, `hold`, `outpost`, `survive`) to the URL.
 
 Clearing a sector drops a **reward orb** in the middle of the arena. Fly into it:
