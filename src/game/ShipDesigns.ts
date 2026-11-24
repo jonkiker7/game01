@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { glow, rimToon } from './materials';
+import { STAR_ROTOR_SHIP } from './models/starRotorShip';
+import type { MeshData, ShipModelData } from './models/modelTypes';
 
 /**
  * Four twin-rotor ship designs. Each builds its model into a group, facing -Z, and reports
@@ -10,7 +12,7 @@ export type ShipDesignId = 'a' | 'b' | 'c' | 'd';
 
 export const SHIP_DESIGNS: { id: ShipDesignId; name: string; blurb: string }[] = [
   { id: 'a', name: 'Valkyrie', blurb: 'Armored wedge gunship with ducted fans on the wingtips' },
-  { id: 'b', name: 'Manta', blurb: 'Flying-wing delta with big wing-mounted fans and a tail boom' },
+  { id: 'b', name: 'Manta', blurb: 'Armored gunship with two big ducted fans on drooped wings (Blender model)' },
   { id: 'c', name: 'Kestrel', blurb: 'Slim dart with open rotors on wingtip nacelles' },
   { id: 'd', name: 'Atlas', blurb: 'Heavy lifter with big fan pods and a belly turret' },
 ];
@@ -66,7 +68,7 @@ export function buildShipDesign(id: ShipDesignId, root: THREE.Group, engineMat: 
     parts: { spinners: [], engines: [], muzzles: [], pulses: [], flashMats: [] },
   };
   kit.parts.flashMats.push(kit.hull, kit.panel, kit.accent, kit.dark);
-  ({ a: valkyrie, b: manta, c: kestrel, d: atlas })[id](root, kit);
+  ({ a: valkyrie, b: starRotor, c: kestrel, d: atlas })[id](root, kit);
   return kit.parts;
 }
 
@@ -92,33 +94,71 @@ function valkyrie(t: THREE.Group, k: Kit): void {
 
 // ---------------------------------------------------------------- design B
 
-function manta(t: THREE.Group, k: Kit): void {
-  // One wide flying-wing body. The fans are large ducted rings mounted on top of the wing,
-  // overhanging its edges a little, so they can be big without making the wing bigger.
-  add(
-    t,
-    flat([[0, 3.4], [0.7, 2.3], [1.4, 0.9], [3.8, -1.0], [3.9, -1.7], [2.6, -1.9], [1.2, -1.5], [0.5, -2.4], [0, -2.2]], 0.45),
-    k.hull,
-  );
-  add(t, flat([[0, 2.95], [0.62, 2.05], [0.62, 1.6], [0, 2.4]], 0.12), k.accent, 0, 0.3);
-  add(t, sphere(0.85, 0.45, 1.8), k.hull, 0, 0.22, -0.2);
-  add(t, sphere(0.46, 0.32, 0.72), k.canopy, 0, 0.5, -1.35);
-  // Blue trailing-edge bands across the wings.
-  add(t, flat([[1.3, -1.35], [2.6, -1.72], [3.85, -1.55], [3.85, -1.75], [2.6, -1.92], [1.25, -1.55]], 0.08, [], 0.02), k.accent, 0, 0.26);
+/** Ship-space scale for the Blender model, so it matches the other designs' size. */
+const STAR_ROTOR_SCALE = 1.15;
 
-  // Tail: a slim boom with a swept tailplane and a vertical fin at the end.
-  add(t, flat([[0, -1.6], [0.32, -1.9], [0.24, -4.3], [0, -4.45]], 0.36), k.hull, 0, 0.08);
-  add(t, flat([[0, -1.9], [0.1, -2.0], [0.1, -4.1], [0, -4.2]], 0.06, [], 0.02), k.accent, 0, 0.3);
-  add(t, flat([[0.2, -3.45], [1.45, -3.95], [1.5, -4.3], [0.2, -4.2]], 0.14), k.panel, 0, 0.1);
-  for (const s of [-1, 1]) add(t, new THREE.BoxGeometry(0.22, 0.18, 0.4), k.accent, s * 1.45, 0.1, 4.1);
-  const fin = add(t, new THREE.BoxGeometry(0.12, 1.0, 1.05), k.accent, 0, 0.62, 4.0);
-  fin.rotation.x = -0.4;
+/**
+ * The Star Rotor ship, modelled in Blender (see src/game/models/starRotorShip.ts).
+ * The two fan rotors are separate meshes that spin like the other designs' fans.
+ */
+function starRotor(t: THREE.Group, k: Kit): void {
+  const model: ShipModelData = STAR_ROTOR_SHIP;
+  const body = new THREE.Group();
+  body.scale.setScalar(STAR_ROTOR_SCALE);
+  t.add(body);
 
-  for (const s of [-1, 1]) {
-    duct(t, k, s * 2.3, 0.45, 0.7, 1.22, s, 0.2, true);
-    gun(t, k, s * 0.95, -0.3, -1.3);
-    engine(t, k, s * 0.5, 0.05, 2.2, 0.22);
+  const interior = rimToon('#151b26', '#ffb070', 0.3);
+  k.parts.flashMats.push(interior);
+  const mats: Record<string, THREE.Material> = {
+    Hull_White: k.hull,
+    Hull_Panel: k.panel,
+    Accent_Blue: k.accent,
+    Gunmetal: k.dark,
+    Interior_Dark: interior,
+    Glow_Cyan: k.glow,
+  };
+  const meshes = (group: THREE.Object3D, parts: Record<string, MeshData>, outline: boolean): void => {
+    for (const [name, data] of Object.entries(parts)) {
+      const mesh = new THREE.Mesh(modelGeometry(data), mats[name] ?? k.panel);
+      if (!outline) mesh.userData.noOutline = true;
+      group.add(mesh);
+    }
+  };
+  meshes(body, model.static, true);
+
+  // Fans: a tilted mount holding a spinner that turns around its local Y axis.
+  for (const [name, rotor] of Object.entries(model.rotors)) {
+    const mount = new THREE.Group();
+    mount.position.fromArray(rotor.pos);
+    mount.quaternion.fromArray(rotor.quat);
+    const spinner = new THREE.Group();
+    mount.add(spinner);
+    meshes(spinner, rotor.geo, false);
+    body.add(mount);
+    k.parts.spinners.push({ obj: spinner, dir: name.includes('_L') ? 1 : -1 });
   }
+
+  // Gun muzzles at the hardpoints under the wings (weapon pods attach here later).
+  for (const hp of Object.values(model.hardpoints)) {
+    const [x, y, z] = hp.map((v) => v * STAR_ROTOR_SCALE);
+    gunMuzzle(t, k, x, y - 0.1, z - 0.9);
+  }
+
+  // Two engine glows on the back of the tail hub (boost flare and trail).
+  const s = STAR_ROTOR_SCALE;
+  const tailBack = model.tail.max[2] * s + 0.03;
+  const tailY = ((model.tail.min[1] + model.tail.max[1]) / 2) * s;
+  for (const side of [-1, 1]) engine(t, k, side * 0.38 * s, tailY, tailBack, 0.2 * s);
+}
+
+/** Builds a BufferGeometry from exported model data (normals kept, so hard edges stay crisp). */
+function modelGeometry(data: MeshData): THREE.BufferGeometry {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(data.p, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(data.n, 3));
+  g.setIndex(data.i);
+  g.computeBoundingSphere();
+  return g;
 }
 
 // ---------------------------------------------------------------- design C
@@ -254,6 +294,16 @@ function gun(t: THREE.Group, k: Kit, x: number, y: number, z: number): void {
   muzzle.position.set(x, y, z - 0.8);
   muzzle.visible = false;
   t.add(barrel, muzzle);
+  k.parts.muzzles.push(muzzle);
+}
+
+/** Just a muzzle flash (no barrel), for ships whose guns are mounted separately. */
+function gunMuzzle(t: THREE.Group, k: Kit, x: number, y: number, z: number): void {
+  const muzzle = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), glow('#ffe27a'));
+  muzzle.scale.set(1, 1, 2.2);
+  muzzle.position.set(x, y, z);
+  muzzle.visible = false;
+  t.add(muzzle);
   k.parts.muzzles.push(muzzle);
 }
 
