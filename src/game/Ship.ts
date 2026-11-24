@@ -79,6 +79,10 @@ export class Ship {
   private readonly shadow: THREE.Mesh;
   private pitch = 0;
   private roll = 0;
+  private lastHeading = 0;
+  private turnRate = 0; // radians/second, + = turning left
+  private sideSpeed = 0; // + = sliding right
+  private readonly thrust = [0, 0]; // left, right side thrusters (0..1)
   private time = 0;
   private boostTimer = 0;
   private hitFlash = 0;
@@ -282,6 +286,13 @@ export class Ship {
     const fz = -Math.cos(this.heading);
     const forwardSpeed = this.velocity.x * fx + this.velocity.y * fz;
     const sideSpeed = this.velocity.x * -fz + this.velocity.y * fx;
+    this.sideSpeed = sideSpeed;
+    if (dt > 0) {
+      let dh = this.heading - this.lastHeading;
+      dh = Math.atan2(Math.sin(dh), Math.cos(dh));
+      this.turnRate = damp(this.turnRate, dh / dt, 12, dt);
+    }
+    this.lastHeading = this.heading;
     this.pitch = damp(this.pitch, clamp(-forwardSpeed * 0.022, -0.55, 0.55), 6, dt);
     this.roll = damp(this.roll, clamp(-sideSpeed * 0.03, -0.6, 0.6), 6, dt);
     // A barrel roll spins the ship once around its nose (eased so it snaps out of the spin).
@@ -347,6 +358,24 @@ export class Ship {
     const boostGlow = this.isBoosting ? 1 : 0;
     this.engineMat.color.setRGB(0.44 + boostGlow * 0.56, 0.97, 1).multiplyScalar(GLOW * (1 + boostGlow * 0.6));
     for (const e of this.parts.engines) e.scale.setScalar(damp(e.scale.x, 1 + boostGlow * 0.9, 12, dt));
+
+    // Side thrusters: the side opposite a turn fires (pushing the nose around); rolls and
+    // sideways drift fire the side doing the pushing; boosts fire both.
+    const turn = clamp(this.turnRate / 4, -1, 1); // + = turning left → right thruster
+    const drift = clamp(this.sideSpeed / 60, -1, 1); // + = sliding right → left thruster
+    const rolling = this.rollTimer > 0 ? 1 : 0;
+    for (const th of this.parts.thrusters) {
+      const i = th.side < 0 ? 0 : 1;
+      let want = Math.max(0, th.side > 0 ? turn : -turn) + Math.max(0, th.side > 0 ? -drift : drift) * 0.6;
+      if (rolling && Math.sign(this.rollDir) === -th.side) want = 1;
+      if (this.isBoosting) want = 1;
+      want = Math.min(1, want < 0.12 ? 0 : want);
+      this.thrust[i] = damp(this.thrust[i], want, want > this.thrust[i] ? 25 : 8, dt);
+      const k = this.thrust[i];
+      th.obj.visible = k > 0.03;
+      const flicker = 0.85 + Math.sin(this.time * 55 + i * 2) * 0.15;
+      th.obj.scale.set(0.6 + k * 0.6, Math.max(0.01, k * flicker * 1.4), 0.6 + k * 0.6);
+    }
 
     this.muzzleFlash -= dt;
     for (const m of this.parts.muzzles) m.visible = this.muzzleFlash > 0;
