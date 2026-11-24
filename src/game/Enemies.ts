@@ -421,7 +421,7 @@ export class EnemyManager {
   nearest(x: number, z: number, range: number, count: number, skip?: Set<Enemy>): Enemy[] {
     const found: { e: Enemy; d: number }[] = [];
     for (const e of this.enemies) {
-      if (!e.alive || skip?.has(e)) continue;
+      if (!e.alive || !e.aimable || skip?.has(e)) continue;
       const v = this.visualPosition(e, this.probe2);
       const d = Math.hypot(v.x - x, v.z - z);
       if (d < range) found.push({ e, d });
@@ -467,7 +467,7 @@ export class EnemyManager {
     let best: Enemy | null = null;
     let bestDist = range;
     for (const e of this.enemies) {
-      if (!e.alive) continue;
+      if (!e.alive || !e.aimable) continue;
       const v = this.visualPosition(e, this.probe2);
       const dx = v.x - x;
       const dz = v.z - z;

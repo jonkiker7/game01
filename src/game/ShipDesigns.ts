@@ -32,6 +32,11 @@ export interface ShipParts {
   pulses: THREE.MeshBasicMaterial[];
   /** Hull materials that flash red when the ship is hit. */
   flashMats: THREE.MeshToonMaterial[];
+  /**
+   * Side thrusters (optional): flames that fire when turning, rolling or boosting.
+   * `side` is -1 (left) or +1 (right); scale the object's Y by how hard it's firing.
+   */
+  thrusters: { obj: THREE.Object3D; side: number }[];
 }
 
 // White / pale blue-grey hull, strong blue accents, dark mechanical parts, cyan glows.
@@ -65,7 +70,7 @@ export function buildShipDesign(id: ShipDesignId, root: THREE.Group, engineMat: 
     glow: glow(COLORS.glow),
     canopy: glow(COLORS.canopy),
     engine: engineMat,
-    parts: { spinners: [], engines: [], muzzles: [], pulses: [], flashMats: [] },
+    parts: { spinners: [], engines: [], muzzles: [], pulses: [], flashMats: [], thrusters: [] },
   };
   kit.parts.flashMats.push(kit.hull, kit.panel, kit.accent, kit.dark);
   ({ a: valkyrie, b: starRotor, c: kestrel, d: atlas })[id](root, kit);
@@ -142,6 +147,28 @@ function starRotor(t: THREE.Group, k: Kit): void {
   for (const hp of Object.values(model.hardpoints)) {
     const [x, y, z] = hp.map((v) => v * STAR_ROTOR_SCALE);
     gunMuzzle(t, k, x, y - 0.1, z - 0.9);
+  }
+
+  // Side thrusters: blue flames out of the bottom of the octagonal pods in front of the wings
+  // (where the glowing triangles are), angled down and outward.
+  for (const side of [-1, 1]) {
+    const nozzle = new THREE.Group();
+    nozzle.position.set(side * 1.46 * STAR_ROTOR_SCALE, -0.3 * STAR_ROTOR_SCALE, -0.95 * STAR_ROTOR_SCALE);
+    nozzle.rotation.z = side * 1.15; // mostly out to the side (and a little down), so it shows from above
+    const flame = new THREE.Group();
+    const outer = new THREE.Mesh(new THREE.ConeGeometry(0.45, 2.6, 12, 1, true), k.engine);
+    outer.rotation.x = Math.PI; // tip pointing away from the nozzle
+    outer.position.y = -1.3;
+    const core = new THREE.Mesh(new THREE.ConeGeometry(0.22, 1.5, 10), glow('#e8ffff', {}, 2.4));
+    core.rotation.x = Math.PI;
+    core.position.y = -0.75;
+    for (const m of [outer, core]) m.userData.noOutline = true;
+    flame.add(outer, core);
+    flame.scale.set(1, 0.01, 1);
+    flame.visible = false;
+    nozzle.add(flame);
+    t.add(nozzle);
+    k.parts.thrusters.push({ obj: flame, side });
   }
 
   // Two engine glows on the back of the tail hub (boost flare and trail).

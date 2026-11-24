@@ -47,6 +47,10 @@ export abstract class Enemy implements Hittable {
   salvage = 3;
   /** How much of a wave's enemy budget this takes (a swarm bug is a fraction, mines are free). */
   weight = 1;
+  /** Whether aim assist and missile lock-on may pick this enemy (a shielded boss core says no). */
+  get aimable(): boolean {
+    return true;
+  }
   /** Chance a wreck drops a healing orb. */
   dropChance = 0.25;
   alive = true;

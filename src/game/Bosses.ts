@@ -498,6 +498,11 @@ export class Juggernaut extends Boss {
     return this.cannons.every((c) => !c.alive);
   }
 
+  /** While the side cannons stand, aim assist and missiles lock onto them, not the shielded core. */
+  get aimable(): boolean {
+    return this.exposed;
+  }
+
   get phase2(): boolean {
     return this.exposed || this.healthFraction < 0.5;
   }
