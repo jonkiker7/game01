@@ -619,18 +619,6 @@ function concourse(g: THREE.Group, parts: StationParts, m: Mats): void {
     post.position.set(x, 6.95, -11.1);
     upper.add(post);
   }
-  // Tall banners hanging over the balcony, with the station's emblem.
-  const bannerTex = bannerTexture();
-  for (const x of [-4.5, 4.5]) {
-    const banner = new THREE.Mesh(new THREE.PlaneGeometry(3, 6), toon('#ffffff', { map: bannerTex, side: THREE.DoubleSide }));
-    banner.position.set(x, 7.2, -13.4);
-    banner.userData.noOutline = true;
-    const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 3.6, 6), m.orange);
-    rod.rotation.z = Math.PI / 2;
-    rod.position.set(x, 10.25, -13.4);
-    upper.add(banner, rod);
-  }
-
   // Station directory board.
   const directory = new THREE.Group();
   const board = new THREE.Mesh(new THREE.BoxGeometry(5, 3.2, 0.4), m.navy);
@@ -1082,37 +1070,6 @@ function shaftTexture(): THREE.CanvasTexture {
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.repeat.set(2, 3);
-  return tex;
-}
-
-function bannerTexture(): THREE.CanvasTexture {
-  const c = document.createElement('canvas');
-  c.width = 128;
-  c.height = 256;
-  const g = c.getContext('2d')!;
-  g.fillStyle = '#c0442f';
-  g.fillRect(0, 0, 128, 256);
-  g.fillStyle = '#e2733a';
-  g.fillRect(10, 0, 108, 236);
-  g.beginPath();
-  g.moveTo(10, 236);
-  g.lineTo(64, 256);
-  g.lineTo(118, 236);
-  g.fill();
-  g.strokeStyle = '#fff1d6';
-  g.lineWidth = 6;
-  g.beginPath();
-  g.arc(64, 100, 34, 0, Math.PI * 2);
-  g.stroke();
-  g.beginPath();
-  g.ellipse(64, 100, 52, 14, -0.4, 0, Math.PI * 2);
-  g.stroke();
-  g.fillStyle = '#fff1d6';
-  g.font = "900 18px 'Cinzel', Georgia, serif";
-  g.textAlign = 'center';
-  g.fillText('HALCYON', 64, 180);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }
 
