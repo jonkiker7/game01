@@ -395,6 +395,12 @@ npm run preview   # serve the production build
 `.github/workflows/deploy.yml` builds and publishes to GitHub Pages on every push to `main`.
 One-time setup: **Settings → Pages → Source: GitHub Actions**.
 
+**Updates reach the Home Screen app by themselves.** Each build has a version stamp (shown after the
+fps counter, e.g. `v11251603` = Nov 25, 16:03 UTC) and writes `version.json`. The game checks it,
+skipping all caches, when it starts and whenever you switch back to it; if a newer build is live it
+reloads into it. During a sortie it waits until you're back at the station. A new deploy takes
+about a minute to build, so give it a minute or two, then switch away from the app and back.
+
 ## Roadmap
 
 1. ✅ Flying prototype: stick flight, camera, buttons, Pages deploy

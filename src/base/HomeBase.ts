@@ -206,6 +206,11 @@ export class HomeBase {
   }
 
   /** Is a menu or conversation open? (Then the pilot doesn't walk.) */
+  /** Launching, or a menu or conversation is open (not a good moment to reload for an update). */
+  get busyLaunching(): boolean {
+    return this.launching >= 0 || this.busy;
+  }
+
   private get busy(): boolean {
     return this.ui.busy || this.convo.active;
   }

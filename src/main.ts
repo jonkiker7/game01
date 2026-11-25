@@ -5,6 +5,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import './style.css';
 import { audio } from './audio/Audio';
+import { BUILD, startUpdater, updateIfWaiting } from './Updater';
 import { BaseUI } from './base/BaseUI';
 import { ConversationUI } from './base/Conversation';
 import { HomeBase } from './base/HomeBase';
@@ -230,6 +231,7 @@ function setMode(m: Mode): void {
 }
 
 function goToBase(spawn: 'wake' | 'landed' = 'wake'): void {
+  updateIfWaiting(); // a newer build went live during the sortie: load it now
   setMode('base');
   audio.song('base');
   audio.setEngine(0);
@@ -722,7 +724,7 @@ function present(realDt: number): void {
   frames++;
   fpsTimer += realDt;
   if (fpsTimer >= 0.5) {
-    fpsEl.textContent = `${Math.round(frames / fpsTimer)} fps · ${quality.toUpperCase()}`;
+    fpsEl.textContent = `${Math.round(frames / fpsTimer)} fps · ${quality.toUpperCase()} · v${BUILD.slice(4)}`;
     frames = 0;
     fpsTimer = 0;
   }
@@ -745,3 +747,6 @@ if (new URLSearchParams(location.search).has('sortie')) {
 } else {
   goToBase();
 }
+
+// Load newer builds automatically (at the station, never mid-sortie).
+startUpdater(() => mode === 'base' && !base.busyLaunching);
