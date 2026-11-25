@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import type { Contract } from '../../base/Save';
 import { type Enemy, type EnemyManager, type Species, ZONE_SPECIES } from '../Enemies';
-import { SPECIES_NAMES } from '../EnemyTypes';
 import { type Boss, BOSS_NAMES, type BossId } from '../Bosses';
 import type { Hud } from '../Hud';
 import type { Blip } from '../Radar';
@@ -242,7 +241,7 @@ export class Run {
     this.phase = 'fight';
     audio.song(this.boss ? 'boss' : 'sortie');
     audio.play(this.boss ? 'bossAppear' : 'sectorStart');
-    hud.show(this.boss ? `BOSS · ${this.boss.name}` : `SECTOR ${s} · ${TITLES[this.kind]}`, 2.6);
+    hud.show(this.boss ? `BOSS · ${this.boss.name}` : TITLES[this.kind], 2.6); // just the mission (which sector doesn't matter)
   }
 
   /**
@@ -518,23 +517,23 @@ export class Run {
   /** What the HUD should say under the radar. */
   objective(): string {
     const line = this.d.contracts.objectiveLine(this.sector);
-    let text = this.baseObjective();
-    if (this.phase === 'fight' && this.pair.length) text += `\nVS ${this.pair.map((p) => SPECIES_NAMES[p]).join(' + ')}`;
+    const text = this.baseObjective();
     return line && this.phase !== 'over' ? `${text}\n${line}` : text;
   }
 
   private baseObjective(): string {
-    const head = this.sector === SECTORS ? 'FINAL SECTOR' : `SECTOR ${this.sector}/${SECTORS}`;
+    // The mission's name, then what's left to do (missions write both lines themselves).
+    const head = this.boss ? this.boss.name : this.mission ? this.mission.title : TITLES[this.kind];
     switch (this.phase) {
       case 'fight':
         if (this.boss) return `${head}\n${this.boss.objectiveLine()}`;
-        if (this.mission) return `${head}\n${this.mission.objective()}`;
+        if (this.mission) return this.mission.objective();
         if (this.kind === 'survive') {
           if (this.timer <= 0 && this.d.contracts.blocking) return `${head}\nDESTROY THE ALPHA`;
-          return `${head}\nSURVIVE · ${Math.ceil(Math.max(0, this.timer))}s`;
+          return `${head}\n${Math.ceil(Math.max(0, this.timer))}s LEFT`;
         }
         if (this.d.enemies.turretsLeft === 0 && this.d.contracts.blocking) return `${head}\nDESTROY THE ALPHA`;
-        return `${head}\nDESTROY THE TOWERS · ${this.d.enemies.turretsLeft} LEFT`;
+        return `${head}\n${this.d.enemies.turretsLeft} TOWERS LEFT`;
       case 'reward':
         return `${head}\nCOLLECT ${REWARD_STYLE[this.reward].label.slice(2)}`;
       case 'choosing':
