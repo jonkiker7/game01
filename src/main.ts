@@ -4,6 +4,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import './style.css';
+import { audio } from './audio/Audio';
 import { BaseUI } from './base/BaseUI';
 import { ConversationUI } from './base/Conversation';
 import { HomeBase } from './base/HomeBase';
@@ -115,7 +116,11 @@ const pickups = new Pickups(scene, effects);
 const pickupTarget = new THREE.Vector3();
 // All hits go through Combat so Arc / Cryo / Plasma upgrades can react.
 const combat = new Combat(enemies, effects, () => ship.stats);
-for (const g of allGuns) g.onHit = (t, dmg) => combat.hit(t, dmg, 'gun');
+for (const g of allGuns)
+  g.onHit = (t, dmg) => {
+    combat.hit(t, dmg, 'gun');
+    audio.play('hit');
+  };
 
 // ---- Nova (special ability): charges from damage dealt ----
 const NOVA_COST = 350; // damage dealt to fill the charge
@@ -123,7 +128,9 @@ const NOVA_RADIUS = 26;
 const NOVA_DAMAGE = 90;
 let specialCharge = 0;
 combat.onDamage = (amount) => {
+  const was = specialCharge;
   specialCharge = Math.min(1, specialCharge + (amount / NOVA_COST) * ship.stats.specialChargeMul);
+  if (was < 1 && specialCharge >= 1) audio.play('novaReady');
 };
 
 // ---- Cluster bomblets waiting to go off ----
@@ -133,7 +140,7 @@ const radar = new Radar($('hud'));
 
 // ?debug in the URL exposes game objects for automated tests and console tinkering.
 if (new URLSearchParams(location.search).has('debug')) {
-  Object.assign(window, { __game: { get rig() { return rig; }, ship, enemies, enemyShots, missiles, pickups, combat, mortars, save, get base() { return base; }, get run() { return run; }, chargeNova: () => (specialCharge = 1) } });
+  Object.assign(window, { __game: { audio, get rig() { return rig; }, ship, enemies, enemyShots, missiles, pickups, combat, mortars, save, get base() { return base; }, get run() { return run; }, chargeNova: () => (specialCharge = 1) } });
 }
 
 const rig = new CameraRig(window.innerWidth / window.innerHeight);
@@ -219,6 +226,8 @@ function setMode(m: Mode): void {
 
 function goToBase(spawn: 'wake' | 'landed' = 'wake'): void {
   setMode('base');
+  audio.song('base');
+  audio.setEngine(0);
   base.enter(spawn);
 }
 
@@ -255,6 +264,21 @@ function showDevPanel(on: boolean): void {
 }
 if (devModeOn()) showDevPanel(true);
 
+// ---------- Sound on/off button (top of the screen, at the base and in sorties) ----------
+$('hud').insertAdjacentHTML('beforeend', '<button id="btn-sound" aria-label="Sound on or off"></button>');
+const soundBtn = $('btn-sound');
+const showSound = () => {
+  soundBtn.textContent = audio.volumes.muted ? '🔇' : '🔊';
+  soundBtn.classList.toggle('off', audio.volumes.muted);
+};
+showSound();
+soundBtn.addEventListener('pointerdown', (e) => {
+  e.stopPropagation();
+  audio.setVolumes({ muted: !audio.volumes.muted });
+  showSound();
+  audio.play('uiTap');
+});
+
 // ---------- Pause menu ----------
 const pauseMenu = new PauseMenu($('hud'));
 let menuPaused = false;
@@ -262,6 +286,7 @@ function openPause(): void {
   if (mode !== 'run' || paused || menuPaused || run.phase === 'over' || run.phase === 'transition') return;
   menuPaused = true;
   input.releaseAll();
+  audio.play('uiConfirm');
   const r = run;
   const active = save.contracts.active;
   pauseMenu.show({
@@ -276,6 +301,7 @@ function openPause(): void {
 }
 function closePause(): void {
   menuPaused = false;
+  audio.play('uiTap');
   pauseMenu.hide();
   input.releaseAll();
 }
@@ -319,15 +345,21 @@ ship.onBoost = () => {
   rig.kick(12, 0.6);
   input.vibrate(30);
   effects.boostBurst(ship.root.position);
+  audio.play('boost');
 };
-ship.onRoll = () => {
+ship.onRoll = (dir) => {
+  audio.play('roll', { pan: dir * 0.5 });
   rig.kick(6, 0.4);
   input.vibrate(18);
 };
-ship.onFullCharge = () => input.vibrate(15);
+ship.onFullCharge = () => {
+  input.vibrate(15);
+  audio.play('chargeFull');
+};
 ship.onMissileEmpty = () => {
   hud.missileEmpty();
   input.vibrate(8);
+  audio.play('missileEmpty');
 };
 /** The enemy a missile would lock onto right now (closest one near the aim line, within range). */
 function missileLock(charge: number, heading: number) {
@@ -351,12 +383,14 @@ ship.onMissile = (charge, heading) => {
     missiles.fire(p, heading, charge, missileLock(charge, heading));
   }
   rig.kick(1 + charge * 2, 0.15);
+  audio.play('missile', { pitch: 1.15 - charge * 0.3 });
 };
 ship.onHit = () => {
   freeze(0.05);
   hud.flashDamage();
   rig.kick(0, 0.6);
   input.vibrate(40);
+  audio.play('playerHit');
 };
 ship.onDeath = () => {
   freeze(0.18);
@@ -364,6 +398,8 @@ ship.onDeath = () => {
   effects.explosion(p, 7, world.heightAt(p.x, p.z));
   rig.kick(4, 2);
   input.vibrate(200);
+  audio.play('shipDown');
+  audio.setEngine(0);
   hud.show('SHIP DOWN');
   run.onDeath();
 };
@@ -371,6 +407,7 @@ pickups.onCollect = (heal) => {
   ship.heal(heal);
   hud.flashHeal();
   input.vibrate(25);
+  audio.play('heal');
 };
 
 missiles.onExplode = (pos, power) => {
@@ -390,6 +427,7 @@ missiles.onExplode = (pos, power) => {
   }
   rig.kick(0, 0.5 + power * 0.9);
   input.vibrate(25 + Math.round(power * 30));
+  audio.play('explosionBig', { volume: swarm ? 0.45 : 0.6 + power * 0.4, pitch: 1.2 - power * 0.3 });
 };
 enemies.onKill = (kind, pos, enemy) => {
   run.onKill(kind, enemy);
@@ -400,6 +438,7 @@ enemies.onKill = (kind, pos, enemy) => {
     pickups.drop(pos, pickupTarget);
   }
   const big = kind !== 'drone';
+  audio.play(big ? 'explosionBig' : 'explosionSmall');
   freeze(big ? 0.08 : 0.05);
   rig.kick(0, big ? 1 : 0.6);
   input.vibrate(30);
@@ -426,6 +465,7 @@ function updateGun(dt: number): void {
   ship.getMuzzle(barrel, muzzlePos);
   barrel = 1 - barrel;
   ship.flashMuzzle();
+  audio.play(weapon === 'machinegun' ? 'gun' : weapon);
 
   // Bullets always fly level. Aim assist turns them toward where an enemy appears on screen;
   // hits are judged on screen too (see Bullets.update), so towers below can still be hit.
@@ -467,6 +507,7 @@ function fireNova(): void {
   mortars.clear();
   enemies.damageAt(p, radius, NOVA_DAMAGE, (t, amt) => combat.hit(t, amt, 'nova'));
   effects.nova(p, radius);
+  audio.play('nova');
   freeze(0.1);
   rig.kick(10, 1.4);
   input.vibrate(80);
@@ -542,6 +583,10 @@ let frames = 0;
 let fpsTimer = 0;
 let last = performance.now();
 
+let wasCharging = false;
+let lastLock: unknown = null;
+let wasDucked = false;
+
 /** One step of the sortie's game logic (movement, enemies, shots, effects). */
 function simulate(dt: number): void {
   if (paused || menuPaused) dt = 0; // upgrade screen or pause menu is open: the world holds still
@@ -579,6 +624,7 @@ function simulate(dt: number): void {
     effects.explosion(bombletPos, 2.8 * st.missileRadiusMul, world.heightAt(bm.x, bm.z));
     enemies.damageAt(bombletPos, 3.5 * st.missileRadiusMul, 22 * st.missileDamageMul, (t, amt) => combat.hit(t, amt, 'bomblet'));
     rig.kick(0, 0.2);
+    audio.play('explosionSmall', { volume: 0.6 });
   }
   pickups.healMul = ship.stats.healMul;
   enemies.update(dt, ship, enemyShots, mortars, rig.camera);
@@ -592,7 +638,13 @@ function simulate(dt: number): void {
     for (let i = 0; i < 2; i++) effects.trail(ship.getEngine(i, enginePos));
   }
   effects.update(dt, rig.lookTarget);
-  aim.update(dt, ship, ship.isCharging ? missileLock(ship.charge, ship.aimHeading) : null);
+  const lock = ship.isCharging ? missileLock(ship.charge, ship.aimHeading) : null;
+  aim.update(dt, ship, lock);
+  // Sounds: starting a charge, and each new lock-on.
+  if (ship.isCharging && !wasCharging) audio.play('charge');
+  wasCharging = ship.isCharging;
+  if (lock && lock !== lastLock) audio.play('lock');
+  lastLock = lock;
   world.update(dt);
 }
 
@@ -644,6 +696,12 @@ renderer.setAnimationLoop((now: number) => {
   run.blips(blips);
   radar.draw(ship.root.position.x, ship.root.position.z, ship.heading, blips, elapsed, { outline: run.shape.outline });
   hud.update(dt);
+
+  // Engine hum rises with speed; music muffles while a menu or power-up choice is open.
+  const top = TUNING.ship.maxSpeed * ship.stats.speedMul;
+  audio.setEngine(ship.alive && !paused && !menuPaused ? 0.15 + 0.85 * Math.min(1, Math.hypot(ship.velocity.x, ship.velocity.y) / top) : 0, ship.isBoosting);
+  const ducked = paused || menuPaused;
+  if (ducked !== wasDucked) audio.setDucked((wasDucked = ducked));
 
   present(realDt);
 });

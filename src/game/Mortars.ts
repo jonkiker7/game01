@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { audio } from '../audio/Audio';
 import type { Effects } from './Effects';
 import { glow } from './materials';
 import { TUNING } from './Tuning';
@@ -98,6 +99,7 @@ export class Mortars {
     m.duration = duration ?? THREE.MathUtils.clamp(dist / TUNING.towerBombs.speed, 0.65, 2);
     m.t = 0;
     m.active = true;
+    audio.play('mortarLaunch', { volume: 0.8 });
     m.obj.visible = true;
     m.obj.position.copy(from);
     m.marker.position.set(m.to.x, m.to.y - 0.6, m.to.z);
@@ -132,6 +134,7 @@ export class Mortars {
         m.obj.visible = false;
         m.marker.visible = false;
         this.effects.explosion(m.to, m.radius * 0.9, groundY(m.to.x, m.to.z));
+        audio.play('mortarImpact');
         const s = ship.root.position;
         // Hit if any part of the ship is inside the ring.
         if (Math.hypot(s.x - m.to.x, s.z - m.to.z) < m.radius + ship.radius) ship.damage(m.damage);

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { audio } from '../audio/Audio';
 import type { Input } from '../game/Input';
 import { addOutlines, glow } from '../game/materials';
 import { approachAngle, damp } from '../game/math';
@@ -295,6 +296,7 @@ export class HomeBase {
     const near = this.pilot.root.visible;
     for (const d of this.doors) {
       const want = near && Math.hypot(p.x - d.x, p.z - d.z) < DOOR_RANGE ? 1 : 0;
+      if (want && d.open < 0.02) audio.play('door');
       d.open = damp(d.open, want, want ? 9 : 5, dt);
       const slide = d.open * (d.half - 0.15);
       d.left.position.x = -slide;
@@ -601,6 +603,7 @@ export class HomeBase {
 
   private startLaunch(): void {
     this.launching = 0;
+    audio.play('launch');
     this.launchFrom.copy(this.pilot.root.position);
     this.setGuide(null);
   }

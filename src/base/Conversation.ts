@@ -1,3 +1,4 @@
+import { audio } from '../audio/Audio';
 import { CALLSIGN, CHARACTERS, type CharacterId, type Mood } from '../content/characters';
 import type { Line } from '../content/dialogue';
 import { portraitUrl } from './Portraits';
@@ -180,6 +181,7 @@ export class ConversationUI {
     this.text.textContent = '';
     this.typing = window.setInterval(() => {
       this.shown = Math.min(this.full.length, this.shown + 2);
+      if (this.full[this.shown - 1] !== ' ') audio.play('talk');
       this.text.textContent = this.full.slice(0, this.shown);
       if (this.shown >= this.full.length) {
         window.clearInterval(this.typing);
