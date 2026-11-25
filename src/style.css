@@ -1216,13 +1216,15 @@ body.in-convo #guide-tag {
 
 /* ---- Dev panel (?dev) ---- */
 #dev-panel {
+  /* On the left, below the armor bar and pause button, so the ship (centre) stays visible. */
   position: fixed;
-  top: calc(6px + env(safe-area-inset-top));
-  left: 50%;
-  transform: translateX(-50%);
-  max-height: 88vh;
+  top: calc(100px + env(safe-area-inset-top));
+  left: calc(8px + env(safe-area-inset-left));
+  width: 250px;
+  max-height: calc(100vh - 110px - env(safe-area-inset-top));
+  overflow-y: auto;
+  touch-action: pan-y;
   z-index: 50;
-  --width: 270px;
   font-size: 12px;
 }
 
