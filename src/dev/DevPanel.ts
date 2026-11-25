@@ -1,7 +1,7 @@
 import GUI from 'lil-gui';
 import * as THREE from 'three';
 import type { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import type { SunShadows } from '../game/Shadows';
+import type { ShadowMode, SunShadows } from '../game/Shadows';
 import { TUNING } from '../game/Tuning';
 import { CANYON_FOG } from '../game/World';
 
@@ -22,6 +22,18 @@ export interface DevHooks {
   setCanyonFog: (color: string, density: number, height: number) => void;
   /** Whether HIGH quality is on (real shadows only exist on HIGH). */
   isHigh: () => boolean;
+  /** Shadow mode (baked / live / off) and strength 0..1. */
+  setShadows: (mode: ShadowMode, strength: number) => void;
+  getShadowMode: () => ShadowMode;
+  /** Re-bake the arena's shadows (after the sun moves). */
+  rebake: () => void;
+  /** Live numbers for the Performance section. */
+  perf: { fps: number; frameMs: number; cpuMs: number; drawCalls: number; triangles: number; bakeMs: number };
+  setQuality: (q: 'high' | 'low') => void;
+  getQuality: () => 'high' | 'low';
+  setResScale: (v: number) => void;
+  setOutlines: (on: boolean) => void;
+  setProps: (on: boolean) => void;
 }
 
 const KEY = 'star-rotor-dev';
@@ -33,7 +45,7 @@ const LOOK_DEFAULTS = {
   sunAngle: 79, // compass direction the sunlight comes from
   sunHeight: 31, // degrees above the horizon (lower = longer shadows)
   rimLight: 2.8,
-  shadows: true,
+  shadowMode: 'baked' as ShadowMode,
   shadowDarkness: 1,
   shadowArea: 190,
   glowStrength: 0.35,
@@ -52,24 +64,32 @@ const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 const TUNING_DEFAULTS = clone(TUNING);
 
 export function openDevPanel(h: DevHooks): void {
-  const look: Look = { ...LOOK_DEFAULTS };
+  const look: Look = { ...LOOK_DEFAULTS, shadowMode: h.getShadowMode() };
   // Restore what was set last time on this device.
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? 'null') as { look?: Partial<Look>; tuning?: typeof TUNING } | null;
-    if (saved?.look) Object.assign(look, saved.look);
+    if (saved?.look) Object.assign(look, { ...saved.look, shadowMode: h.getShadowMode() }); // the game remembers the mode itself
+    if (!['baked', 'live', 'off'].includes(look.shadowMode)) look.shadowMode = 'baked';
     if (saved?.tuning) for (const k of Object.keys(TUNING) as (keyof typeof TUNING)[]) Object.assign(TUNING[k], saved.tuning[k] ?? {});
   } catch {
     /* ignore a broken save */
   }
 
+  let lastShadow = '';
+  let lastSun = '';
   const apply = () => {
     h.sun.intensity = look.sunIntensity;
     h.sun.color.set(look.sunColor);
     h.shadows.setDirection(look.sunAngle, look.sunHeight);
     h.rim.intensity = look.rimLight;
-    h.shadows.enabled = look.shadows && h.isHigh();
-    h.shadows.darkness = look.shadowDarkness;
     h.shadows.area = look.shadowArea;
+    // Shadows re-bake only when something that affects them changed (baking takes a moment).
+    const shadowKey = `${look.shadowMode}|${look.shadowDarkness}`;
+    const sunKey = `${look.sunAngle}|${look.sunHeight}`;
+    if (shadowKey !== lastShadow) h.setShadows(look.shadowMode, look.shadowDarkness);
+    else if (sunKey !== lastSun) h.rebake();
+    lastShadow = shadowKey;
+    lastSun = sunKey;
     h.bloom.strength = look.glowStrength;
     h.bloom.radius = look.glowSpread;
     h.bloom.threshold = look.glowThreshold;
@@ -104,10 +124,30 @@ export function openDevPanel(h: DevHooks): void {
   light.add(look, 'sunHeight', 15, 89, 1).name('sun height °').onChange(changed);
   light.add(look, 'rimLight', 0, 3, 0.05).name('blue rim light').onChange(changed);
 
-  const shade = gui.addFolder('Shadows (HIGH quality)');
-  shade.add(look, 'shadows').name('on').onChange(changed);
+  const shade = gui.addFolder('Shadows');
+  shade.add(look, 'shadowMode', { 'baked (terrain once per arena)': 'baked', 'live (all, every frame)': 'live', off: 'off' }).name('mode').onChange(changed);
   shade.add(look, 'shadowDarkness', 0, 1, 0.05).name('darkness').onChange(changed);
-  shade.add(look, 'shadowArea', 60, 250, 5).name('area (bigger = blurrier)').onChange(changed);
+  shade.add(look, 'shadowArea', 60, 250, 5).name('live area (bigger = blurrier)').onChange(changed);
+
+  // ---- Performance: live numbers, and switches to see what each feature costs (not saved).
+  const perfF = gui.addFolder('Performance');
+  const p = h.perf;
+  perfF.add(p, 'fps').name('fps').listen().disable();
+  perfF.add(p, 'frameMs').name('frame time ms').listen().disable();
+  perfF.add(p, 'cpuMs').name('game code ms').listen().disable();
+  perfF.add(p, 'drawCalls').name('draw calls').listen().disable();
+  perfF.add(p, 'triangles').name('triangles').listen().disable();
+  perfF.add(p, 'bakeMs').name('last shadow bake ms').listen().disable();
+  const sw = { quality: h.getQuality(), glow: true, outlines: true, plants: true, resolution: 1 };
+  perfF.add(sw, 'quality', { HIGH: 'high', LOW: 'low' }).name('quality').onChange((q: 'high' | 'low') => h.setQuality(q));
+  perfF.add(sw, 'glow').name('glow (bloom)').onChange((on: boolean) => (h.bloom.enabled = on));
+  perfF.add(sw, 'outlines').name('ink outlines').onChange((on: boolean) => h.setOutlines(on));
+  perfF.add(sw, 'plants').name('trees, plants, rocks').onChange((on: boolean) => h.setProps(on));
+  perfF.add(sw, 'resolution', 0.4, 1, 0.05).name('resolution ×').onChange((v: number) => h.setResScale(v));
+  // New enemies come with outlines: keep them hidden while the switch is off.
+  setInterval(() => {
+    if (!sw.outlines) h.setOutlines(false);
+  }, 1000);
 
   const canyon = gui.addFolder('Canyon fog');
   canyon.addColor(look, 'canyonFogColor').name('colour').onChange(changed);

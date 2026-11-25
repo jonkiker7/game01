@@ -103,8 +103,9 @@ export function buildStation(scene: THREE.Scene): StationParts {
       const gaps = room.gaps.filter((x) => x.side === side);
       const windows = (room.windows ?? []).filter((x) => x.side === side);
       const near = side === 's' || side === 'e' ? room.id : undefined;
-      buildWallLine(g, parts, m, room.rect, side, gaps, windows, () => [room.level, room.level], room.height, [], near);
-      for (const gap of gaps) doorway(g, parts, m, room.rect, side, gap.a, gap.b, room.level, room.height, room.id === 'hangar' && side === 'n', near);
+      const h = room.sideHeights?.[side] ?? room.height;
+      buildWallLine(g, parts, m, room.rect, side, gaps, windows, () => [room.level, room.level], h, [], near);
+      for (const gap of gaps) doorway(g, parts, m, room.rect, side, gap.a, gap.b, room.level, h, room.id === 'hangar' && side === 'n', near);
     }
   }
   for (const [ci, c] of CORRIDORS.entries()) {

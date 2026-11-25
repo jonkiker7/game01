@@ -37,7 +37,7 @@ import { defaultStats } from './game/run/Upgrades';
 import { RunUI } from './game/run/RunUI';
 import { Ship } from './game/Ship';
 import { TUNING } from './game/Tuning';
-import { SunShadows } from './game/Shadows';
+import { ShadowBaker, type ShadowMode, SunShadows } from './game/Shadows';
 import { isShipDesign } from './game/ShipDesigns';
 import { World } from './game/World';
 
@@ -87,13 +87,49 @@ renderer.shadowMap.type = THREE.PCFShadowMap;
 const sunShadows = new SunShadows(sun, scene);
 sunShadows.setDirection(79, 31); // compass direction the light comes from, and height above the horizon
 sunShadows.darkness = 1;
-sunShadows.enabled = quality === 'high';
 const rim = new THREE.DirectionalLight('#5fd8ff', 2.8); // cool back light for colour contrast
 rim.position.set(30, 20, -40);
 scene.add(rim);
 
 // ---------- Game objects ----------
 const world = new World(scene);
+
+// ---------- Shadows: baked for the static arena, live only for moving things ----------
+const SHADOW_KEY = 'star-rotor-shadows';
+const baker = new ShadowBaker(renderer);
+let shadowMode: ShadowMode = (() => {
+  try {
+    const v = localStorage.getItem(SHADOW_KEY);
+    return v === 'live' || v === 'off' || v === 'baked' ? v : 'baked';
+  } catch {
+    return 'baked';
+  }
+})();
+let shadowStrength = 1;
+function rebakeShadows(): void {
+  if (shadowMode === 'baked') baker.bake(world.group, sunShadows.toSun, world.region());
+}
+/** Apply the shadow mode (and quality: live shadows only exist on HIGH). */
+function applyShadows(): void {
+  baker.strength = shadowMode === 'baked' ? 0.85 * shadowStrength : 0;
+  world.setStaticCasting(shadowMode === 'live');
+  sunShadows.enabled = shadowMode !== 'off' && quality === 'high';
+  sunShadows.darkness = shadowStrength;
+  rebakeShadows();
+}
+function setShadowMode(m: ShadowMode): void {
+  shadowMode = m;
+  try {
+    localStorage.setItem(SHADOW_KEY, m);
+  } catch {
+    /* private mode */
+  }
+  applyShadows();
+}
+world.patchGround = (mat) => baker.patch(mat);
+for (const o of world.group.children) if (o.userData.isGround) baker.patch((o as THREE.Mesh).material as THREE.Material);
+world.onGenerated = () => rebakeShadows();
+applyShadows();
 const effects = new Effects(scene, (x, z) => world.heightAt(x, z));
 // Pick the ship design with ?ship=a|b|c|d (see designs.html); defaults to the Manta.
 const shipParam = new URLSearchParams(location.search).get('ship');
@@ -146,7 +182,7 @@ const radar = new Radar($('hud'));
 
 // ?debug in the URL exposes game objects for automated tests and console tinkering.
 if (new URLSearchParams(location.search).has('debug')) {
-  Object.assign(window, { __game: { audio, get rig() { return rig; }, ship, enemies, enemyShots, missiles, pickups, combat, mortars, save, get base() { return base; }, get run() { return run; }, chargeNova: () => (specialCharge = 1) } });
+  Object.assign(window, { __game: { audio, baker, get perf() { return perf; }, get rig() { return rig; }, ship, enemies, enemyShots, missiles, pickups, combat, mortars, save, get base() { return base; }, get run() { return run; }, chargeNova: () => (specialCharge = 1) } });
 }
 
 const rig = new CameraRig(window.innerWidth / window.innerHeight);
@@ -266,6 +302,26 @@ function showDevPanel(on: boolean): void {
       shadows: sunShadows,
       setCanyonFog: (c, d, h) => world.setCanyonFog(c, d, h),
       isHigh: () => quality === 'high',
+      setShadows: (mode, strength) => {
+        shadowStrength = strength;
+        setShadowMode(mode);
+      },
+      rebake: rebakeShadows,
+      getShadowMode: () => shadowMode,
+      perf,
+      setQuality: (q) => setQuality(q, true),
+      getQuality: () => quality,
+      setResScale: (v) => {
+        resScale = v;
+        resize();
+      },
+      setOutlines: (on) =>
+        [scene, base.scene].forEach((root) =>
+          root.traverse((o) => {
+            if (o.userData.isOutline) o.visible = on;
+          }),
+        ),
+      setProps: (on) => world.setProps(on),
     }),
   );
 }
@@ -521,11 +577,12 @@ function fireNova(): void {
 }
 
 // ---------- Resize & fullscreen ----------
+let resScale = 1; // dev panel: render resolution multiplier
 function resize(): void {
   const w = window.innerWidth;
   const h = window.innerHeight;
   // Phones have very dense screens; capping the pixel ratio keeps the frame rate up.
-  const ratio = Math.min(window.devicePixelRatio, quality === 'high' ? 1.75 : 1.25);
+  const ratio = Math.min(window.devicePixelRatio, quality === 'high' ? 1.75 : 1.25) * resScale;
   renderer.setPixelRatio(ratio);
   renderer.setSize(w, h);
   composer.setPixelRatio(ratio);
@@ -536,7 +593,7 @@ function resize(): void {
 
 function setQuality(q: Quality, remember: boolean): void {
   quality = q;
-  sunShadows.enabled = q === 'high'; // real shadows on HIGH; LOW keeps just the blob shadows
+  applyShadows(); // live shadows on HIGH only; baked ones cost almost nothing, so they stay on LOW
   if (remember) {
     qualityChosen = true;
     try {
@@ -656,7 +713,9 @@ function simulate(dt: number): void {
   world.update(dt);
 }
 
+let frameStart = 0;
 renderer.setAnimationLoop((now: number) => {
+  frameStart = performance.now();
   const realDt = Math.min((now - last) / 1000, MAX_DT); // clamp so a hiccup doesn't teleport the ship
   last = now;
   elapsed += realDt;
@@ -714,12 +773,32 @@ renderer.setAnimationLoop((now: number) => {
   present(realDt);
 });
 
+/** Numbers for the dev panel's Performance section. */
+const perf = { fps: 0, frameMs: 0, cpuMs: 0, drawCalls: 0, triangles: 0, bakeMs: 0 };
+let perfCpu = 0;
+let perfCount = 0;
+let perfAcc = 0;
+renderer.info.autoReset = false; // count every pass of a frame (shadows, scene, glow) together
+
 /** Draw the frame (base or sortie), then housekeeping: input, fps readout, auto quality. */
 function present(realDt: number): void {
   if (quality === 'high') composer.render(realDt);
   else if (mode === 'base') renderer.render(base.scene, base.camera);
   else renderer.render(scene, rig.camera);
   input.endFrame();
+  perf.drawCalls = renderer.info.render.calls;
+  perf.triangles = renderer.info.render.triangles;
+  renderer.info.reset();
+  perfCpu += performance.now() - frameStart;
+  perfAcc += realDt;
+  perfCount++;
+  if (perfAcc >= 0.5) {
+    perf.fps = Math.round(perfCount / perfAcc);
+    perf.frameMs = +((perfAcc / perfCount) * 1000).toFixed(1);
+    perf.cpuMs = +(perfCpu / perfCount).toFixed(1);
+    perf.bakeMs = Math.round(baker.lastBakeMs);
+    perfAcc = perfCpu = perfCount = 0;
+  }
 
   frames++;
   fpsTimer += realDt;

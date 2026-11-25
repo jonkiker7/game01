@@ -111,6 +111,34 @@ export class World {
     this.buildSpores(this.placer(0.5), per(600));
     this.buildEdgeTrees();
     castShadows(this.group);
+    // Everything that casts a shadow here is static: it can go into the baked shadows.
+    this.group.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh && o.castShadow) o.userData.bakeCaster = true;
+    });
+    this.setStaticCasting(this.staticCasting);
+    this.setProps(this.propsVisible);
+    this.onGenerated?.();
+  }
+
+  /** Called after each new arena is built (main re-bakes the shadows). */
+  onGenerated?: () => void;
+  /** Lets main add baked shadows to the ground material. */
+  patchGround?: (mat: THREE.Material) => void;
+  private staticCasting = true;
+  private propsVisible = true;
+
+  /** Whether the terrain, trees and rocks go into the live shadow map (off when baked). */
+  setStaticCasting(on: boolean): void {
+    this.staticCasting = on;
+    this.group.traverse((o) => {
+      if (o.userData.bakeCaster) o.castShadow = on;
+    });
+  }
+
+  /** Show or hide every plant, tree, rock and relic (for measuring what they cost). */
+  setProps(visible: boolean): void {
+    this.propsVisible = visible;
+    for (const o of this.group.children) if (!o.userData.isGround && !this.fogLayers.includes(o as THREE.Mesh)) o.visible = visible;
   }
 
   private seed = 1;
@@ -260,7 +288,7 @@ export class World {
   // ---------------------------------------------------------------- ground
 
   /** The area to build ground over: the arena, its tree band, and black ground beyond. */
-  private region(): { x0: number; z0: number; x1: number; z1: number } {
+  region(): { x0: number; z0: number; x1: number; z1: number } {
     const b = this.shape.bounds;
     const m = EDGE_BAND + EDGE_EXTRA;
     return { x0: b.x0 - m, z0: b.z0 - m, x1: b.x1 + m, z1: b.z1 + m };
@@ -329,6 +357,8 @@ export class World {
     ground.receiveShadow = true;
     ground.castShadow = true; // cliffs throw shadows down into the canyons
     ground.userData.noCast = true; // (castShadows() skips it; it's set by hand above)
+    ground.userData.isGround = true;
+    this.patchGround?.(ground.material as THREE.Material);
     this.group.add(ground);
     this.buildCanyonDecor();
   }

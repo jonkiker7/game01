@@ -40,6 +40,8 @@ export interface Room {
   level: number;
   /** Wall height (the concourse is taller and grander). */
   height: number;
+  /** A different height for some walls (e.g. the hangar's low entrance wall, so you can see in). */
+  sideHeights?: Partial<Record<Side, number>>;
   /** Openings in the floor, looking down into the depths of the station. */
   holes?: Rect[];
 }
@@ -92,7 +94,8 @@ export const ROOMS: Room[] = [
     rect: { x0: -21, z0: -54, x1: 21, z1: -22 },
     floor: '#bfb6a6',
     level: -4,
-    height: 16, // double height, so the ship clears the bay door on the way out
+    height: 16, // double height, so the ship clears the bay door
+    sideHeights: { s: 8 }, // ...except the entrance wall (the stairs side), kept low so you can see in on the way out
     gaps: [
       { side: 's', a: -4, b: 4 },
       { side: 'n', a: -11, b: 11 }, // the bay door to space, lined up with the entrance and pad
