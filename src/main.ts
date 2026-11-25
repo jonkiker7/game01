@@ -75,10 +75,8 @@ let qualityChosen = savedQuality() !== null; // if the player picked one, don't 
 // ---------- Scene & lighting ----------
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(JUNGLE.sky);
-scene.fog = new THREE.Fog(JUNGLE.sky, 80, 285);
-
-const hemi = new THREE.HemisphereLight(JUNGLE.hemiSky, JUNGLE.hemiGround, 0.8);
-scene.add(hemi);
+// No distance fog and no sky fill light: the canyon fog and the blue rim light do those jobs, and
+// leaving them out (rather than at zero) saves shader work on every surface.
 const sun = new THREE.DirectionalLight('#ffdcc4', 4.25);
 sun.position.set(-40, 60, 25);
 scene.add(sun);
@@ -246,7 +244,6 @@ function showDevPanel(on: boolean): void {
   import('./dev/DevPanel').then(({ openDevPanel }) =>
     openDevPanel({
       sun,
-      hemi,
       rim,
       scene,
       bloom,
