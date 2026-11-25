@@ -4,7 +4,7 @@
  *
  * - base:   slow and dreamy, for walking around the station
  * - sortie: driving, for missions
- * - boss:   faster and darker, for boss fights
+ * - boss:   same pace as the sortie song, lower and darker, for boss fights
  *
  * Each song can be replaced by your own looping file (`music-base`, `music-sortie`,
  * `music-boss` in public/sfx/sounds.json).
@@ -81,23 +81,25 @@ const SONGS: Record<SongId, Song> = {
     level: 1.25,
   },
   boss: {
-    bpm: 136,
+    // Same tempo as the sortie song, but an octave lower, in a dark minor key with a sparse,
+    // creeping pattern: more serious, not faster.
+    bpm: 118,
     chords: [
-      [-5, -2, 2, 7], // Em
-      [-9, -5, -2, 3], // C
-      [-7, -3, 0, 5], // D
-      [-10, -6, -3, 0], // B7
+      [-12, -9, -5, 0], // Am
+      [-11, -7, -4, 1], // Bb (the half-step up is what makes it ominous)
+      [-12, -9, -5, 0], // Am
+      [-17, -13, -10, -5], // E
     ],
     barsPerChord: 1,
-    bass: 'xxoxxxoxxxoxx5o5',
-    arp: '0123012301230123',
-    arpOctave: 12,
-    arpWave: 'sawtooth',
-    arpGain: 0.018,
-    kick: 'x..x..x.x..x..x.',
-    snare: '....x.......x.xx',
-    hat: 'xxxxxxxxxxxxxxxx',
-    pad: 0.012,
+    bass: 'x.x.x.x.x.x.x.x.',
+    arp: '0..1..2.3..2..1.',
+    arpOctave: 0,
+    arpWave: 'square',
+    arpGain: 0.03,
+    kick: 'x.......x.......',
+    snare: '....x.......x...',
+    hat: '..x...x...x...x.',
+    pad: 0.013,
     level: 1.3,
   },
 };
