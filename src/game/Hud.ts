@@ -130,7 +130,8 @@ export class Hud {
     this.objective.textContent = text;
   }
 
-  show(text: string, seconds = 2.2): void {
+  show(text: string, seconds = 2.2, big = false): void {
+    this.message.classList.toggle('big', big);
     this.message.textContent = text;
     this.message.classList.add('visible');
     this.messageTimer = seconds;
