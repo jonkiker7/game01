@@ -1225,3 +1225,158 @@ body.in-convo #guide-tag {
   --width: 270px;
   font-size: 12px;
 }
+
+/* ---- Pause button and pause menu ---- */
+#btn-pause {
+  position: absolute;
+  top: calc(56px + env(safe-area-inset-top));
+  left: calc(14px + env(safe-area-inset-left));
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 2px solid var(--gold-dim);
+  background: rgba(20, 6, 18, 0.65);
+  color: var(--gold);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: -1px;
+  pointer-events: auto;
+}
+
+body.mode-base #btn-pause {
+  display: none;
+}
+
+#pause {
+  z-index: 40;
+}
+
+#pause .panel {
+  width: min(92vw, 760px);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#pause h2 {
+  margin: 0;
+  text-align: center;
+  letter-spacing: 0.3em;
+}
+
+#pause .cols {
+  display: flex;
+  gap: 14px;
+  min-height: 0;
+  flex: 1;
+}
+
+#pause .ship-col {
+  flex: 0 0 34%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+#pause .ship-view {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 12px;
+  background: radial-gradient(circle at 50% 45%, rgba(111, 247, 255, 0.18), rgba(0, 0, 0, 0) 70%);
+}
+
+#pause .info-col {
+  flex: 1;
+  overflow-y: auto;
+  touch-action: pan-y;
+  min-height: 0;
+  padding-right: 4px;
+}
+
+#pause section {
+  margin-bottom: 8px;
+}
+
+#pause h3 {
+  margin: 0 0 4px;
+  font-family: var(--display);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: var(--gold);
+}
+
+#pause .row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  color: #e8dfcc;
+}
+
+#pause .row b {
+  color: #9ef3ff;
+  text-align: right;
+}
+
+#pause .info-col {
+  text-align: left;
+}
+
+#pause .line {
+  font-size: 12px;
+  color: #e8dfcc;
+  white-space: pre-line;
+}
+
+#pause .line.contract {
+  color: #ffc58a;
+}
+
+#pause .dim {
+  opacity: 0.55;
+  font-style: italic;
+}
+
+#pause .chip {
+  display: inline-block;
+  margin: 0 4px 4px 0;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: rgba(242, 196, 109, 0.12);
+  border: 1px solid rgba(242, 196, 109, 0.35);
+  font-size: 11px;
+  color: #e8dfcc;
+}
+
+#pause .chip small {
+  display: block;
+  opacity: 0.7;
+  font-size: 10px;
+}
+
+#pause .buttons {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+#pause .buttons button {
+  font-family: var(--display);
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  padding: 8px 18px;
+  border-radius: 20px;
+  border: 2px solid var(--gold-dim);
+  background: rgba(90, 14, 34, 0.9);
+  color: var(--gold);
+}
+
+#pause .buttons .dev {
+  background: rgba(30, 30, 50, 0.9);
+  color: #c8d0ff;
+  font-size: 11px;
+}
