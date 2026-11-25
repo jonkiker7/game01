@@ -237,7 +237,16 @@ composer.addPass(bloom);
 // Developer panel: `?dev` in the URL adds sliders for lighting, shadows, glow and tuning.
 if (new URLSearchParams(location.search).has('dev')) {
   import('./dev/DevPanel').then(({ openDevPanel }) =>
-    openDevPanel({ sun, hemi, rim, scene, bloom, shadows: sunShadows, isHigh: () => quality === 'high' }),
+    openDevPanel({
+      sun,
+      hemi,
+      rim,
+      scene,
+      bloom,
+      shadows: sunShadows,
+      setCanyonFog: (c, d, h) => world.setCanyonFog(c, d, h),
+      isHigh: () => quality === 'high',
+    }),
   );
 }
 composer.addPass(new OutputPass());

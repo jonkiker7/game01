@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import type { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import type { SunShadows } from '../game/Shadows';
 import { TUNING } from '../game/Tuning';
+import { CANYON_FOG } from '../game/World';
 
 /**
  * Developer panel (open the game with `?dev`): sliders for lighting, shadows, fog, glow, the
@@ -18,6 +19,8 @@ export interface DevHooks {
   scene: THREE.Scene;
   bloom: UnrealBloomPass;
   shadows: SunShadows;
+  /** Canyon fog (colour, density 0..1, height 0..1 of the canyon depth). */
+  setCanyonFog: (color: string, density: number, height: number) => void;
   /** Whether HIGH quality is on (real shadows only exist on HIGH). */
   isHigh: () => boolean;
 }
@@ -41,6 +44,9 @@ const LOOK_DEFAULTS = {
   glowSpread: 0.45,
   glowThreshold: 1.2,
   vignette: 0.7,
+  canyonFogColor: CANYON_FOG.color,
+  canyonFogDensity: CANYON_FOG.density,
+  canyonFogHeight: CANYON_FOG.height,
   vignetteSize: 52,
 };
 
@@ -75,6 +81,7 @@ export function openDevPanel(h: DevHooks): void {
     h.bloom.strength = look.glowStrength;
     h.bloom.radius = look.glowSpread;
     h.bloom.threshold = look.glowThreshold;
+    h.setCanyonFog(look.canyonFogColor, look.canyonFogDensity, look.canyonFogHeight);
     const root = document.documentElement.style;
     root.setProperty('--vig', String(look.vignette));
     root.setProperty('--vig-size', `${look.vignetteSize}%`);
@@ -109,6 +116,11 @@ export function openDevPanel(h: DevHooks): void {
   shade.add(look, 'shadows').name('on').onChange(changed);
   shade.add(look, 'shadowDarkness', 0, 1, 0.05).name('darkness').onChange(changed);
   shade.add(look, 'shadowArea', 60, 250, 5).name('area (bigger = blurrier)').onChange(changed);
+
+  const canyon = gui.addFolder('Canyon fog');
+  canyon.addColor(look, 'canyonFogColor').name('colour').onChange(changed);
+  canyon.add(look, 'canyonFogDensity', 0, 0.6, 0.01).name('density').onChange(changed);
+  canyon.add(look, 'canyonFogHeight', 0, 1, 0.01).name('height (0 = floor, 1 = rim)').onChange(changed);
 
   const post = gui.addFolder('Glow and vignette');
   post.add(look, 'glowStrength', 0, 3, 0.05).name('glow strength').onChange(changed);
