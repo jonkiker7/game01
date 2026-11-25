@@ -37,7 +37,7 @@ import { Ship } from './game/Ship';
 import { TUNING } from './game/Tuning';
 import { SunShadows } from './game/Shadows';
 import { isShipDesign } from './game/ShipDesigns';
-import { JUNGLE, World } from './game/World';
+import { World } from './game/World';
 
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
 
@@ -74,7 +74,7 @@ let qualityChosen = savedQuality() !== null; // if the player picked one, don't 
 
 // ---------- Scene & lighting ----------
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(JUNGLE.sky);
+scene.background = new THREE.Color('#000000'); // beyond the arena's tree band it's all black
 // No distance fog and no sky fill light: the canyon fog and the blue rim light do those jobs, and
 // leaving them out (rather than at zero) saves shader work on every surface.
 const sun = new THREE.DirectionalLight('#ffffff', 4.25);
@@ -270,7 +270,7 @@ function openPause(): void {
     ship: save.ship,
     levels: r.levels,
     perks: PERKS.map((p) => [p.name, save.perks[p.id] ?? 0, p.costs.length]),
-    objective: r.objective().split('\n').filter((l) => !l.startsWith('◆')), // the contract gets its own line
+    objective: [...r.objective().split('\n').filter((l) => !l.startsWith('◆')), `LEVEL SEED ${r.seed}`], // the contract gets its own line
     contract: active ? { title: active.title, sector: active.sector, status: contracts.objectiveLine(r.sector)?.replace('◆ ', '') ?? '' } : null,
   });
 }
@@ -537,6 +537,7 @@ const boostBtn = $('btn-boost');
 const rollBtns = [$('btn-roll-l'), $('btn-roll-r')];
 const specialBtn = $('btn-special');
 const aimLead = new THREE.Vector2();
+const camTarget = new THREE.Vector3();
 let frames = 0;
 let fpsTimer = 0;
 let last = performance.now();
@@ -629,7 +630,7 @@ renderer.setAnimationLoop((now: number) => {
   } else {
     aimLead.set(0, 0);
   }
-  rig.update(dt, ship.root.position, ship.velocity, aimLead);
+  rig.update(dt, run.cameraTarget(ship.root.position, camTarget), ship.velocity, aimLead);
   sunShadows.follow(rig.lookTarget.x, rig.lookTarget.z);
 
   boostBtn.style.setProperty('--cd', String(ship.boostCooldown / ship.stats.boostCooldown));
@@ -641,8 +642,7 @@ renderer.setAnimationLoop((now: number) => {
   specialBtn.classList.toggle('ready', specialCharge >= 1);
   hud.setObjective(run.objective());
   run.blips(blips);
-  const ac = run.arenaCenter;
-  radar.draw(ship.root.position.x, ship.root.position.z, ship.heading, blips, elapsed, { x: ac.x, z: ac.y, r: run.arenaRadius });
+  radar.draw(ship.root.position.x, ship.root.position.z, ship.heading, blips, elapsed, { outline: run.shape.outline });
   hud.update(dt);
 
   present(realDt);

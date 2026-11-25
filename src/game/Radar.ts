@@ -9,9 +9,8 @@ export interface Blip {
 
 /** The arena outline drawn on the radar. */
 export interface RadarArena {
-  x: number;
-  z: number;
-  r: number;
+  /** The arena edge as a closed loop of world points. */
+  outline: readonly { x: number; z: number }[];
 }
 
 const RANGE = 110; // world units from the ship to the radar's edge (about 2-3 screens)
@@ -82,7 +81,13 @@ export class Radar {
       g.lineWidth = 1.5;
       g.setLineDash([4, 3]);
       g.beginPath();
-      g.arc(c + ((arena.x - shipX) / RANGE) * R, c + ((arena.z - shipZ) / RANGE) * R, (arena.r / RANGE) * R, 0, Math.PI * 2);
+      arena.outline.forEach((p, i) => {
+        const px = c + ((p.x - shipX) / RANGE) * R;
+        const py = c + ((p.z - shipZ) / RANGE) * R;
+        if (i === 0) g.moveTo(px, py);
+        else g.lineTo(px, py);
+      });
+      g.closePath();
       g.stroke();
       g.setLineDash([]);
     }

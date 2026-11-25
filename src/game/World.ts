@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { castShadows } from './Shadows';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { GLOW, glow, outlineInstanced, toon } from './materials';
+import { blobArena, type ArenaShape } from './ArenaShape';
+import { GLOW, glow, outlineInstanced, outlineMaterial, toon } from './materials';
 import { fbm, mulberry32, smoothstep, valueNoise } from './math';
 
 /** Colours for one planet. Each new planet becomes a different palette + props. */
@@ -24,29 +25,6 @@ export const JUNGLE = {
   relic: ['#c9b04a', '#b39a3c', '#d6c063'],
   relicDark: '#5b5226',
 };
-
-/** The landing zone: home base and respawn point. */
-export const LANDING_PAD = { x: 0, z: 0, radius: 7 };
-
-/** Groups of enemy turrets. Coordinates are (x, z); the landing pad is at 0, 0. */
-export const OUTPOSTS: [number, number][] = [
-  // Each sector's arena is centred on one of these (see run/Run.ts); the first is next to the
-  // landing pad. Spread out so a sortie visits different parts of the jungle.
-  [0, -70],
-  [140, -120],
-  [-140, -110],
-  [170, 40],
-  [-170, 30],
-  [0, 110],
-  [110, 200],
-  [-120, 190],
-  [230, -230],
-  [-230, -230],
-  [240, 170],
-  [-240, 170],
-  [60, -240],
-  [-70, -240],
-];
 
 type Placer = (rand: () => number) => { x: number; z: number };
 
@@ -76,21 +54,10 @@ const LEDGE = 0.38;
 /** Canyon width (in ridge-noise units; bigger = wider canyons). */
 const CANYON_WIDTH = 0.1;
 
-/**
- * Spots that must stay solid rock: every arena centre (for every arena size the game clamps
- * them to; see run/Run.ts arenaAt).
- */
-const CLEAR_SPOTS: [number, number][] = (() => {
-  const out: [number, number][] = [];
-  for (const [x, z] of OUTPOSTS) {
-    for (const r of [110, 125, 130, 150, 180]) {
-      const lim = 354 - r;
-      const c: [number, number] = [Math.max(-lim, Math.min(lim, x)), Math.max(-lim, Math.min(lim, z))];
-      if (!out.some((o) => Math.hypot(o[0] - c[0], o[1] - c[1]) < 4)) out.push(c);
-    }
-  }
-  return out;
-})();
+/** Width of the band of tall trees outside the arena, which fades to black. */
+const EDGE_BAND = 38;
+/** Ground beyond the band (fully black), so the screen edges never show empty space. */
+const EDGE_EXTRA = 70;
 
 /**
  * An alien jungle: mossy ground with pale streams, purple-trunked trees, pink fan plants,
@@ -100,29 +67,87 @@ const CLEAR_SPOTS: [number, number][] = (() => {
  * plants keep clear of the landing pad and the turret outposts so enemies stay readable.
  */
 export class World {
-  readonly halfSize = 360;
+  /** Far bound for anything clamping to the map (arenas confine the ship themselves). */
+  readonly halfSize = 2000;
   readonly palette = JUNGLE;
   readonly group = new THREE.Group();
   private readonly bulbMat: THREE.MeshBasicMaterial;
-  private readonly padRing: THREE.Mesh;
   private readonly fogLayers: THREE.Mesh[] = [];
   private time = 0;
+  /** The current round's arena, and the noise offsets that make its terrain unique. */
+  shape: ArenaShape = blobArena(150, 1);
+  private ox = 0;
+  private oz = 0;
+  private fog = { ...CANYON_FOG };
 
   constructor(scene: THREE.Scene) {
     this.bulbMat = glow(this.palette.bulb);
-    this.buildGround();
-    this.buildTrees(this.placer(4, 12, 1.8));
-    this.buildGiantTrees(this.placer(10, 34, 0.8)); // well clear of towers so they never hide them
-    this.buildPinkFans(this.placer(1, 9, 1.2));
-    this.buildBulbStalks(this.placer(2, 9, 1));
-    this.buildFerns(this.placer(0, 7, 0.6));
-    this.buildRocks(this.placer(3, 9, 0.3));
-    this.buildRelics(this.placer(9, 12, 0));
-    this.buildSpores(this.placer(0, 6, 0.5));
-    this.buildBorder();
-    this.padRing = this.buildLandingPad();
-    castShadows(this.group);
     scene.add(this.group);
+    this.generate(this.shape, 1);
+  }
+
+  /**
+   * Build a fresh level for an arena: new hills and canyons (from `seed`), jungle on the rock
+   * tops inside it, and a few rows of tall trees outside that fade to black.
+   */
+  generate(shape: ArenaShape, seed: number): void {
+    this.clear();
+    this.shape = shape;
+    const rand = mulberry32(seed * 977 + 3);
+    this.ox = (rand() - 0.5) * 9000;
+    this.oz = (rand() - 0.5) * 9000;
+    this.seed = seed;
+    const area = this.arenaArea();
+    // Prop counts were tuned for a 720×720 map: scale them to this arena's area.
+    const per = (n: number) => Math.round((n * area) / (720 * 720));
+    this.buildGround();
+    this.buildTrees(this.placer(1.8), per(1500));
+    this.buildGiantTrees(this.placer(0.8), per(190));
+    this.buildPinkFans(this.placer(1.2), per(2400));
+    this.buildBulbStalks(this.placer(1), per(460));
+    this.buildFerns(this.placer(0.6), per(4000));
+    this.buildRocks(this.placer(0.3), per(300));
+    this.buildRelics(this.placer(0), Math.max(2, per(45)));
+    this.buildSpores(this.placer(0.5), per(600));
+    this.buildEdgeTrees();
+    castShadows(this.group);
+  }
+
+  private seed = 1;
+
+  /** Remove (and free) the previous level. */
+  private clear(): void {
+    const shared = outlineMaterial();
+    this.group.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      m.geometry?.dispose();
+      const mats = Array.isArray(m.material) ? m.material : [m.material];
+      for (const mat of mats) if (mat && mat !== shared && mat !== this.bulbMat) mat.dispose();
+    });
+    this.group.clear();
+    this.fogLayers.length = 0;
+  }
+
+  /** Rough area of the arena (for scaling prop counts). */
+  private arenaArea(): number {
+    const b = this.shape.bounds;
+    let inside = 0;
+    const n = 40;
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        const x = b.x0 + ((i + 0.5) / n) * (b.x1 - b.x0);
+        const z = b.z0 + ((j + 0.5) / n) * (b.z1 - b.z0);
+        if (this.shape.depth(x, z) > 0) inside++;
+      }
+    }
+    return (inside / (n * n)) * (b.x1 - b.x0) * (b.z1 - b.z0);
+  }
+
+  /** 0 inside the arena, rising to 1 (black) at the outer edge of the tree band. */
+  darkAt(x: number, z: number): number {
+    const out = -this.shape.depth(x, z);
+    return smoothstep(0, EDGE_BAND, out);
   }
 
   /**
@@ -131,10 +156,7 @@ export class World {
    * ground (down in a canyon) and `isRock` to check there's solid ground.
    */
   heightAt(x: number, z: number): number {
-    const hills = (fbm(x * 0.016, z * 0.016, 3) - 0.5) * 6;
-    // Flatten the area around the landing pad at the centre.
-    const flat = smoothstep(10, 26, Math.hypot(x, z));
-    return hills * flat;
+    return (fbm((x + this.ox) * 0.016, (z + this.oz) * 0.016, 3) - 0.5) * 6;
   }
 
   /**
@@ -152,6 +174,7 @@ export class World {
    * bottom), `height` how far up the canyon it reaches (0..1 of the depth).
    */
   setCanyonFog(color: string, density: number, height: number): void {
+    this.fog = { color, density, height };
     const floor = -CANYON_DEPTH + 1;
     this.fogLayers.forEach((layer, i) => {
       const k = i / (FOG_LAYERS - 1); // 0 = the bottom layer, 1 = the top one
@@ -180,6 +203,7 @@ export class World {
 
   /** Is (x, z) on a rock top, with at least `margin` units of rock around it? */
   isRock(x: number, z: number, margin = 0): boolean {
+    if (this.shape.depth(x, z) < margin + 3) return false; // inside the arena, too
     if (this.canyonT(x, z) > 0) return false;
     if (margin <= 0) return true;
     for (let i = 0; i < 8; i++) {
@@ -209,15 +233,20 @@ export class World {
    * canyon (1 = its centre line). Arena centres and the landing pad are always solid rock.
    */
   private canyonT(x: number, z: number): number {
-    const ridgeA = 1 - Math.abs(fbm(x * 0.0072 + 31, z * 0.0072 - 17, 3) - 0.5) * 2;
-    const ridgeB = 1 - Math.abs(fbm(x * 0.0115 - 60, z * 0.0115 + 44, 2) - 0.5) * 2;
+    const nx = x + this.ox;
+    const nz = z + this.oz;
+    const ridgeA = 1 - Math.abs(fbm(nx * 0.0072 + 31, nz * 0.0072 - 17, 3) - 0.5) * 2;
+    const ridgeB = 1 - Math.abs(fbm(nx * 0.0115 - 60, nz * 0.0115 + 44, 2) - 0.5) * 2;
     const r = Math.max(ridgeA, ridgeB * 0.985);
-    const w = CANYON_WIDTH * (0.75 + valueNoise(x * 0.012 + 5, z * 0.012 - 9) * 0.6);
+    const w = CANYON_WIDTH * (0.75 + valueNoise(nx * 0.012 + 5, nz * 0.012 - 9) * 0.6);
     let t = (r - (1 - w)) / w;
     if (t <= 0) return 0;
-    // Keep solid rock around the landing pad and every arena centre.
-    let clear = smoothstep(32, 48, Math.hypot(x, z));
-    for (const [cx, cz] of CLEAR_SPOTS) clear = Math.min(clear, smoothstep(26, 40, Math.hypot(x - cx, z - cz)));
+    // Solid rock around the arena's centre and where you fly in, and canyons die out toward
+    // the arena edge (the trees outside stand on solid ground).
+    const sh = this.shape;
+    let clear = smoothstep(26, 42, Math.hypot(x - sh.center.x, z - sh.center.z));
+    clear = Math.min(clear, smoothstep(14, 26, Math.hypot(x - sh.entry.x, z - sh.entry.z)));
+    clear = Math.min(clear, smoothstep(4, 18, sh.depth(x, z)));
     t = t * 1.25 - (1 - clear) * 1.3;
     return t;
   }
@@ -226,17 +255,25 @@ export class World {
     this.time += dt;
     const pulse = 0.8 + Math.sin(this.time * 2.2) * 0.2;
     this.bulbMat.color.set(this.palette.bulb).multiplyScalar(GLOW * pulse);
-    (this.padRing.material as THREE.MeshBasicMaterial).opacity = 0.45 + Math.sin(this.time * 3) * 0.25;
   }
 
   // ---------------------------------------------------------------- ground
 
+  /** The area to build ground over: the arena, its tree band, and black ground beyond. */
+  private region(): { x0: number; z0: number; x1: number; z1: number } {
+    const b = this.shape.bounds;
+    const m = EDGE_BAND + EDGE_EXTRA;
+    return { x0: b.x0 - m, z0: b.z0 - m, x1: b.x1 + m, z1: b.z1 + m };
+  }
+
   private buildGround(): void {
-    const size = this.halfSize * 2 + 200;
-    const seg = 380; // ~2.4 units per cell: canyon walls drop across one cell, so they read as cliffs
-    const cell = size / seg;
-    const geo = new THREE.PlaneGeometry(size, size, seg, seg);
+    const r = this.region();
+    const cell = 2.4; // canyon walls drop across one cell, so they read as cliffs
+    const segX = Math.ceil((r.x1 - r.x0) / cell);
+    const segZ = Math.ceil((r.z1 - r.z0) / cell);
+    const geo = new THREE.PlaneGeometry(segX * cell, segZ * cell, segX, segZ);
     geo.rotateX(-Math.PI / 2);
+    geo.translate((r.x0 + r.x1) / 2, 0, (r.z0 + r.z1) / 2);
 
     const pos = geo.attributes.position;
     const colors = new Float32Array(pos.count * 3);
@@ -250,7 +287,7 @@ export class World {
     const floor = new THREE.Color(CANYON.floor);
     const c = new THREE.Color();
 
-    const jitter = mulberry32(13);
+    const jitter = mulberry32(this.seed * 31 + 13);
     for (let i = 0; i < pos.count; i++) {
       // Nudge every grid point a little, so cliff edges break into irregular facets
       // instead of following the grid in stair steps.
@@ -266,8 +303,8 @@ export class World {
       if (depth === 0) {
         // Rock top: moss, brighter on the rises and deep teal in the hollows.
         c.copy(low).lerp(high, smoothstep(-2.2, 1.6, top));
-        c.lerp(pink, 0.55 * smoothstep(0.56, 0.68, fbm(x * 0.03 + 50, z * 0.03 - 20, 2)));
-        const stream = Math.abs(fbm(x * 0.009 + 13, z * 0.009 + 7, 3) - 0.5);
+        c.lerp(pink, 0.55 * smoothstep(0.56, 0.68, fbm((x + this.ox) * 0.03 + 50, (z + this.oz) * 0.03 - 20, 2)));
+        const stream = Math.abs(fbm((x + this.ox) * 0.009 + 13, (z + this.oz) * 0.009 + 7, 3) - 0.5);
         c.lerp(path, 0.85 * (1 - smoothstep(0.012, 0.03, stream)));
         // Bare sandstone along the rim, where the moss gives way to the cliff edge.
         const nearEdge = [0, 1, 2, 3].some((k) => this.canyonAt(x + Math.cos(k * 1.57) * cell * 1.2, z + Math.sin(k * 1.57) * cell * 1.2) > 0);
@@ -280,6 +317,8 @@ export class World {
         // The canyon floor: deep blue rubble.
         c.copy(deep).lerp(floor, valueNoise(x * 0.05 + 3, z * 0.05) * 0.8).multiplyScalar(grain);
       }
+      // Outside the arena the ground fades to black through the tree band.
+      c.multiplyScalar(1 - this.darkAt(x, z));
       c.toArray(colors, i * 3);
     }
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
@@ -301,10 +340,10 @@ export class World {
   private buildCanyonDecor(): void {
     // Layers of fog inside the canyons, thickest at the bottom (the rock tops hide them
     // everywhere else). They ignore the sky-coloured fog. Tunable in the ?dev panel.
-    const hazeSize = this.halfSize * 2 + 200;
+    const reg = this.region();
     for (let i = 0; i < FOG_LAYERS; i++) {
       const haze = new THREE.Mesh(
-        new THREE.PlaneGeometry(hazeSize, hazeSize),
+        new THREE.PlaneGeometry(reg.x1 - reg.x0, reg.z1 - reg.z0).translate((reg.x0 + reg.x1) / 2, -(reg.z0 + reg.z1) / 2, 0),
         new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, fog: false }),
       );
       haze.rotation.x = -Math.PI / 2;
@@ -314,34 +353,38 @@ export class World {
       this.fogLayers.push(haze);
       this.group.add(haze);
     }
-    this.setCanyonFog(CANYON_FOG.color, CANYON_FOG.density, CANYON_FOG.height);
+    this.setCanyonFog(this.fog.color, this.fog.density, this.fog.height);
 
-    const rand = mulberry32(77);
-    const limit = this.halfSize + 40;
+    const rand = mulberry32(this.seed * 17 + 77);
+    const b = this.shape.bounds;
     const rim: THREE.Matrix4[] = [];
     const rubble: THREE.Matrix4[] = [];
-    for (let i = 0; i < 26000 && (rim.length < 900 || rubble.length < 700); i++) {
-      const x = (rand() * 2 - 1) * limit;
-      const z = (rand() * 2 - 1) * limit;
+    const scale = this.arenaArea() / (720 * 720);
+    const maxRim = Math.round(900 * scale);
+    const maxRubble = Math.round(700 * scale);
+    for (let i = 0; i < 26000 * scale + 2000 && (rim.length < maxRim || rubble.length < maxRubble); i++) {
+      const x = b.x0 + rand() * (b.x1 - b.x0);
+      const z = b.z0 + rand() * (b.z1 - b.z0);
+      if (this.shape.depth(x, z) < 2) continue;
       const depth = this.canyonAt(x, z);
       const top = this.heightAt(x, z);
       if (depth === 0) {
         // Blocks on the rock top near a rim, but with the whole block on solid rock (plus a margin
         // for the faceted cliff edge), so nothing hangs over the drop.
-        if (rim.length >= 900) continue;
+        if (rim.length >= maxRim) continue;
         const sx = 1 + rand() * 3.2;
         const sz = sx * (0.6 + rand() * 0.6);
         const foot = Math.max(sx, sz) + 1.6;
         if (!this.footprintAt(x, z, foot, 0) || this.isRock(x, z, foot + 3)) continue;
         rim.push(this.matrix(x, top + sx * 0.25, z, rand() * Math.PI, sx, sx * (0.35 + rand() * 0.5), sz, (rand() - 0.5) * 0.3));
       } else if (depth < 1) {
-        if (rim.length >= 900 || rand() < 0.6) continue;
+        if (rim.length >= maxRim || rand() < 0.6) continue;
         const sx = 1.2 + rand() * 3;
         if (!this.footprintAt(x, z, sx + 1.6, LEDGE)) continue; // fully on the ledge
         rim.push(this.matrix(x, top - LEDGE * CANYON_DEPTH + sx * 0.25, z, rand() * Math.PI, sx, sx * 0.5, sx * 0.8, (rand() - 0.5) * 0.4));
       } else {
         const y = this.surfaceAt(x, z);
-        if (rubble.length < 700) {
+        if (rubble.length < maxRubble) {
           const sx = 0.8 + rand() * 2.6;
           if (!this.footprintAt(x, z, sx + 1.6, 1)) continue; // on the floor, not against a wall
           rubble.push(this.matrix(x, y + sx * 0.2, z, rand() * Math.PI, sx, sx * 0.55, sx * 0.9, (rand() - 0.5) * 0.6));
@@ -356,25 +399,33 @@ export class World {
   // ---------------------------------------------------------------- placement
 
   /**
-   * Returns a function that picks random spots inside the play area, keeping `padClear`
-   * units from the landing pad's edge and `outpostClear` units from every turret outpost.
+   * Returns a function that picks random spots on the rock tops inside the arena.
    * `clumping` > 0 favours dense jungle patches (higher = stronger).
    */
-  private placer(padClear: number, outpostClear: number, clumping = 1): Placer {
-    const limit = this.halfSize - 6;
+  private placer(clumping = 1): Placer {
+    const b = this.shape.bounds;
     return (rand) => {
-      for (let tries = 0; tries < 50; tries++) {
-        const x = (rand() * 2 - 1) * limit;
-        const z = (rand() * 2 - 1) * limit;
+      for (let tries = 0; tries < 60; tries++) {
+        const x = b.x0 + rand() * (b.x1 - b.x0);
+        const z = b.z0 + rand() * (b.z1 - b.z0);
+        if (this.shape.depth(x, z) < 2) continue;
         // Plants grow in thick clumps with open clearings between them.
-        if (rand() > Math.pow(jungleDensity(x, z), clumping)) continue;
-        if (Math.hypot(x, z) < 9 + padClear) continue;
-        if (!this.isRock(x, z, 4)) continue; // plants grow on the rock tops, not over the canyons
-        if (OUTPOSTS.some(([ox, oz]) => Math.hypot(x - ox, z - oz) < 8 + outpostClear)) continue;
+        if (rand() > Math.pow(jungleDensity(x + this.ox, z + this.oz), clumping)) continue;
+        if (Math.hypot(x - this.shape.entry.x, z - this.shape.entry.z) < 12) continue; // room to fly in
+        if (this.canyonT(x, z) > 0 || !this.footprintRock(x, z, 4)) continue; // on the rock tops
         return { x, z };
       }
-      return { x: limit, z: limit };
+      return { x: b.x1 + 999, z: b.z1 + 999 }; // nowhere suitable: put it far off screen
     };
+  }
+
+  /** Rock-top check that ignores the arena edge (plants may grow right up to it). */
+  private footprintRock(x: number, z: number, margin: number): boolean {
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      if (this.canyonT(x + Math.cos(a) * margin, z + Math.sin(a) * margin) > 0) return false;
+    }
+    return true;
   }
 
   /**
@@ -397,15 +448,22 @@ export class World {
       if (!list) chunks.set(key, (list = []));
       list.push(m);
     }
-    const rand = mulberry32(seed);
+    const rand = mulberry32(seed + this.seed * 101);
     const color = new THREE.Color();
     for (const list of chunks.values()) {
       const tints = list.map(() => rand());
+      // Things outside the arena fade to black with the ground.
+      const light = list.map((m) => {
+        p.setFromMatrixPosition(m);
+        return 1 - this.darkAt(p.x, p.z);
+      });
       for (const part of parts) {
         const mesh = new THREE.InstancedMesh(part.geo, part.mat, list.length);
         list.forEach((m, i) => {
           mesh.setMatrixAt(i, m);
-          if (part.colors) mesh.setColorAt(i, color.set(part.colors[Math.floor(tints[i] * part.colors.length)]));
+          if (part.colors) color.set(part.colors[Math.floor(tints[i] * part.colors.length)]);
+          else color.setRGB(1, 1, 1);
+          mesh.setColorAt(i, color.multiplyScalar(light[i]));
         });
         mesh.computeBoundingSphere();
         this.group.add(mesh);
@@ -427,7 +485,7 @@ export class World {
 
   /** Purple-trunked jungle trees with drooping teal leaves. Canopy tops out below the ship. */
   private buildTrees(place: Placer, count = 1500): void {
-    const rand = mulberry32(31);
+    const rand = mulberry32(31 + this.seed * 7);
     const matrices: THREE.Matrix4[] = [];
     for (let i = 0; i < count; i++) {
       const { x, z } = place(rand);
@@ -449,7 +507,7 @@ export class World {
    * guns (top out around 20 units), so they add depth without hiding anything that matters.
    */
   private buildGiantTrees(place: Placer, count = 190): void {
-    const rand = mulberry32(81);
+    const rand = mulberry32(81 + this.seed * 7);
     const matrices: THREE.Matrix4[] = [];
     for (let i = 0; i < count; i++) {
       const { x, z } = place(rand);
@@ -468,7 +526,7 @@ export class World {
 
   /** Big pink leaves fanning up out of the ground, like the reference's alien foliage. */
   private buildPinkFans(place: Placer, count = 2400): void {
-    const rand = mulberry32(41);
+    const rand = mulberry32(41 + this.seed * 7);
     const matrices: THREE.Matrix4[] = [];
     for (let i = 0; i < count; i++) {
       const { x, z } = place(rand);
@@ -480,7 +538,7 @@ export class World {
 
   /** Curving stalks topped with glowing pink bulbs. */
   private buildBulbStalks(place: Placer, clusters = 460): void {
-    const rand = mulberry32(51);
+    const rand = mulberry32(51 + this.seed * 7);
     const matrices: THREE.Matrix4[] = [];
     for (let c = 0; c < clusters; c++) {
       const { x, z } = place(rand);
@@ -505,7 +563,7 @@ export class World {
 
   /** Low ferns as ground cover. */
   private buildFerns(place: Placer, count = 4000): void {
-    const rand = mulberry32(61);
+    const rand = mulberry32(61 + this.seed * 7);
     const matrices: THREE.Matrix4[] = [];
     for (let i = 0; i < count; i++) {
       const { x, z } = place(rand);
@@ -516,7 +574,7 @@ export class World {
   }
 
   private buildRocks(place: Placer, count = 300): void {
-    const rand = mulberry32(11);
+    const rand = mulberry32(11 + this.seed * 7);
     const matrices: THREE.Matrix4[] = [];
     for (let i = 0; i < count; i++) {
       const { x, z } = place(rand);
@@ -531,7 +589,7 @@ export class World {
 
   /** Old yellow machinery half swallowed by the jungle (like the reference's ruins). */
   private buildRelics(place: Placer, count = 45): void {
-    const rand = mulberry32(71);
+    const rand = mulberry32(71 + this.seed * 7);
     const matrices: THREE.Matrix4[] = [];
     for (let i = 0; i < count; i++) {
       const { x, z } = place(rand);
@@ -551,7 +609,7 @@ export class World {
 
   /** Glowing seed pods on the ground. */
   private buildSpores(place: Placer, count = 600): void {
-    const rand = mulberry32(37);
+    const rand = mulberry32(37 + this.seed * 7);
     const matrices: THREE.Matrix4[] = [];
     for (let i = 0; i < count; i++) {
       const { x, z } = place(rand);
@@ -561,21 +619,25 @@ export class World {
     this.instanced([{ geo: new THREE.SphereGeometry(1, 10, 8), mat: glow(this.palette.spore) }], matrices, 38);
   }
 
-  /** Giant jungle trees around the border mark the edge you can't fly past. */
-  private buildBorder(): void {
-    const rand = mulberry32(53);
-    const spacing = 13;
+  /**
+   * A few rows of thick, tall jungle trees all around the arena edge. They grow taller and
+   * closer together further out, and fade to black with the ground.
+   */
+  private buildEdgeTrees(): void {
+    const rand = mulberry32(this.seed * 19 + 53);
+    const b = this.shape.bounds;
+    const m = EDGE_BAND + 6;
+    const spacing = 6.5;
     const matrices: THREE.Matrix4[] = [];
-    for (let row = 0; row < 2; row++) {
-      const off = this.halfSize + 8 + row * 12;
-      const perSide = Math.ceil((off * 2) / spacing) + 1;
-      for (let side = 0; side < 4; side++) {
-        for (let k = 0; k < perSide; k++) {
-          const t = -off + k * spacing + (rand() - 0.5) * 5;
-          const [x, z] = side === 0 ? [t, -off] : side === 1 ? [t, off] : side === 2 ? [-off, t] : [off, t];
-          const s = 2.4 + rand() * 1.6 + row * 0.8;
-          matrices.push(this.matrix(x, this.heightAt(x, z) - 1, z, rand() * Math.PI * 2, s, s * (1.3 + rand() * 0.8), s));
-        }
+    for (let x = b.x0 - m; x <= b.x1 + m; x += spacing) {
+      for (let z = b.z0 - m; z <= b.z1 + m; z += spacing) {
+        const px = x + (rand() - 0.5) * spacing * 0.9;
+        const pz = z + (rand() - 0.5) * spacing * 0.9;
+        const out = -this.shape.depth(px, pz); // how far outside the arena
+        if (out < -1 || out > EDGE_BAND + 4) continue;
+        const k = Math.min(1, Math.max(0, out / EDGE_BAND));
+        const s = 1.7 + k * 1.3 + rand() * 0.6; // tall but below the camera's line of sight
+        matrices.push(this.matrix(px, this.heightAt(px, pz) - 0.6, pz, rand() * Math.PI * 2, s, s * (1.1 + rand() * 0.5), s, (rand() - 0.5) * 0.1));
       }
     }
     this.instanced(
@@ -586,24 +648,6 @@ export class World {
       matrices,
       54,
     );
-  }
-
-  private buildLandingPad(): THREE.Mesh {
-    const pad = new THREE.Mesh(new THREE.CylinderGeometry(7, 7.6, 0.6, 6), toon('#5a4f86'));
-    pad.position.y = 0.3;
-    const inner = new THREE.Mesh(new THREE.CylinderGeometry(5.2, 5.2, 0.65, 6), toon('#3a2f5a'));
-    inner.position.y = 0.3;
-    const ring = new THREE.Mesh(
-      new THREE.RingGeometry(5.4, 5.9, 6),
-      glow('#6ff7ff', { transparent: true, opacity: 0.6, side: THREE.DoubleSide }),
-    );
-    ring.rotation.x = -Math.PI / 2;
-    ring.position.y = 0.66;
-    const outline = new THREE.InstancedMesh(pad.geometry, pad.material, 1);
-    pad.updateMatrix();
-    outline.setMatrixAt(0, pad.matrix);
-    this.group.add(pad, outlineInstanced(outline), inner, ring);
-    return ring;
   }
 }
 
