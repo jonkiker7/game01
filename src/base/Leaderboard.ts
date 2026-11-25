@@ -12,10 +12,10 @@ export class LeaderboardSign {
   private readonly texture: THREE.CanvasTexture;
 
   constructor() {
-    const W = 12;
-    const H = 4.6;
-    this.canvas.width = 1280;
-    this.canvas.height = Math.round((1280 * H) / W);
+    const W = 15;
+    const H = 5;
+    this.canvas.width = 1536;
+    this.canvas.height = Math.round((1536 * H) / W);
     this.texture = new THREE.CanvasTexture(this.canvas);
     this.texture.colorSpace = THREE.SRGBColorSpace;
     this.texture.anisotropy = 4;
@@ -47,11 +47,11 @@ export class LeaderboardSign {
 
     c.textBaseline = 'middle';
     c.fillStyle = '#f2c46d';
-    c.font = '900 58px Georgia, serif';
+    c.font = '900 70px Georgia, serif';
     c.textAlign = 'center';
-    c.fillText('★  TOP PILOTS  ★', w / 2, 64);
+    c.fillText('★  TOP PILOTS  ★', w / 2, 70);
     c.fillStyle = 'rgba(242, 196, 109, 0.5)';
-    c.fillRect(80, 108, w - 160, 3);
+    c.fillRect(80, 120, w - 160, 3);
 
     // Two columns of five.
     const rowH = (h - 150) / 5;
@@ -64,12 +64,12 @@ export class LeaderboardSign {
         c.fillStyle = 'rgba(111, 247, 255, 0.14)';
         c.fillRect(x0 + 6, y - rowH / 2 + 6, colW - 30, rowH - 12);
       }
-      c.font = '700 40px Georgia, serif';
+      c.font = '700 50px Georgia, serif';
       c.textAlign = 'left';
       c.fillStyle = i < 3 ? '#f2c46d' : '#9a90ae';
       c.fillText(`${i + 1}.`, x0 + 20, y);
       c.fillStyle = e.you ? '#6ff7ff' : '#efe9f7';
-      c.fillText(e.name, x0 + 100, y);
+      c.fillText(e.name, x0 + 120, y);
       c.textAlign = 'right';
       c.fillStyle = e.you ? '#6ff7ff' : '#f2c46d';
       c.fillText(e.score.toLocaleString('en-US'), x0 + colW - 40, y);
