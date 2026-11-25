@@ -9,7 +9,7 @@ import { BUILD, startUpdater, updateIfWaiting } from './Updater';
 import { BaseUI } from './base/BaseUI';
 import { ConversationUI } from './base/Conversation';
 import { HomeBase } from './base/HomeBase';
-import { applyPerks, loadSave, PERKS, rollContracts, writeSave } from './base/Save';
+import { addToLeaderboard, applyPerks, loadSave, PERKS, rollContracts, writeSave } from './base/Save';
 import { devModeOn, PauseMenu } from './game/run/PauseMenu';
 import { AimIndicator } from './game/AimIndicator';
 import { CameraRig } from './game/CameraRig';
@@ -235,6 +235,7 @@ const run = new Run({
     save.contracts.offers = rollContracts(); // a fresh board after every sortie
     save.lastRun = { won: r.won, sectors: r.sectorsCleared, kills: r.kills };
     save.runs++;
+    addToLeaderboard(save, r.score);
     const newBest = r.score > save.best;
     const prevBest = save.best;
     if (newBest) save.best = r.score;
