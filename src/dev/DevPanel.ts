@@ -98,8 +98,11 @@ export function openDevPanel(h: DevHooks): void {
     save();
   };
 
-  const gui = new GUI({ title: 'DEV' });
-  gui.domElement.id = 'dev-panel';
+  // Our own fixed box on the left of the screen (lil-gui's default placement is top-centre/right).
+  const box = document.createElement('div');
+  box.id = 'dev-panel';
+  document.body.appendChild(box);
+  const gui = new GUI({ title: 'DEV', container: box, width: 250 });
   gui.close();
 
   const light = gui.addFolder('Lighting');
