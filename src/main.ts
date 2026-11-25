@@ -7,7 +7,8 @@ import './style.css';
 import { BaseUI } from './base/BaseUI';
 import { ConversationUI } from './base/Conversation';
 import { HomeBase } from './base/HomeBase';
-import { applyPerks, loadSave, rollContracts, writeSave } from './base/Save';
+import { applyPerks, loadSave, PERKS, rollContracts, writeSave } from './base/Save';
+import { devModeOn, PauseMenu } from './game/run/PauseMenu';
 import { AimIndicator } from './game/AimIndicator';
 import { CameraRig } from './game/CameraRig';
 import { Effects } from './game/Effects';
@@ -235,7 +236,13 @@ const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.75, 0.45, 1.2);
 composer.addPass(bloom);
 
 // Developer panel: `?dev` in the URL adds sliders for lighting, shadows, glow and tuning.
-if (new URLSearchParams(location.search).has('dev')) {
+let devPanelLoaded = false;
+/** Load and show the dev panel (from ?dev, or the switch in the pause menu). */
+function showDevPanel(on: boolean): void {
+  const el = document.getElementById('dev-panel');
+  if (el) el.style.display = on ? '' : 'none';
+  if (!on || devPanelLoaded) return;
+  devPanelLoaded = true;
   import('./dev/DevPanel').then(({ openDevPanel }) =>
     openDevPanel({
       sun,
@@ -249,6 +256,48 @@ if (new URLSearchParams(location.search).has('dev')) {
     }),
   );
 }
+if (devModeOn()) showDevPanel(true);
+
+// ---------- Pause menu ----------
+const pauseMenu = new PauseMenu($('hud'));
+let menuPaused = false;
+function openPause(): void {
+  if (mode !== 'run' || paused || menuPaused || run.phase === 'over' || run.phase === 'transition') return;
+  menuPaused = true;
+  input.releaseAll();
+  const r = run;
+  const active = save.contracts.active;
+  pauseMenu.show({
+    stats: r.stats,
+    armor: ship.armor,
+    ship: save.ship,
+    levels: r.levels,
+    perks: PERKS.map((p) => [p.name, save.perks[p.id] ?? 0, p.costs.length]),
+    objective: r.objective().split('\n').filter((l) => !l.startsWith('◆')), // the contract gets its own line
+    contract: active ? { title: active.title, sector: active.sector, status: contracts.objectiveLine(r.sector)?.replace('◆ ', '') ?? '' } : null,
+  });
+}
+function closePause(): void {
+  menuPaused = false;
+  pauseMenu.hide();
+  input.releaseAll();
+}
+pauseMenu.pauseButton.addEventListener('pointerdown', (e) => {
+  e.stopPropagation();
+  openPause();
+});
+pauseMenu.onResume = closePause;
+pauseMenu.onDevToggle = (on) => showDevPanel(on);
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Escape' || e.code === 'KeyP') {
+    if (menuPaused) closePause();
+    else openPause();
+  }
+});
+// Leaving the app (switching apps, locking the phone) pauses a sortie.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) openPause();
+});
 composer.addPass(new OutputPass());
 
 // ---------- Hit-stop: freeze for a split second on big impacts (Hades does this a lot) ----------
@@ -497,9 +546,9 @@ let last = performance.now();
 
 /** One step of the sortie's game logic (movement, enemies, shots, effects). */
 function simulate(dt: number): void {
-  if (paused) dt = 0; // upgrade screen is open: the world holds still
+  if (paused || menuPaused) dt = 0; // upgrade screen or pause menu is open: the world holds still
 
-  if (!paused) {
+  if (!paused && !menuPaused) {
     ship.update(dt, input, world);
     run.update(dt);
     updateGun(dt);
@@ -517,7 +566,7 @@ function simulate(dt: number): void {
   missiles.radiusMul = ship.stats.missileRadiusMul;
   combat.update(dt, ship.root.position);
   // Nova button.
-  if (input.consumePress('special') && ship.alive && !paused) {
+  if (input.consumePress('special') && ship.alive && !paused && !menuPaused) {
     if (specialCharge >= 1) fireNova();
     else input.vibrate(8);
   }
@@ -574,7 +623,7 @@ renderer.setAnimationLoop((now: number) => {
   // things still collide properly; normal play is always one step per frame.
   const steps = MAX_DT > 1 / 20 ? Math.max(1, Math.ceil(dt / (1 / 30))) : 1;
   for (let i = 0; i < steps; i++) simulate(dt / steps);
-  if (paused) dt = 0;
+  if (paused || menuPaused) dt = 0;
 
   // While charging a missile, lean the camera toward the target so it stays on screen.
   if (ship.isCharging) {
