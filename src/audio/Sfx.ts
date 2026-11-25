@@ -70,7 +70,7 @@ export const SOUND_RULES: Partial<Record<SoundId, { gap?: number; voices?: numbe
   explosionBig: { gap: 0.08, voices: 4, jitter: 0.12 },
   playerHit: { gap: 0.12, jitter: 0.1 },
   talk: { gap: 0.055, jitter: 0.2 },
-  door: { gap: 0.2 },
+  door: { gap: 0.6 },
   lock: { gap: 0.15 },
   heal: { gap: 0.08 },
   uiTap: { gap: 0.04 },
@@ -344,10 +344,15 @@ const SYNTHS: Record<SoundId, Synth> = {
   uiTap: (b, o, t, p) => tone(b, o, t, p, { type: 'sine', freq: 1300, to: 1100, dur: 0.05, gain: 0.08 }),
   uiConfirm: (b, o, t, p) => arp(b, o, t, p, [hz(10), hz(17)], 0.055, { type: 'square', dur: 0.08, gain: 0.05, filter: { type: 'lowpass', freq: 3500 }, echo: 0.25 }),
   uiDeny: (b, o, t, p) => arp(b, o, t, p, [180, 150], 0.09, { type: 'square', dur: 0.08, gain: 0.06, filter: { type: 'lowpass', freq: 900 } }),
+  // An airlock: a low clunk as the seal releases, a long pneumatic hiss with a servo hum under
+  // it as the panels slide, and a soft thud as they lock open.
   door: (b, o, t, p) =>
     Math.max(
-      noise(b, o, t, p, { dur: 0.45, gain: 0.12, attack: 0.02, filter: { type: 'highpass', freq: 3500, to: 1800 }, verb: 0.2 }),
-      tone(b, o, t, p, { type: 'sawtooth', freq: 85, to: 130, dur: 0.4, gain: 0.05, filter: { type: 'lowpass', freq: 400 } }),
+      tone(b, o, t, p, { type: 'sine', freq: 75, to: 42, dur: 0.3, gain: 0.28 }),
+      noise(b, o, t, p, { dur: 0.08, gain: 0.08, filter: { type: 'lowpass', freq: 500 } }),
+      noise(b, o, t, p, { dur: 1.15, gain: 0.13, attack: 0.12, at: 0.06, filter: { type: 'bandpass', freq: 1100, to: 380, q: 0.9 }, verb: 0.3 }),
+      tone(b, o, t, p, { type: 'sawtooth', freq: 52, to: 68, dur: 1.0, gain: 0.05, attack: 0.15, at: 0.05, filter: { type: 'lowpass', freq: 260 } }),
+      tone(b, o, t, p, { type: 'sine', freq: 62, to: 40, dur: 0.25, gain: 0.18, at: 1.0 }),
     ),
   talk: (b, o, t, p) => tone(b, o, t, p, { type: 'square', freq: 620 + Math.random() * 180, dur: 0.03, gain: 0.06, filter: { type: 'lowpass', freq: 2200 } }),
   buy: (b, o, t, p) =>

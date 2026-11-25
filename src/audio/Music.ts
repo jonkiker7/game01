@@ -161,7 +161,7 @@ export class MusicPlayer {
     const mk = (to: AudioNode) => {
       const g = ctx.createGain();
       g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(song.level, t + 1.5);
+      g.gain.linearRampToValueAtTime(song.level, t + 0.5); // in quickly, so music is heard right away
       g.connect(to);
       return g;
     };

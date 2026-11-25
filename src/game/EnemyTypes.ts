@@ -539,8 +539,10 @@ export class Pulsar extends Enemy {
   readonly hitTop = PULSAR_HEIGHT + 3;
   readonly aimHeight = PULSAR_HEIGHT;
   private phase: 'rest' | 'fire' = 'rest';
-  private timer = 1.5 + Math.random();
+  private timer = TUNING.pulsar.wakeDelay + Math.random(); // a grace period after it arrives
   private volley = 0;
+  /** Every pulsar on the field, to see how close the others are. */
+  private static readonly all = new Set<Pulsar>();
   private spin = Math.random() * Math.PI * 2;
   private readonly orb = glow('#ff5fd2', {}, 1.4);
   private readonly rings: THREE.Mesh[] = [];
@@ -548,6 +550,7 @@ export class Pulsar extends Enemy {
 
   constructor(hpMul = 1) {
     super(85 * hpMul);
+    Pulsar.all.add(this);
     this.salvage = 6;
     this.weight = 1.5;
     this.dropChance = 0.35;
@@ -570,6 +573,22 @@ export class Pulsar extends Enemy {
     addOutlines(this.root);
   }
 
+  /** Weaker with other pulsars close by; full damage once they're spread out (or it's alone). */
+  private shotDamage(): number {
+    const T = TUNING.pulsar;
+    const p = this.root.position;
+    let nearest = Infinity;
+    for (const o of Pulsar.all) {
+      if (!o.alive) {
+        Pulsar.all.delete(o);
+        continue;
+      }
+      if (o !== this) nearest = Math.min(nearest, Math.hypot(o.root.position.x - p.x, o.root.position.z - p.z));
+    }
+    const k = Math.min(1, nearest / T.fullDamageSpacing);
+    return T.minDamage + (T.maxDamage - T.minDamage) * k;
+  }
+
   protected think({ ship, shots, world, dt }: Ctx): void {
     const p = this.root.position;
     p.y = world.heightAt(p.x, p.z);
@@ -589,15 +608,17 @@ export class Pulsar extends Enemy {
       }
       return;
     }
-    // Firing: three arms of a rotating spiral, a volley every 0.16 s.
+    // Firing: the arms of a rotating spiral, a volley every `volleyGap` seconds.
+    const T = TUNING.pulsar;
     this.volley -= dt;
     if (this.volley <= 0) {
-      this.volley = 0.16;
-      this.spin += 0.33;
+      this.volley = T.volleyGap;
+      this.spin += 0.33 * (T.volleyGap / 0.16); // the spiral turns at the same speed whatever the gap
       this.tmp.set(p.x, p.y + PULSAR_HEIGHT + 0.6, p.z);
-      for (let i = 0; i < 3; i++) {
-        const a = this.spin + (i / 3) * Math.PI * 2;
-        shots.fire(this.tmp, Math.cos(a), Math.sin(a), 16, ship.root.position.y, 9, 6, 5);
+      const damage = this.shotDamage();
+      for (let i = 0; i < T.arms; i++) {
+        const a = this.spin + (i / T.arms) * Math.PI * 2;
+        shots.fire(this.tmp, Math.cos(a), Math.sin(a), 16, ship.root.position.y, 9, damage, 5);
       }
     }
     if (this.timer <= 0) {

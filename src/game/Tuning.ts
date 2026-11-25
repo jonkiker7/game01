@@ -21,6 +21,18 @@ export const TUNING = {
     perSecond: 30, // time bonus per second left on the mission clock
     protect: 1000, // bonus at full health on what you protect (generator, convoy)
   },
+  /**
+   * Pulsar spirals. A pulsar's shots are weakest when other pulsars stand close by (so a cluster
+   * doesn't stack into instant death) and grow to full damage as they spread apart.
+   */
+  pulsar: {
+    arms: 2, // spiral arms (was 3)
+    volleyGap: 0.26, // seconds between volleys (was 0.16): fewer orbs on each arm
+    minDamage: 1.5, // per shot, with another pulsar right next to it
+    maxDamage: 4, // per shot, once the nearest other pulsar is `fullDamageSpacing` away (or none)
+    fullDamageSpacing: 50,
+    wakeDelay: 2.5, // seconds after arriving before its first spiral
+  },
   nova: {
     cooldown: 10, // seconds after firing before Nova is ready again
     damagePerSecond: 150, // damage you deal (not counting Nova itself) that takes 1 second off

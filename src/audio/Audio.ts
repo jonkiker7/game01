@@ -75,17 +75,20 @@ class AudioEngine {
   constructor() {
     // Browsers only allow sound after the player touches the screen or presses a key.
     // (iPhones only count the finger lifting, hence touchend/pointerup as well.)
+    // These stay on for good: after the app comes back from the background, a phone may only let
+    // sound resume on the next touch, so every touch checks (it costs nothing when it's running).
     const events = ['pointerdown', 'pointerup', 'touchend', 'keydown'];
-    const unlock = () => {
-      this.start();
-      if (this.bus?.ctx.state === 'running') for (const e of events) window.removeEventListener(e, unlock, true);
-    };
+    const unlock = () => this.start();
     for (const e of events) window.addEventListener(e, unlock, true);
     document.addEventListener('visibilitychange', () => {
       if (!this.bus) return;
       if (document.hidden) void this.bus.ctx.suspend();
       else void this.bus.ctx.resume();
     });
+    // And keep nudging it awake while the app is open (works without a touch on most browsers).
+    window.setInterval(() => {
+      if (this.bus && !document.hidden && this.bus.ctx.state !== 'running') void this.bus.ctx.resume();
+    }, 1000);
     void this.loadFiles();
   }
 
