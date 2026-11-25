@@ -41,9 +41,12 @@ are a quick dodge to screen left or right, whichever way the ship is facing: a f
 invulnerability. They have their own short cooldown (0.9 s), separate from boost, so you can chain
 boost and rolls.
 
-**Shadows and vignette:** on HIGH quality the sun casts real shadows from trees, plants, rocks,
-towers, ground enemies and ground bosses (flying things keep a simple shadow right below them, which
-helps you aim). LOW skips real shadows. A soft vignette darkens the screen edges on both.
+**Shadows and vignette:** the terrain, trees, plants and rocks never move, so their shadows are
+**baked**: worked out once when each arena is built (one render from the sun into a depth texture
+that the ground reads), costing almost nothing per frame, on HIGH and LOW. On HIGH, moving things
+(towers, ground enemies, ground bosses, mission objects) still cast live shadows; flying things keep
+a simple shadow right below them, which helps you aim. The dev panel can switch to the old **live**
+mode (everything redrawn every frame) or **off** to compare. A soft vignette darkens the screen edges.
 
 **Pause:** the ❚❚ button (top left, or P / Esc) pauses a sortie and shows your ship, its current
 stats, your missions (this round's objective and your contract), power-ups taken this sortie and
@@ -53,7 +56,9 @@ your base upgrades. Switching away from the app pauses automatically.
 and stays on until you switch it off), or add `?dev` to the URL (e.g. `?dev&sortie`) for a **DEV** panel at the top. Its
 sliders cover lighting (sun brightness/colour/direction/height, rim light), shadows (darkness and area),
 glow (bloom), the vignette, canyon fog (colour, density, height), plus gameplay numbers (ship speeds and rolls, tower bombs,
-swarmers). Changes apply live and are remembered on that device while `?dev` is on.
+swarmers, Nova). **Performance** shows fps, frame time, game-code time, draw calls and triangles,
+with switches for quality, shadow mode, glow, ink outlines, trees and plants, and render resolution,
+so you can see what each one costs on your phone (these switches aren't saved). Changes apply live and are remembered on that device while `?dev` is on.
 **📋 Copy settings** copies them so they can be made the game's defaults; **↺ Reset** goes back.
 Gameplay defaults live in `src/game/Tuning.ts`.
 
