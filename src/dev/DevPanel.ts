@@ -128,6 +128,9 @@ export function openDevPanel(h: DevHooks): void {
   ship.add(TUNING.ship, 'boostSpeed', 40, 300, 5).name('boost speed').onChange(changed);
   ship.add(TUNING.ship, 'rollSpeed', 20, 200, 5).name('roll speed').onChange(changed);
   ship.add(TUNING.ship, 'rollCooldown', 0.1, 3, 0.05).name('roll cooldown s').onChange(changed);
+  const nova = play.addFolder('Nova');
+  nova.add(TUNING.nova, 'cooldown', 1, 30, 0.5).name('cooldown s').onChange(changed);
+  nova.add(TUNING.nova, 'damagePerSecond', 20, 1000, 10).name('damage per second off').onChange(changed);
   const bombs = play.addFolder('Tower bombs');
   bombs.add(TUNING.towerBombs, 'speed', 5, 100, 1).name('speed').onChange(changed);
   bombs.add(TUNING.towerBombs, 'radius', 3, 40, 0.5).name('blast radius').onChange(changed);

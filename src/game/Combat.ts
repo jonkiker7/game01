@@ -18,7 +18,7 @@ const ARC_COLOR = '#a9c8ff';
  */
 export class Combat {
   /** Called with the damage actually dealt (charges the special). */
-  onDamage?: (amount: number) => void;
+  onDamage?: (amount: number, source: HitSource) => void;
   private staticTimer = 2.5;
   private readonly a = new THREE.Vector3();
   private readonly b = new THREE.Vector3();
@@ -57,7 +57,7 @@ export class Combat {
 
     // Gunfire can be blocked by shields; missiles and explosions get through.
     e.damage(dmg, source !== 'gun' && source !== 'arc');
-    this.onDamage?.(dmg);
+    this.onDamage?.(dmg, source);
 
     // Arc: chain lightning onward.
     if (fromGun && s.arcRounds > 0 && Math.random() < 0.18 + 0.1 * s.arcRounds) this.chain(e, 2, 6 + 4 * s.arcRounds);

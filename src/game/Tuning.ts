@@ -9,6 +9,10 @@ export const TUNING = {
     rollSpeed: 95, // sideways kick of a barrel roll
     rollCooldown: 0.9,
   },
+  nova: {
+    cooldown: 10, // seconds after firing before Nova is ready again
+    damagePerSecond: 150, // damage you deal (not counting Nova itself) that takes 1 second off
+  },
   towerBombs: {
     speed: 34, // units per second across the ground
     radius: 20, // blast radius (matches the red warning ring)
