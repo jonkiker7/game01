@@ -122,15 +122,20 @@ for (const g of allGuns)
     audio.play('hit');
   };
 
-// ---- Nova (special ability): charges from damage dealt ----
-const NOVA_COST = 350; // damage dealt to fill the charge
+// ---- Nova (special ability) ----
+// After firing it recharges over TUNING.nova.cooldown seconds; damage you deal speeds that up
+// (every `damagePerSecond` damage takes a second off). Nova's own damage doesn't count, so it
+// can't refill itself. The Capacitor power-up speeds up both.
 const NOVA_RADIUS = 26;
 const NOVA_DAMAGE = 90;
-let specialCharge = 0;
-combat.onDamage = (amount) => {
-  const was = specialCharge;
-  specialCharge = Math.min(1, specialCharge + (amount / NOVA_COST) * ship.stats.specialChargeMul);
-  if (was < 1 && specialCharge >= 1) audio.play('novaReady');
+let specialCharge = 0; // 0 = just fired, 1 = ready
+function chargeNova(seconds: number): void {
+  if (specialCharge >= 1) return;
+  specialCharge = Math.min(1, specialCharge + (seconds * ship.stats.specialChargeMul) / TUNING.nova.cooldown);
+  if (specialCharge >= 1) audio.play('novaReady');
+}
+combat.onDamage = (amount, source) => {
+  if (source !== 'nova') chargeNova(amount / TUNING.nova.damagePerSecond);
 };
 
 // ---- Cluster bomblets waiting to go off ----
@@ -592,6 +597,7 @@ function simulate(dt: number): void {
   if (paused || menuPaused) dt = 0; // upgrade screen or pause menu is open: the world holds still
 
   if (!paused && !menuPaused) {
+    if (ship.alive) chargeNova(dt);
     ship.update(dt, input, world);
     run.update(dt);
     updateGun(dt);

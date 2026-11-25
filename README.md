@@ -333,8 +333,10 @@ drone, swarmer, lancer, crawler, sniper, minelayer, pulsar. On a very slow test 
   **Rail Lance** (slow, heavy bolts that pierce every enemy in a line).
 - **Missile slot:** Missiles (default, charged with lock-on), **Cluster Bomb** (the blast throws
   out 5 bomblets) or **Swarm Rockets** (a volley of homing rockets; charge for more).
-- **Nova:** the NOVA button charges as you deal damage. When it glows, tap it for a shockwave
-  that damages everything around you and wipes out enemy shots.
+- **Nova:** when the NOVA button glows, tap it for a shockwave that damages everything around
+  you and wipes out enemy shots. It then recharges over 10 seconds, and the damage you deal
+  speeds that up (every 150 damage takes a second off, so steady machine-gun fire brings it down
+  to about 6–7 seconds). Nova's own damage doesn't count. Both numbers are in the dev panel.
 - **Power-up families** (coloured cards):
   - **Arc (lightning):** Arc Rounds, Arc Warheads, Static Field
   - **Cryo (ice):** Cryo Rounds (chill; 5 chills freeze), Cryo Warheads, Frostbite
