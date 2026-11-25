@@ -51,7 +51,7 @@ your station upgrades. Switching away from the app pauses automatically.
 
 **Dev panel:** switch it on with **DEV PANEL: ON** in the pause menu (works in the Home Screen app,
 and stays on until you switch it off), or add `?dev` to the URL (e.g. `?dev&sortie`) for a **DEV** panel at the top. Its
-sliders cover lighting (sun brightness/colour/direction/height, sky and rim light, fog), shadows (darkness and area),
+sliders cover lighting (sun brightness/colour/direction/height, rim light), shadows (darkness and area),
 glow (bloom), the vignette, canyon fog (colour, density, height), plus gameplay numbers (ship speeds and rolls, tower bombs,
 swarmers). Changes apply live and are remembered on that device while `?dev` is on.
 **📋 Copy settings** copies them so they can be made the game's defaults; **↺ Reset** goes back.

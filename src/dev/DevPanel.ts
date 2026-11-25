@@ -14,7 +14,6 @@ import { CANYON_FOG } from '../game/World';
 
 export interface DevHooks {
   sun: THREE.DirectionalLight;
-  hemi: THREE.HemisphereLight;
   rim: THREE.DirectionalLight;
   scene: THREE.Scene;
   bloom: UnrealBloomPass;
@@ -33,10 +32,7 @@ const LOOK_DEFAULTS = {
   sunColor: '#ffdcc4',
   sunAngle: 79, // compass direction the sunlight comes from
   sunHeight: 57, // degrees above the horizon (lower = longer shadows)
-  skyLight: 0.8,
   rimLight: 0.9,
-  fogStart: 80,
-  fogEnd: 285,
   shadows: true,
   shadowDarkness: 1,
   shadowArea: 150,
@@ -70,11 +66,7 @@ export function openDevPanel(h: DevHooks): void {
     h.sun.intensity = look.sunIntensity;
     h.sun.color.set(look.sunColor);
     h.shadows.setDirection(look.sunAngle, look.sunHeight);
-    h.hemi.intensity = look.skyLight;
     h.rim.intensity = look.rimLight;
-    const fog = h.scene.fog as THREE.Fog;
-    fog.near = look.fogStart;
-    fog.far = look.fogEnd;
     h.shadows.enabled = look.shadows && h.isHigh();
     h.shadows.darkness = look.shadowDarkness;
     h.shadows.area = look.shadowArea;
@@ -110,10 +102,7 @@ export function openDevPanel(h: DevHooks): void {
   light.addColor(look, 'sunColor').name('sun colour').onChange(changed);
   light.add(look, 'sunAngle', -180, 180, 1).name('sun direction °').onChange(changed);
   light.add(look, 'sunHeight', 15, 89, 1).name('sun height °').onChange(changed);
-  light.add(look, 'skyLight', 0, 3, 0.05).name('sky fill light').onChange(changed);
   light.add(look, 'rimLight', 0, 3, 0.05).name('blue rim light').onChange(changed);
-  light.add(look, 'fogStart', 20, 400, 5).name('fog start').onChange(changed);
-  light.add(look, 'fogEnd', 60, 800, 5).name('fog end').onChange(changed);
 
   const shade = gui.addFolder('Shadows (HIGH quality)');
   shade.add(look, 'shadows').name('on').onChange(changed);
