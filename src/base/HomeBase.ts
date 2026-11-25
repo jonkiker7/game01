@@ -175,8 +175,8 @@ export class HomeBase {
     this.shipHolder.scale.setScalar(1.35);
     this.scene.add(this.shipHolder);
     // The leaderboard, high on the concourse's north wall above the hangar doorway.
-    // Hung upright in front of the balcony's edge (facing the room, at the pilot's eye line).
-    this.board.root.position.set(0, 9, -10.7);
+    // Hung upright on the wall between the two halves of the balcony, facing the room.
+    this.board.root.position.set(0, 9, -13.3);
     this.scene.add(this.board.root);
     this.board.draw(this.save.leaderboard);
     this.parkShip();

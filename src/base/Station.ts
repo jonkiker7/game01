@@ -606,16 +606,16 @@ function concourse(g: THREE.Group, parts: StationParts, m: Mats): void {
   const upper = new THREE.Group();
   g.add(upper);
   parts.walls.push({ obj: upper, x: 0, z: -12.5, cut: 1 });
-  const balcony = new THREE.Mesh(new THREE.BoxGeometry(36, 0.6, 3), m.creamDark);
-  balcony.position.set(0, 6.3, -12.5);
-  const lip = new THREE.Mesh(new THREE.BoxGeometry(36, 0.25, 0.3), glow(STATION.amber, {}, 1.2));
-  lip.position.set(0, 6.0, -11);
-  lip.userData.noOutline = true;
-  upper.add(balcony, lip);
-  // The railing stops either side of the middle, where the leaderboard hangs in front.
+  // Two halves flanking the middle, where the leaderboard hangs on the wall.
   const GAP = 8.6;
   for (const side of [-1, 1]) {
     const len = 18 - GAP;
+    const balcony = new THREE.Mesh(new THREE.BoxGeometry(len, 0.6, 3), m.creamDark);
+    balcony.position.set(side * (GAP + len / 2), 6.3, -12.5);
+    const lip = new THREE.Mesh(new THREE.BoxGeometry(len, 0.25, 0.3), glow(STATION.amber, {}, 1.2));
+    lip.position.set(side * (GAP + len / 2), 6.0, -11);
+    lip.userData.noOutline = true;
+    upper.add(balcony, lip);
     const rail = new THREE.Mesh(new THREE.BoxGeometry(len, 0.2, 0.2), m.orange);
     rail.position.set(side * (GAP + len / 2), 7.6, -11.1);
     upper.add(rail);
