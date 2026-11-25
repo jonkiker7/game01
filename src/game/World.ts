@@ -62,7 +62,6 @@ export const CANYON = {
   sandstoneDark: '#a98a5a',
   deep: '#16233d', // the canyon floor, far below
   floor: '#22405a',
-  crystal: '#5ff8ff',
   lake: '#2fb8ff', // the glowing lake on the canyon floors
   mist: '#ff6fc0', // pink atmosphere rising off the lake
   redGlow: '#ff5a4a',
@@ -264,7 +263,7 @@ export class World {
         // The ledge part way down: sandstone, banded.
         c.copy(sand).lerp(sandDark, 0.35 + valueNoise(x * 0.08, z * 0.08) * 0.4).multiplyScalar(grain * 0.95);
       } else {
-        // The canyon floor: deep blue rubble, a little teal near the crystals.
+        // The canyon floor (under the lake): deep blue rubble.
         c.copy(deep).lerp(floor, valueNoise(x * 0.05 + 3, z * 0.05) * 0.8).multiplyScalar(grain);
       }
       c.toArray(colors, i * 3);
@@ -283,8 +282,7 @@ export class World {
 
   /**
    * Placeholder canyon dressing (to be replaced by Blender assets): sandstone blocks scattered
-   * along the rims and on the ledges, rubble on the floor, and glowing crystals in the depths
-   * (mostly teal, a few red) with soft pools of light around them.
+   * along the rims and on the ledges, rubble on the floor, the glowing lake and the pink mist.
    */
   private buildCanyonDecor(): void {
     // A glowing blue lake along the canyon floors (the rock tops hide it everywhere else).
@@ -323,8 +321,7 @@ export class World {
     const limit = this.halfSize + 40;
     const rim: THREE.Matrix4[] = [];
     const rubble: THREE.Matrix4[] = [];
-    const crystals: { m: THREE.Matrix4; x: number; y: number; z: number; red: boolean }[] = [];
-    for (let i = 0; i < 26000 && (rim.length < 900 || rubble.length < 700 || crystals.length < 700); i++) {
+    for (let i = 0; i < 26000 && (rim.length < 900 || rubble.length < 700); i++) {
       const x = (rand() * 2 - 1) * limit;
       const z = (rand() * 2 - 1) * limit;
       const depth = this.canyonAt(x, z);
@@ -345,11 +342,7 @@ export class World {
         rim.push(this.matrix(x, top - LEDGE * CANYON_DEPTH + sx * 0.25, z, rand() * Math.PI, sx, sx * 0.5, sx * 0.8, (rand() - 0.5) * 0.4));
       } else {
         const y = this.surfaceAt(x, z);
-        if (rand() < 0.35 && crystals.length < 700) {
-          if (!this.footprintAt(x, z, 2.5, 1)) continue;
-          const h = 2 + rand() * 4;
-          crystals.push({ m: this.matrix(x, Math.max(y, LAKE_Y - 0.5) + h * 0.4, z, rand() * Math.PI, 0.6 + rand() * 0.6, h, 0.6 + rand() * 0.6, (rand() - 0.5) * 0.5), x, y, z, red: rand() < 0.14 });
-        } else if (rubble.length < 700) {
+        if (rubble.length < 700) {
           const sx = 0.8 + rand() * 2.6;
           if (!this.footprintAt(x, z, sx + 1.6, 1)) continue; // on the floor, not against a wall
           rubble.push(this.matrix(x, y + sx * 0.2, z, rand() * Math.PI, sx, sx * 0.55, sx * 0.9, (rand() - 0.5) * 0.6));
@@ -359,35 +352,6 @@ export class World {
     const block = new THREE.DodecahedronGeometry(1, 0);
     this.instanced([{ geo: block, mat: faceted(toon('#ffffff')), colors: [CANYON.sandstone, CANYON.sandstoneDark, '#e8d08e'] }], rim, 41);
     this.instanced([{ geo: block, mat: faceted(toon('#ffffff')), colors: [CANYON.deep, CANYON.floor, '#2b3d5c'] }], rubble, 42);
-
-    // Crystals glow (unlit, so they bloom on HIGH) with an additive pool of light on the floor.
-    const shard = new THREE.OctahedronGeometry(1, 0);
-    const pool = new THREE.CircleGeometry(1, 20);
-    pool.rotateX(-Math.PI / 2);
-    for (const red of [false, true]) {
-      const list = crystals.filter((k) => k.red === red);
-      const color = red ? CANYON.redGlow : CANYON.crystal;
-      // Drawn after the haze layers (transparent, later render order) so they glow through it.
-      const gems = new THREE.InstancedMesh(shard, glow(color, { transparent: true, fog: false }, red ? 2 : 1.7), list.length);
-      gems.renderOrder = 3;
-      const pools = new THREE.InstancedMesh(
-        pool,
-        glow(color, { transparent: true, opacity: red ? 0.45 : 0.35, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }, 0.9),
-        list.length,
-      );
-      pools.renderOrder = 2;
-      list.forEach((k, i) => {
-        gems.setMatrixAt(i, k.m);
-        const r = red ? 9 + Math.random() * 5 : 5 + Math.random() * 4;
-        // Light pools on the water's surface (or on the floor where it's above the water).
-        pools.setMatrixAt(i, new THREE.Matrix4().compose(new THREE.Vector3(k.x, Math.max(k.y, LAKE_Y) + 0.3, k.z), new THREE.Quaternion(), new THREE.Vector3(r, 1, r)));
-      });
-      for (const m of [gems, pools]) {
-        m.computeBoundingSphere();
-        m.userData.noCast = true;
-        this.group.add(m);
-      }
-    }
   }
 
   // ---------------------------------------------------------------- placement
