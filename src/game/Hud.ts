@@ -8,6 +8,10 @@ export class Hud {
   private readonly missileBtn: HTMLElement | null;
   private readonly pipRing: HTMLElement;
   private readonly salvage: HTMLElement;
+  private readonly score: HTMLElement;
+  private readonly scorePop: HTMLElement;
+  private lastScore = -1;
+  private popTimer = 0;
   private lastSalvage = -1;
   private lastMissiles = -1;
   private messageTimer = 0;
@@ -20,6 +24,8 @@ export class Hud {
       'beforeend',
       `<div id="armor"><span class="label">ARMOR</span><div class="bar"><div class="fill"></div></div></div>
        <div id="salvage"></div>
+       <div id="score"></div>
+       <div id="score-pop"></div>
        <div id="objective"></div>
        <div id="message"></div>
        <div id="damage"></div>
@@ -30,6 +36,8 @@ export class Hud {
     this.message = root.querySelector('#message') as HTMLElement;
     this.damage = root.querySelector('#damage') as HTMLElement;
     this.salvage = root.querySelector('#salvage') as HTMLElement;
+    this.score = root.querySelector('#score') as HTMLElement;
+    this.scorePop = root.querySelector('#score-pop') as HTMLElement;
 
     // Missile pips: little missile shapes on an arc around the top-left of the MSL button.
     this.missileBtn = root.querySelector('#btn-missile');
@@ -104,6 +112,30 @@ export class Hud {
     this.armorFill.classList.toggle('low', k <= 0.3);
   }
 
+  setScore(points: number): void {
+    const p = Math.round(points);
+    if (p === this.lastScore) return;
+    this.lastScore = p;
+    this.score.textContent = `SCORE ${p.toLocaleString('en-US')}`;
+  }
+
+  /** A short breakdown of points earned (e.g. when a sector is cleared). */
+  showScore(lines: [string, number][], seconds = 4): void {
+    this.scorePop.replaceChildren(
+      ...lines.map(([label, pts]) => {
+        const row = document.createElement('div');
+        const l = document.createElement('span');
+        l.textContent = label;
+        const v = document.createElement('b');
+        v.textContent = `+${Math.round(pts).toLocaleString('en-US')}`;
+        row.append(l, v);
+        return row;
+      }),
+    );
+    this.scorePop.classList.add('visible');
+    this.popTimer = seconds;
+  }
+
   setSalvage(amount: number): void {
     if (amount === this.lastSalvage) return;
     this.lastSalvage = amount;
@@ -154,6 +186,10 @@ export class Hud {
     if (this.messageTimer > 0) {
       this.messageTimer -= dt;
       if (this.messageTimer <= 0) this.message.classList.remove('visible');
+    }
+    if (this.popTimer > 0) {
+      this.popTimer -= dt;
+      if (this.popTimer <= 0) this.scorePop.classList.remove('visible');
     }
   }
 }

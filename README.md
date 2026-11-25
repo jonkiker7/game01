@@ -302,6 +302,27 @@ shot down the run ends; the summary screen shows your progress and banks your sa
 The radar marks whatever the current step is about (towers, drones, the reward, or the gates) and
 shows the arena wall as a dashed circle.
 
+## Score
+
+Every sortie keeps a score (top centre), and the best one is saved as your high score.
+
+- **Damage:** 1 point per point of damage dealt.
+- **Mission complete:** +1000 (beating the boss: +2500).
+- **Time bonus:** +30 per second left on the mission clock. That's more than the waves could ever
+  give you in damage per second (roughly 10–25), so finishing fast always beats farming, while
+  damage still adds up to about as much as the bonuses.
+- **Protection bonus:** up to +1000 for the health left on the generator or convoy.
+
+**Mission clocks** (shown under the objective): Destroy the Outpost 2:30, Rescue 2:00, Sabotage
+2:00, Hold the Zones 2:10, Deliver the Cargo 2:30. Running out of time fails the mission. Escort
+(1:20) and the boss (3:00) have a par time only: it counts down the time bonus but never fails.
+Survive and Defend run on their own timers. All the point values are in the dev panel (Score);
+the clocks are in `CLOCK` in `src/game/run/Run.ts`.
+
+**Deliver the Cargo** (on the convoy's corridor map): six crates are scattered along the route.
+Fly over them to pick them up and take them to the safe zone at the far right. How many you can
+carry at once depends on your ship: Manta 2, Kestrel 2, Valkyrie 3, Atlas 4.
+
 ## Bosses
 
 A health bar shows across the top. Every attack has a tell, and below half health each boss enters

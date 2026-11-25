@@ -15,6 +15,9 @@ const CATEGORY: Record<UpgradeCategory, { icon: string; color: string; name: str
 
 export interface RunSummary {
   won: boolean;
+  score: number;
+  best: number;
+  newBest: boolean;
   failed?: boolean;
   sectorsCleared: number;
   totalSectors: number;
@@ -81,6 +84,7 @@ export class RunUI {
   showEnd(s: RunSummary, restart: () => void, buttonLabel = 'NEW SORTIE ▸'): void {
     this.endEl.innerHTML = `
       <h1 class="${s.won ? 'won' : 'lost'}">${s.won ? 'SORTIE COMPLETE' : s.failed ? 'MISSION FAILED' : 'SHOT DOWN'}</h1>
+      <div class="end-score"><b>${s.score.toLocaleString('en-US')}</b><span>${s.newBest ? '★ NEW HIGH SCORE ★' : `SCORE · BEST ${s.best.toLocaleString('en-US')}`}</span></div>
       <div class="stats">
         <div><b>${s.sectorsCleared}/${s.totalSectors}</b><span>SECTORS CLEARED</span></div>
         <div><b>${s.kills}</b><span>ENEMIES DESTROYED</span></div>

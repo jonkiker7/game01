@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { cargoCapacity } from '../ShipDesigns';
 import type { EnemyManager } from '../Enemies';
 import { type Ctx, Enemy, ENEMY_ARMOR, ENEMY_BODY, ENEMY_GLOW } from '../EnemyBase';
 import type { Hud } from '../Hud';
@@ -19,7 +20,7 @@ import type { World } from '../World';
  * Defend and Escort can be failed, which ends the sortie (like being shot down).
  */
 
-export type MissionKind = 'rescue' | 'defend' | 'escort' | 'sabotage' | 'hold';
+export type MissionKind = 'rescue' | 'defend' | 'escort' | 'sabotage' | 'hold' | 'cargo';
 
 export const MISSION_TITLES: Record<MissionKind, string> = {
   rescue: 'RESCUE THE CREW',
@@ -27,9 +28,13 @@ export const MISSION_TITLES: Record<MissionKind, string> = {
   escort: 'ESCORT THE CONVOY',
   sabotage: 'SABOTAGE THE FORTRESS',
   hold: 'HOLD THE ZONES',
+  cargo: 'DELIVER THE CARGO',
 };
 
-export const MISSION_RADIUS: Record<MissionKind, number> = { rescue: 150, defend: 110, escort: 150, sabotage: 150, hold: 125 };
+export const MISSION_RADIUS: Record<MissionKind, number> = { rescue: 150, defend: 110, escort: 150, sabotage: 150, hold: 125, cargo: 150 };
+
+/** Missions that play on the snaking left-to-right corridor map. */
+export const CORRIDOR_MISSIONS: MissionKind[] = ['escort', 'cargo'];
 
 const GREEN = '#5dff8a';
 const GOLD = '#ffd36b';
@@ -796,8 +801,130 @@ class Hold extends Mission {
   }
 }
 
+// ---- Cargo
+
+/** Crates scattered along the corridor; deliver them all to the safe zone on the far right. */
+const CARGO_CRATES = 6;
+
+class Cargo extends Mission {
+  readonly kind = 'cargo';
+  private readonly crates: { x: number; z: number; obj: THREE.Group; taken: boolean }[] = [];
+  private readonly zone = new THREE.Vector3();
+  private carrying = 0;
+  private delivered = 0;
+  private readonly total = CARGO_CRATES;
+  /** Loads carried at once: depends on the ship (Manta 2, Atlas 4...). */
+  private get capacity(): number {
+    return cargoCapacity(this.d.ship.design);
+  }
+  private readonly hold = new THREE.Group();
+
+  protected setup(): void {
+    // The route: the corridor's centre line, left to right.
+    const path = this.d.world.shape.path ?? [
+      { x: this.cx - this.R * 0.8, z: this.cz },
+      { x: this.cx + this.R * 0.8, z: this.cz },
+    ];
+    const cum = [0];
+    for (let i = 1; i < path.length; i++) cum.push(cum[i - 1] + Math.hypot(path[i].x - path[i - 1].x, path[i].z - path[i - 1].z));
+    const len = cum[cum.length - 1];
+    const at = (d: number) => {
+      let i = 1;
+      while (i < path.length - 1 && cum[i] < d) i++;
+      const a = path[i - 1];
+      const b = path[i];
+      const k = (d - cum[i - 1]) / (cum[i] - cum[i - 1] || 1);
+      const dx = b.x - a.x;
+      const dz = b.z - a.z;
+      const l = Math.hypot(dx, dz) || 1;
+      return { x: a.x + dx * k, z: a.z + dz * k, nx: -dz / l, nz: dx / l };
+    };
+    // The safe zone at the far right end.
+    const end = path[path.length - 1];
+    const zs = this.d.world.nearestRock(end.x, end.z, 10);
+    this.zone.set(zs.x, this.d.world.heightAt(zs.x, zs.z), zs.z);
+    const pad = new THREE.Mesh(new THREE.CylinderGeometry(9, 9.6, 0.6, 6), toon('#2a3150'));
+    pad.position.copy(this.zone);
+    const zr = ring(GREEN, 12, 0.9);
+    zr.position.set(this.zone.x, this.zone.y + HOVER_HEIGHT - 1, this.zone.z);
+    this.group.add(pad, zr, beam(GREEN, this.zone.x, this.zone.y, this.zone.z, 2.4));
+    // Crates spread along the way, off to either side of the route.
+    for (let i = 0; i < this.total; i++) {
+      const p = at(len * (0.12 + (0.7 * (i + Math.random() * 0.6)) / this.total));
+      const side = (Math.random() < 0.5 ? -1 : 1) * (6 + Math.random() * 22);
+      const { x, z } = this.d.world.nearestRock(p.x + p.nx * side, p.z + p.nz * side, 3);
+      const ground = this.d.world.heightAt(x, z);
+      const obj = new THREE.Group();
+      const box = new THREE.Mesh(new THREE.BoxGeometry(3, 2.2, 3), toon('#e2733a'));
+      box.position.y = 1.1;
+      const band = new THREE.Mesh(new THREE.BoxGeometry(3.1, 0.5, 3.1), toon('#2f8f95'));
+      band.position.y = 1.1;
+      const flare = beam(GOLD, 0, 0, 0, 1.1);
+      flare.position.set(0, (HOVER_HEIGHT + 14) / 2, 0);
+      obj.add(box, band, flare);
+      obj.position.set(x, ground, z);
+      obj.rotation.y = Math.random() * Math.PI;
+      addOutlines(obj);
+      this.group.add(obj);
+      this.crates.push({ x, z, obj, taken: false });
+    }
+    // Crates you're carrying hang under the ship.
+    this.d.ship.root.add(this.hold);
+  }
+
+  update(dt: number): void {
+    this.time += dt;
+    const cap = this.capacity;
+    for (const c of this.crates) {
+      if (c.taken || this.carrying >= cap) continue;
+      if (this.shipNear(c.x, c.z, 7)) {
+        c.taken = true;
+        c.obj.visible = false;
+        this.carrying++;
+        this.showHold();
+        this.d.hud.show(this.carrying >= cap ? 'HOLD FULL · TO THE SAFE ZONE' : `CARGO ABOARD ${this.carrying}/${cap}`, 1.6);
+      }
+    }
+    if (this.carrying > 0 && this.shipNear(this.zone.x, this.zone.z, 12)) {
+      this.delivered += this.carrying;
+      this.carrying = 0;
+      this.showHold();
+      this.d.hud.show(`DELIVERED · ${this.delivered}/${this.total}`, 1.6);
+      this.d.hud.flashHeal();
+    }
+    if (this.delivered >= this.total) this.done = true;
+  }
+
+  /** Little crates slung under the ship, one per load aboard. */
+  private showHold(): void {
+    this.hold.clear();
+    for (let i = 0; i < this.carrying; i++) {
+      const b = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.9, 1.2), toon('#e2733a'));
+      b.position.set((i - (this.carrying - 1) / 2) * 1.5, -2.2, 0.6);
+      this.hold.add(b);
+    }
+  }
+
+  objective(): string {
+    return `${this.title}\nDELIVERED ${this.delivered}/${this.total} · ABOARD ${this.carrying}/${this.capacity}`;
+  }
+
+  blips(out: Blip[]): void {
+    if (this.carrying < this.capacity) for (const c of this.crates) if (!c.taken) out.push({ x: c.x, z: c.z, kind: 'reward', color: GOLD });
+    if (this.carrying > 0) out.push({ x: this.zone.x, z: this.zone.z, kind: 'reward', color: GREEN });
+  }
+
+  cleanup(): void {
+    this.hold.clear();
+    this.hold.removeFromParent();
+    super.cleanup();
+  }
+}
+
 export function createMission(kind: MissionKind, d: MissionDeps): Mission {
   switch (kind) {
+    case 'cargo':
+      return new Cargo(d);
     case 'rescue':
       return new Rescue(d);
     case 'defend':

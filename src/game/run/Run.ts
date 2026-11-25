@@ -8,10 +8,11 @@ import type { Ship } from '../Ship';
 import type { World } from '../World';
 import { type ArenaShape, blobArena, corridorArena } from '../ArenaShape';
 import type { ContractTracker } from './Contracts';
-import { createMission, type Mission, type MissionDeps, MISSION_RADIUS, MISSION_TITLES, type MissionKind } from './Missions';
+import { CORRIDOR_MISSIONS, createMission, type Mission, type MissionDeps, MISSION_RADIUS, MISSION_TITLES, type MissionKind } from './Missions';
 import { type ArenaVisual, type Gate, REWARD_STYLE, type Reward } from './Arena';
 import type { RunUI } from './RunUI';
 import { audio } from '../../audio/Audio';
+import { TUNING } from '../Tuning';
 import { defaultStats, PRIMARY_NAMES, rollUpgrades, rollWeapons, SECONDARY_NAMES, type Stats, type Upgrade, UPGRADES } from './Upgrades';
 
 /** Rounds per sortie, the last one being the boss (2 rounds, then the boss). */
@@ -20,6 +21,8 @@ export const SECTORS = 3;
 /** How a sortie ended. */
 export interface RunResult {
   won: boolean;
+  /** Points scored this sortie. */
+  score: number;
   /** Lost by failing a mission (the generator or convoy was destroyed) rather than being shot down. */
   failed?: boolean;
   sectorsCleared: number;
@@ -38,8 +41,25 @@ const SURVIVE_TIME = 40;
 
 type EncounterKind = 'outpost' | 'survive' | 'stronghold' | 'boss' | MissionKind;
 /** Encounters the rounds before the boss can be. */
-const ROUND_KINDS: EncounterKind[] = ['outpost', 'survive', 'rescue', 'defend', 'escort', 'sabotage', 'hold'];
+const ROUND_KINDS: EncounterKind[] = ['outpost', 'survive', 'rescue', 'defend', 'escort', 'sabotage', 'hold', 'cargo'];
 type Phase = 'intro' | 'fight' | 'failed' | 'reward' | 'choosing' | 'gates' | 'transition' | 'over';
+
+/**
+ * Mission clocks. `fail`: running out of time fails the mission (it ends the sortie). Without
+ * it, the clock is just a par time for the time bonus. Survive and Defend already run on their
+ * own timers, so they have none.
+ */
+const CLOCK: Partial<Record<EncounterKind, { limit: number; fail: boolean }>> = {
+  outpost: { limit: 150, fail: true },
+  rescue: { limit: 120, fail: true },
+  sabotage: { limit: 120, fail: true },
+  hold: { limit: 130, fail: true },
+  cargo: { limit: 150, fail: true },
+  escort: { limit: 80, fail: false },
+  boss: { limit: 180, fail: false },
+};
+
+const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 /** How long the mission title stays up at the start of a round (enemies arrive 1 s before it goes). */
 const INTRO_TIME = 4.6;
@@ -139,6 +159,7 @@ export class Run {
     this.lastRoundKind = null;
     this.kills = 0;
     this.salvage = 0;
+    this.score = 0;
     this.missionFailed = false;
     this.won = false;
     this.reward = 'upgrade';
@@ -164,7 +185,7 @@ export class Run {
   private buildArena(): void {
     const seed = this.seed * 10 + this.sector;
     this.shape =
-      this.kind === 'escort'
+      CORRIDOR_MISSIONS.includes(this.kind as MissionKind)
         ? corridorArena(CORRIDOR.length, CORRIDOR.halfWidth, seed)
         : blobArena(ARENA_RADIUS[this.kind] * 0.92, seed);
     this.d.world.generate(this.shape, seed);
@@ -220,6 +241,20 @@ export class Run {
   }
 
   private introTimer = 0;
+  /** Points this sortie, and seconds spent on the current mission. */
+  score = 0;
+  private elapsed = 0;
+
+  /** Damage dealt to enemies scores points (only while a mission is on). */
+  addDamage(amount: number): void {
+    if (this.phase === 'fight') this.score += amount * TUNING.score.perDamage;
+  }
+
+  /** Seconds left on this mission's clock (null if it has none). */
+  private timeLeft(): number | null {
+    const c = CLOCK[this.kind];
+    return c ? Math.max(0, c.limit - this.elapsed) : null;
+  }
 
   /** The enemies, objective and contract for this round arrive. */
   private beginFight(): void {
@@ -258,6 +293,7 @@ export class Run {
     }
     this.d.contracts.enterSector(s, cx, cz, R);
     this.phase = 'fight';
+    this.elapsed = 0;
     if (this.boss) hud.show(this.boss.name, 2.2, true);
   }
 
@@ -338,6 +374,12 @@ export class Run {
         if (this.introTimer <= 0) this.beginFight();
         break;
       case 'fight': {
+        this.elapsed += dt;
+        const c = CLOCK[this.kind];
+        if (c?.fail && this.elapsed >= c.limit) {
+          this.failEncounter('OUT OF TIME · MISSION FAILED');
+          break;
+        }
         if (this.mission) {
           this.mission.update(dt);
           if (this.mission.failed) {
@@ -388,8 +430,21 @@ export class Run {
     }
   }
 
+  /** Bonus points for finishing a mission: clear, time left, and health of what you protected. */
+  private awardBonus(): void {
+    const S = TUNING.score;
+    const lines: [string, number][] = [[this.boss ? 'BOSS DEFEATED' : 'MISSION COMPLETE', this.boss ? S.bossClear : S.clear]];
+    const left = this.timeLeft();
+    if (left !== null && left > 0) lines.push([`TIME BONUS · ${clock(left)}`, left * S.perSecond]);
+    const guard = this.mission?.healthBar();
+    if (guard && guard.fraction > 0) lines.push([`${guard.name} ${Math.round(guard.fraction * 100)}%`, guard.fraction * S.protect]);
+    for (const [, pts] of lines) this.score += pts;
+    this.d.hud.showScore(lines);
+  }
+
   private clearEncounter(): void {
     const { enemies, hud } = this.d;
+    this.awardBonus();
     enemies.stopDrones();
     enemies.destroyAll();
     if (this.sector === SECTORS) {
@@ -412,12 +467,12 @@ export class Run {
    * A mission was failed (generator or convoy destroyed): it blows up, a red banner holds for
    * a few seconds, and then the sortie ends, just like being shot down.
    */
-  private failEncounter(): void {
+  private failEncounter(text?: string): void {
     const { enemies, hud } = this.d;
     enemies.stopDrones();
     enemies.destroyAll();
-    this.mission?.onFail();
-    hud.show(this.mission?.failText ?? 'OBJECTIVE FAILED', 3.4);
+    if (!text) this.mission?.onFail();
+    hud.show(text ?? this.mission?.failText ?? 'OBJECTIVE FAILED', 3.4);
     audio.play('fail');
     hud.flashDamage();
     this.phase = 'failed';
@@ -525,6 +580,7 @@ export class Run {
     this.d.releaseInput();
     this.d.onFinish({
       won: this.won,
+      score: Math.round(this.score),
       failed: this.missionFailed,
       sectorsCleared: this.won ? SECTORS : this.sector - 1,
       totalSectors: SECTORS,
@@ -538,7 +594,10 @@ export class Run {
   /** What the HUD should say under the radar. */
   objective(): string {
     const line = this.d.contracts.objectiveLine(this.sector);
-    const text = this.baseObjective();
+    let text = this.baseObjective();
+    // The mission clock (a hard limit, or the time bonus counting down).
+    const left = this.phase === 'fight' ? this.timeLeft() : null;
+    if (left !== null) text += `\n${CLOCK[this.kind]!.fail ? '⏱' : '⏱ BONUS'} ${clock(left)}`;
     return line && this.phase !== 'over' ? `${text}\n${line}` : text;
   }
 
