@@ -19,7 +19,7 @@ export function castShadows(root: THREE.Object3D): void {
 }
 
 /** Half the width of the shadowed area (bigger = covers more of the screen, but blurrier). */
-const AREA = 150;
+const AREA = 190;
 /**
  * The camera tilts forward, so it sees far more ground ahead (up the screen) than behind:
  * the shadowed area is shifted forward to match.

@@ -29,21 +29,21 @@ const KEY = 'star-rotor-dev';
 /** Current defaults (must match the game's starting values). */
 const LOOK_DEFAULTS = {
   sunIntensity: 4.25,
-  sunColor: '#ffdcc4',
+  sunColor: '#ffffff',
   sunAngle: 79, // compass direction the sunlight comes from
-  sunHeight: 57, // degrees above the horizon (lower = longer shadows)
-  rimLight: 0.9,
+  sunHeight: 31, // degrees above the horizon (lower = longer shadows)
+  rimLight: 2.8,
   shadows: true,
   shadowDarkness: 1,
-  shadowArea: 150,
-  glowStrength: 0.75,
-  glowSpread: 0.45,
+  shadowArea: 190,
+  glowStrength: 0.35,
+  glowSpread: 0.4,
   glowThreshold: 1.2,
-  vignette: 0.7,
+  vignette: 0.9,
   canyonFogColor: CANYON_FOG.color,
   canyonFogDensity: CANYON_FOG.density,
   canyonFogHeight: CANYON_FOG.height,
-  vignetteSize: 52,
+  vignetteSize: 62,
 };
 
 type Look = typeof LOOK_DEFAULTS;
