@@ -611,10 +611,17 @@ function concourse(g: THREE.Group, parts: StationParts, m: Mats): void {
   const lip = new THREE.Mesh(new THREE.BoxGeometry(36, 0.25, 0.3), glow(STATION.amber, {}, 1.2));
   lip.position.set(0, 6.0, -11);
   lip.userData.noOutline = true;
-  const rail = new THREE.Mesh(new THREE.BoxGeometry(36, 0.2, 0.2), m.orange);
-  rail.position.set(0, 7.6, -11.1);
-  upper.add(balcony, lip, rail);
+  upper.add(balcony, lip);
+  // The railing stops either side of the middle, where the leaderboard hangs in front.
+  const GAP = 8.6;
+  for (const side of [-1, 1]) {
+    const len = 18 - GAP;
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(len, 0.2, 0.2), m.orange);
+    rail.position.set(side * (GAP + len / 2), 7.6, -11.1);
+    upper.add(rail);
+  }
   for (let x = -17; x <= 17; x += 1.7) {
+    if (Math.abs(x) < GAP) continue;
     const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.3, 0.12), m.navy);
     post.position.set(x, 6.95, -11.1);
     upper.add(post);
