@@ -47,7 +47,7 @@ helps you aim). LOW skips real shadows. A soft vignette darkens the screen edges
 
 **Dev panel:** add `?dev` to the URL (e.g. `?dev&sortie`) for a **DEV** panel at the top. Its
 sliders cover lighting (sun brightness/colour/direction/height, sky and rim light, fog), shadows (darkness and area),
-glow (bloom) and the vignette, plus gameplay numbers (ship speeds and rolls, tower bombs,
+glow (bloom), the vignette, canyon fog (colour, density, height), plus gameplay numbers (ship speeds and rolls, tower bombs,
 swarmers). Changes apply live and are remembered on that device while `?dev` is on.
 **📋 Copy settings** copies them so they can be made the game's defaults; **↺ Reset** goes back.
 Gameplay defaults live in `src/game/Tuning.ts`.
@@ -124,8 +124,9 @@ post contracts have things to say once you've finished one. Contract writing liv
 ## The terrain: mesas and canyons
 
 The ground is the top of big, flat-ish rock mesas (the jungle grows on top), split by winding
-**canyons** about a third of the map. Their sandstone walls step down past a ledge to a glowing
-blue lake, with pink atmosphere rising off it (thickest at the water, thinning toward the rim). Decor rocks only sit where their whole footprint is on
+**canyons** about a third of the map. Their sandstone walls step down past a ledge into dark blue
+depths, with layered fog that's thickest at the bottom (colour, density and height are in the `?dev`
+panel under **Canyon fog**). Decor rocks only sit where their whole footprint is on
 solid ground, so nothing hangs over a cliff edge. The ship flies at a steady height over both.
 
 - Everything that stands on the ground (towers, crawlers, pulsars, ground bosses, pylons, the

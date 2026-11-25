@@ -62,15 +62,15 @@ export const CANYON = {
   sandstoneDark: '#a98a5a',
   deep: '#16233d', // the canyon floor, far below
   floor: '#22405a',
-  lake: '#2fb8ff', // the glowing lake on the canyon floors
-  mist: '#ff6fc0', // pink atmosphere rising off the lake
+  fog: '#0e1a36', // haze in the canyons (darker and bluer the deeper you look)
   redGlow: '#ff5a4a',
 };
 
 /** How far the canyons drop below the rock tops. */
 export const CANYON_DEPTH = 48;
-/** Height of the glowing lake's surface (just above the canyon floor). */
-const LAKE_Y = -CANYON_DEPTH + 5; // high enough to cover the floor everywhere
+/** Canyon fog: colour, density (opacity of each layer) and height (fraction of the depth it reaches up to). */
+export const CANYON_FOG = { color: CANYON.fog, density: 0.22, height: 0.8 };
+const FOG_LAYERS = 6;
 /** Depth fraction of the stepped ledge part way down the canyon walls. */
 const LEDGE = 0.38;
 /** Canyon width (in ridge-noise units; bigger = wider canyons). */
@@ -105,7 +105,7 @@ export class World {
   readonly group = new THREE.Group();
   private readonly bulbMat: THREE.MeshBasicMaterial;
   private readonly padRing: THREE.Mesh;
-  private lakeMat: THREE.MeshBasicMaterial | null = null;
+  private readonly fogLayers: THREE.Mesh[] = [];
   private time = 0;
 
   constructor(scene: THREE.Scene) {
@@ -144,7 +144,23 @@ export class World {
   canyonAt(x: number, z: number): number {
     const t = this.canyonT(x, z);
     if (t <= 0) return 0;
-    return t < 0.3 ? LEDGE : 1;
+    return t < 0.42 ? LEDGE : 1;
+  }
+
+  /**
+   * Canyon fog: `density` is each layer's opacity (they stack, so it's thickest at the
+   * bottom), `height` how far up the canyon it reaches (0..1 of the depth).
+   */
+  setCanyonFog(color: string, density: number, height: number): void {
+    const floor = -CANYON_DEPTH + 1;
+    this.fogLayers.forEach((layer, i) => {
+      const k = i / (FOG_LAYERS - 1); // 0 = the bottom layer, 1 = the top one
+      const m = layer.material as THREE.MeshBasicMaterial;
+      m.color.set(color);
+      m.opacity = density * (1 - 0.6 * k);
+      layer.visible = density > 0.001 && height > 0.01;
+      layer.position.y = floor + k * height * (CANYON_DEPTH - 1);
+    });
   }
 
   /** Is every point within `r` of (x, z) at the same canyon depth (0 = rock top, LEDGE, 1 = floor)? */
@@ -211,8 +227,6 @@ export class World {
     const pulse = 0.8 + Math.sin(this.time * 2.2) * 0.2;
     this.bulbMat.color.set(this.palette.bulb).multiplyScalar(GLOW * pulse);
     (this.padRing.material as THREE.MeshBasicMaterial).opacity = 0.45 + Math.sin(this.time * 3) * 0.25;
-    // The lake's ripples drift slowly.
-    if (this.lakeMat?.map) this.lakeMat.map.offset.set(this.time * 0.006, this.time * 0.004);
   }
 
   // ---------------------------------------------------------------- ground
@@ -263,7 +277,7 @@ export class World {
         // The ledge part way down: sandstone, banded.
         c.copy(sand).lerp(sandDark, 0.35 + valueNoise(x * 0.08, z * 0.08) * 0.4).multiplyScalar(grain * 0.95);
       } else {
-        // The canyon floor (under the lake): deep blue rubble.
+        // The canyon floor: deep blue rubble.
         c.copy(deep).lerp(floor, valueNoise(x * 0.05 + 3, z * 0.05) * 0.8).multiplyScalar(grain);
       }
       c.toArray(colors, i * 3);
@@ -282,40 +296,25 @@ export class World {
 
   /**
    * Placeholder canyon dressing (to be replaced by Blender assets): sandstone blocks scattered
-   * along the rims and on the ledges, rubble on the floor, the glowing lake and the pink mist.
+   * along the rims and on the ledges, rubble on the floor, and layered fog in the depths.
    */
   private buildCanyonDecor(): void {
-    // A glowing blue lake along the canyon floors (the rock tops hide it everywhere else).
+    // Layers of fog inside the canyons, thickest at the bottom (the rock tops hide them
+    // everywhere else). They ignore the sky-coloured fog. Tunable in the ?dev panel.
     const hazeSize = this.halfSize * 2 + 200;
-    // Drawn after most of the mist (see the render orders below), so it glows a clear blue.
-    this.lakeMat = new THREE.MeshBasicMaterial({ map: lakeTexture(), fog: false, toneMapped: false, transparent: true });
-    this.lakeMat.color.set(CANYON.lake).multiplyScalar(1.7);
-    this.lakeMat.map!.repeat.set(hazeSize / 60, hazeSize / 60);
-    const lake = new THREE.Mesh(new THREE.PlaneGeometry(hazeSize, hazeSize), this.lakeMat);
-    lake.rotation.x = -Math.PI / 2;
-    lake.position.y = LAKE_Y;
-    lake.renderOrder = 1.5;
-    lake.userData.noCast = true;
-    lake.userData.noOutline = true;
-    this.group.add(lake);
-
-    // Pink atmosphere rising off the lake: thickest at the water, thinning toward the rim.
-    // (Stacked see-through layers, ignoring the sky-coloured fog.)
-    const layers = 7;
-    for (let i = 0; i < layers; i++) {
-      const k = i / (layers - 1); // 0 = just above the lake, 1 = near the top
+    for (let i = 0; i < FOG_LAYERS; i++) {
       const haze = new THREE.Mesh(
         new THREE.PlaneGeometry(hazeSize, hazeSize),
-        new THREE.MeshBasicMaterial({ color: CANYON.mist, transparent: true, opacity: 0.11 * (1 - k) + 0.03, depthWrite: false, fog: false }),
+        new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, fog: false }),
       );
       haze.rotation.x = -Math.PI / 2;
-      haze.position.y = LAKE_Y + 4 + k * (CANYON_DEPTH * 0.75);
-      // The lowest layer goes over the lake (a thin pink film on the water); the rest under it.
-      haze.renderOrder = i === 0 ? 1.7 : 1;
+      haze.renderOrder = 1;
       haze.userData.noCast = true;
       haze.userData.noOutline = true;
+      this.fogLayers.push(haze);
       this.group.add(haze);
     }
+    this.setCanyonFog(CANYON_FOG.color, CANYON_FOG.density, CANYON_FOG.height);
 
     const rand = mulberry32(77);
     const limit = this.halfSize + 40;
@@ -757,39 +756,5 @@ function paintedTexture(): THREE.CanvasTexture {
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.repeat.set(22, 22);
   tex.anisotropy = 4;
-  return tex;
-}
-
-
-/** Soft ripples for the glowing lake (bright blue with paler caustic streaks). */
-function lakeTexture(): THREE.CanvasTexture {
-  const c = document.createElement('canvas');
-  c.width = c.height = 256;
-  const g = c.getContext('2d')!;
-  g.fillStyle = '#9fb8c8';
-  g.fillRect(0, 0, 256, 256);
-  const rand = mulberry32(5);
-  g.lineCap = 'round';
-  for (let i = 0; i < 90; i++) {
-    const x = rand() * 256;
-    const y = rand() * 256;
-    const len = 10 + rand() * 30;
-    g.strokeStyle = `rgba(255, 255, 255, ${0.25 + rand() * 0.45})`;
-    g.lineWidth = 1 + rand() * 2.5;
-    g.beginPath();
-    g.moveTo(x, y);
-    g.quadraticCurveTo(x + len * 0.5, y + (rand() - 0.5) * 12, x + len, y + (rand() - 0.5) * 6);
-    g.stroke();
-    // Wrap around so the texture tiles seamlessly.
-    if (x + len > 256) {
-      g.beginPath();
-      g.moveTo(x - 256, y);
-      g.quadraticCurveTo(x - 256 + len * 0.5, y, x - 256 + len, y);
-      g.stroke();
-    }
-  }
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   return tex;
 }
