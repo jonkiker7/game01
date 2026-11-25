@@ -324,7 +324,9 @@ function windowPiece(m: Mats, len: number, h: number): THREE.Group {
   glass.userData.noOutline = true;
   seg.add(sill, header, glass);
   for (const s of [-1, 1]) {
-    const post = new THREE.Mesh(new THREE.BoxGeometry(0.4, h, WALL_T + 0.1), m.orange);
+    // Wide and deep enough to cover where the sill, header and neighbouring wall overlap
+    // (their faces line up there, which flickers if it's left showing).
+    const post = new THREE.Mesh(new THREE.BoxGeometry(WALL_T + 0.3, h + 0.02, WALL_T + 0.25), m.orange);
     post.position.set((s * len) / 2, h / 2, 0);
     seg.add(post);
   }
