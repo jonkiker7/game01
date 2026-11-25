@@ -62,8 +62,7 @@ export class ContractTracker {
     // Somewhere away from the middle of the arena (where the towers cluster).
     const a = Math.random() * Math.PI * 2;
     const r = radius * (0.3 + Math.random() * 0.3);
-    const x = cx + Math.cos(a) * r;
-    const z = cz + Math.sin(a) * r;
+    const { x, z } = this.world.nearestRock(cx + Math.cos(a) * r, cz + Math.sin(a) * r, 4);
     const ground = this.world.heightAt(x, z);
     this.spot.set(x, ground, z);
     if (c.type === 'retrieve') this.buildPod(ground);

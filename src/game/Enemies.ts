@@ -483,6 +483,8 @@ export class EnemyManager {
   }
 
   private register(e: Enemy, x: number, z: number): void {
+    // Anything standing on the ground goes on a rock top, never over a canyon.
+    if (e.kind !== 'drone' && e.species !== 'bosspart') ({ x, z } = this.world.nearestRock(x, z, e.radius + 1));
     e.root.position.set(x, this.world.heightAt(x, z), z);
     // Things standing on the ground cast real shadows; flyers keep it simple (see Shadows.ts).
     if (e.kind !== 'drone') castShadows(e.root);

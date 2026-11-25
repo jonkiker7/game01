@@ -46,9 +46,49 @@ export const OUTPOSTS: [number, number][] = [
   [-240, 170],
   [60, -240],
   [-70, -240],
-]
+];
 
 type Placer = (rand: () => number) => { x: number; z: number };
+
+/** Flat-shaded (faceted) version of a material: every polygon face shows crisply. */
+function faceted<T extends THREE.Material>(m: T): T {
+  (m as T & { flatShading: boolean }).flatShading = true;
+  return m;
+}
+
+/** Canyon colours (placeholders until the Blender rocks arrive). */
+export const CANYON = {
+  sandstone: '#d8bf7e',
+  sandstoneDark: '#a98a5a',
+  deep: '#16233d', // the canyon floor, far below
+  floor: '#22405a',
+  crystal: '#5ff8ff',
+  haze: '#0e1a36',
+  redGlow: '#ff5a4a',
+};
+
+/** How far the canyons drop below the rock tops. */
+export const CANYON_DEPTH = 48;
+/** Depth fraction of the stepped ledge part way down the canyon walls. */
+const LEDGE = 0.38;
+/** Canyon width (in ridge-noise units; bigger = wider canyons). */
+const CANYON_WIDTH = 0.1;
+
+/**
+ * Spots that must stay solid rock: every arena centre (for every arena size the game clamps
+ * them to; see run/Run.ts arenaAt).
+ */
+const CLEAR_SPOTS: [number, number][] = (() => {
+  const out: [number, number][] = [];
+  for (const [x, z] of OUTPOSTS) {
+    for (const r of [110, 125, 130, 150, 180]) {
+      const lim = 354 - r;
+      const c: [number, number] = [Math.max(-lim, Math.min(lim, x)), Math.max(-lim, Math.min(lim, z))];
+      if (!out.some((o) => Math.hypot(o[0] - c[0], o[1] - c[1]) < 4)) out.push(c);
+    }
+  }
+  return out;
+})();
 
 /**
  * An alien jungle: mossy ground with pale streams, purple-trunked trees, pink fan plants,
@@ -82,12 +122,75 @@ export class World {
     scene.add(this.group);
   }
 
-  /** Ground height at a world position (the ship hovers relative to this). */
+  /**
+   * Height of the rock tops (the playing surface) at a world position. Continuous across the
+   * canyons, so the ship hovers at a steady height over them. Use `surfaceAt` for the real
+   * ground (down in a canyon) and `isRock` to check there's solid ground.
+   */
   heightAt(x: number, z: number): number {
     const hills = (fbm(x * 0.016, z * 0.016, 3) - 0.5) * 6;
     // Flatten the area around the landing pad at the centre.
     const flat = smoothstep(10, 26, Math.hypot(x, z));
     return hills * flat;
+  }
+
+  /**
+   * How deep into a canyon (x, z) is: 0 = on the rock top, LEDGE = on the stepped ledge part
+   * way down, 1 = on the canyon floor.
+   */
+  canyonAt(x: number, z: number): number {
+    const t = this.canyonT(x, z);
+    if (t <= 0) return 0;
+    return t < 0.42 ? LEDGE : 1;
+  }
+
+  /** The real ground height, including canyons. */
+  surfaceAt(x: number, z: number): number {
+    return this.heightAt(x, z) - this.canyonAt(x, z) * CANYON_DEPTH;
+  }
+
+  /** Is (x, z) on a rock top, with at least `margin` units of rock around it? */
+  isRock(x: number, z: number, margin = 0): boolean {
+    if (this.canyonT(x, z) > 0) return false;
+    if (margin <= 0) return true;
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      if (this.canyonT(x + Math.cos(a) * margin, z + Math.sin(a) * margin) > 0) return false;
+    }
+    return true;
+  }
+
+  /** The closest point to (x, z) that's on a rock top with `margin` of room (searches outward). */
+  nearestRock(x: number, z: number, margin = 0): { x: number; z: number } {
+    if (this.isRock(x, z, margin)) return { x, z };
+    for (let r = 3; r <= 90; r += 3) {
+      const steps = Math.max(8, Math.round(r * 1.2));
+      for (let i = 0; i < steps; i++) {
+        const a = (i / steps) * Math.PI * 2;
+        const px = x + Math.cos(a) * r;
+        const pz = z + Math.sin(a) * r;
+        if (this.isRock(px, pz, margin)) return { x: px, z: pz };
+      }
+    }
+    return { x, z };
+  }
+
+  /**
+   * The canyon field: winding cracks where two noise fields cross their midpoints. > 0 means
+   * canyon (1 = its centre line). Arena centres and the landing pad are always solid rock.
+   */
+  private canyonT(x: number, z: number): number {
+    const ridgeA = 1 - Math.abs(fbm(x * 0.0072 + 31, z * 0.0072 - 17, 3) - 0.5) * 2;
+    const ridgeB = 1 - Math.abs(fbm(x * 0.0115 - 60, z * 0.0115 + 44, 2) - 0.5) * 2;
+    const r = Math.max(ridgeA, ridgeB * 0.985);
+    const w = CANYON_WIDTH * (0.75 + valueNoise(x * 0.012 + 5, z * 0.012 - 9) * 0.6);
+    let t = (r - (1 - w)) / w;
+    if (t <= 0) return 0;
+    // Keep solid rock around the landing pad and every arena centre.
+    let clear = smoothstep(32, 48, Math.hypot(x, z));
+    for (const [cx, cz] of CLEAR_SPOTS) clear = Math.min(clear, smoothstep(26, 40, Math.hypot(x - cx, z - cz)));
+    t = t * 1.25 - (1 - clear) * 1.3;
+    return t;
   }
 
   update(dt: number): void {
@@ -101,7 +204,8 @@ export class World {
 
   private buildGround(): void {
     const size = this.halfSize * 2 + 200;
-    const seg = 300;
+    const seg = 380; // ~2.4 units per cell: canyon walls drop across one cell, so they read as cliffs
+    const cell = size / seg;
     const geo = new THREE.PlaneGeometry(size, size, seg, seg);
     geo.rotateX(-Math.PI / 2);
 
@@ -111,31 +215,139 @@ export class World {
     const high = new THREE.Color(this.palette.groundHigh);
     const pink = new THREE.Color(this.palette.groundPink);
     const path = new THREE.Color(this.palette.path);
+    const sand = new THREE.Color(CANYON.sandstone);
+    const sandDark = new THREE.Color(CANYON.sandstoneDark);
+    const deep = new THREE.Color(CANYON.deep);
+    const floor = new THREE.Color(CANYON.floor);
     const c = new THREE.Color();
 
+    const jitter = mulberry32(13);
     for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i);
-      const z = pos.getZ(i);
-      const h = this.heightAt(x, z);
-      pos.setY(i, h);
+      // Nudge every grid point a little, so cliff edges break into irregular facets
+      // instead of following the grid in stair steps.
+      const x = pos.getX(i) + (jitter() - 0.5) * cell * 0.8;
+      const z = pos.getZ(i) + (jitter() - 0.5) * cell * 0.8;
+      pos.setX(i, x);
+      pos.setZ(i, z);
+      const depth = this.canyonAt(x, z);
+      const top = this.heightAt(x, z);
+      pos.setY(i, top - depth * CANYON_DEPTH + (depth >= 1 ? (valueNoise(x * 0.2, z * 0.2) - 0.5) * 3 : 0));
+      const grain = 0.88 + valueNoise(x * 0.3, z * 0.3) * 0.24;
 
-      // Moss is brighter on the rises and deep teal in the hollows.
-      c.copy(low).lerp(high, smoothstep(-2.2, 1.6, h));
-      // Soft patches of pink ground cover.
-      c.lerp(pink, 0.55 * smoothstep(0.56, 0.68, fbm(x * 0.03 + 50, z * 0.03 - 20, 2)));
-      // Pale winding streams where a noise field crosses its midpoint.
-      const stream = Math.abs(fbm(x * 0.009 + 13, z * 0.009 + 7, 3) - 0.5);
-      c.lerp(path, 0.85 * (1 - smoothstep(0.012, 0.03, stream)));
-      c.multiplyScalar((0.88 + valueNoise(x * 0.3, z * 0.3) * 0.24) * 1.1);
+      if (depth === 0) {
+        // Rock top: moss, brighter on the rises and deep teal in the hollows.
+        c.copy(low).lerp(high, smoothstep(-2.2, 1.6, top));
+        c.lerp(pink, 0.55 * smoothstep(0.56, 0.68, fbm(x * 0.03 + 50, z * 0.03 - 20, 2)));
+        const stream = Math.abs(fbm(x * 0.009 + 13, z * 0.009 + 7, 3) - 0.5);
+        c.lerp(path, 0.85 * (1 - smoothstep(0.012, 0.03, stream)));
+        // Bare sandstone along the rim, where the moss gives way to the cliff edge.
+        const nearEdge = [0, 1, 2, 3].some((k) => this.canyonAt(x + Math.cos(k * 1.57) * cell * 1.2, z + Math.sin(k * 1.57) * cell * 1.2) > 0);
+        if (nearEdge) c.lerp(sand, 0.75);
+        c.multiplyScalar(grain * 1.1);
+      } else if (depth < 1) {
+        // The ledge part way down: sandstone, banded.
+        c.copy(sand).lerp(sandDark, 0.35 + valueNoise(x * 0.08, z * 0.08) * 0.4).multiplyScalar(grain * 0.95);
+      } else {
+        // The canyon floor: deep blue rubble, a little teal near the crystals.
+        c.copy(deep).lerp(floor, valueNoise(x * 0.05 + 3, z * 0.05) * 0.8).multiplyScalar(grain);
+      }
       c.toArray(colors, i * 3);
     }
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geo.computeVertexNormals();
 
-    const ground = new THREE.Mesh(geo, toon('#ffffff', { vertexColors: true, map: paintedTexture() }));
-    ground.receiveShadow = true; // trees, towers and ground enemies cast onto it (HIGH quality)
-    ground.userData.noCast = true;
+    // Flat shading gives the crisp, faceted low-poly cliffs.
+    const ground = new THREE.Mesh(geo, faceted(toon('#ffffff', { vertexColors: true, map: paintedTexture() })));
+    ground.receiveShadow = true;
+    ground.castShadow = true; // cliffs throw shadows down into the canyons
+    ground.userData.noCast = true; // (castShadows() skips it; it's set by hand above)
     this.group.add(ground);
+    this.buildCanyonDecor();
+  }
+
+  /**
+   * Placeholder canyon dressing (to be replaced by Blender assets): sandstone blocks scattered
+   * along the rims and on the ledges, rubble on the floor, and glowing crystals in the depths
+   * (mostly teal, a few red) with soft pools of light around them.
+   */
+  private buildCanyonDecor(): void {
+    // Layers of dark blue haze inside the canyons: the deeper you look, the darker and bluer it
+    // gets (the rock tops hide the layers everywhere else). They ignore the sky-coloured fog.
+    const hazeSize = this.halfSize * 2 + 200;
+    for (const [frac, opacity] of [[0.22, 0.28], [0.5, 0.34], [0.78, 0.38]] as const) {
+      const haze = new THREE.Mesh(
+        new THREE.PlaneGeometry(hazeSize, hazeSize),
+        new THREE.MeshBasicMaterial({ color: CANYON.haze, transparent: true, opacity, depthWrite: false, fog: false }),
+      );
+      haze.rotation.x = -Math.PI / 2;
+      haze.position.y = -CANYON_DEPTH * frac;
+      haze.renderOrder = 1;
+      haze.userData.noCast = true;
+      haze.userData.noOutline = true;
+      this.group.add(haze);
+    }
+
+    const rand = mulberry32(77);
+    const limit = this.halfSize + 40;
+    const rim: THREE.Matrix4[] = [];
+    const rubble: THREE.Matrix4[] = [];
+    const crystals: { m: THREE.Matrix4; x: number; y: number; z: number; red: boolean }[] = [];
+    for (let i = 0; i < 26000 && (rim.length < 900 || rubble.length < 700 || crystals.length < 700); i++) {
+      const x = (rand() * 2 - 1) * limit;
+      const z = (rand() * 2 - 1) * limit;
+      const depth = this.canyonAt(x, z);
+      const top = this.heightAt(x, z);
+      if (depth === 0) {
+        // Blocks on the rock top, only right at a rim.
+        if (rim.length >= 900 || this.isRock(x, z, 3.5)) continue;
+        const sx = 1 + rand() * 3.2;
+        rim.push(this.matrix(x, top + sx * 0.25, z, rand() * Math.PI, sx, sx * (0.35 + rand() * 0.5), sx * (0.6 + rand() * 0.6), (rand() - 0.5) * 0.3));
+      } else if (depth < 1) {
+        if (rim.length >= 900 || rand() < 0.6) continue;
+        const sx = 1.2 + rand() * 3;
+        rim.push(this.matrix(x, top - LEDGE * CANYON_DEPTH + sx * 0.25, z, rand() * Math.PI, sx, sx * 0.5, sx * 0.8, (rand() - 0.5) * 0.4));
+      } else {
+        const y = this.surfaceAt(x, z);
+        if (rand() < 0.35 && crystals.length < 700) {
+          const h = 1.5 + rand() * 3.5;
+          crystals.push({ m: this.matrix(x, y + h * 0.4, z, rand() * Math.PI, 0.6 + rand() * 0.6, h, 0.6 + rand() * 0.6, (rand() - 0.5) * 0.5), x, y, z, red: rand() < 0.14 });
+        } else if (rubble.length < 700) {
+          const sx = 0.8 + rand() * 2.6;
+          rubble.push(this.matrix(x, y + sx * 0.2, z, rand() * Math.PI, sx, sx * 0.55, sx * 0.9, (rand() - 0.5) * 0.6));
+        }
+      }
+    }
+    const block = new THREE.DodecahedronGeometry(1, 0);
+    this.instanced([{ geo: block, mat: faceted(toon('#ffffff')), colors: [CANYON.sandstone, CANYON.sandstoneDark, '#e8d08e'] }], rim, 41);
+    this.instanced([{ geo: block, mat: faceted(toon('#ffffff')), colors: [CANYON.deep, CANYON.floor, '#2b3d5c'] }], rubble, 42);
+
+    // Crystals glow (unlit, so they bloom on HIGH) with an additive pool of light on the floor.
+    const shard = new THREE.OctahedronGeometry(1, 0);
+    const pool = new THREE.CircleGeometry(1, 20);
+    pool.rotateX(-Math.PI / 2);
+    for (const red of [false, true]) {
+      const list = crystals.filter((k) => k.red === red);
+      const color = red ? CANYON.redGlow : CANYON.crystal;
+      // Drawn after the haze layers (transparent, later render order) so they glow through it.
+      const gems = new THREE.InstancedMesh(shard, glow(color, { transparent: true, fog: false }, red ? 2 : 1.7), list.length);
+      gems.renderOrder = 3;
+      const pools = new THREE.InstancedMesh(
+        pool,
+        glow(color, { transparent: true, opacity: red ? 0.45 : 0.35, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }, 0.9),
+        list.length,
+      );
+      pools.renderOrder = 2;
+      list.forEach((k, i) => {
+        gems.setMatrixAt(i, k.m);
+        const r = red ? 9 + Math.random() * 5 : 5 + Math.random() * 4;
+        pools.setMatrixAt(i, new THREE.Matrix4().compose(new THREE.Vector3(k.x, k.y + 0.6, k.z), new THREE.Quaternion(), new THREE.Vector3(r, 1, r)));
+      });
+      for (const m of [gems, pools]) {
+        m.computeBoundingSphere();
+        m.userData.noCast = true;
+        this.group.add(m);
+      }
+    }
   }
 
   // ---------------------------------------------------------------- placement
@@ -154,6 +366,7 @@ export class World {
         // Plants grow in thick clumps with open clearings between them.
         if (rand() > Math.pow(jungleDensity(x, z), clumping)) continue;
         if (Math.hypot(x, z) < 9 + padClear) continue;
+        if (!this.isRock(x, z, 4)) continue; // plants grow on the rock tops, not over the canyons
         if (OUTPOSTS.some(([ox, oz]) => Math.hypot(x - ox, z - oz) < 8 + outpostClear)) continue;
         return { x, z };
       }

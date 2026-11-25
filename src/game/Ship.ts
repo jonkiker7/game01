@@ -304,7 +304,7 @@ export class Ship {
     }
     this.tilt.rotation.set(this.pitch, 0, this.roll + spin);
 
-    this.updateVisuals(dt, ground);
+    this.updateVisuals(dt, world.surfaceAt(p.x, p.z)); // the blob shadow lands down in canyons too
   }
 
   /** Start fresh for a new run: full armor and missiles, at (x, z), facing north. */

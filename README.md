@@ -121,6 +121,21 @@ sortie (or drop it from the board). New offers go up after every sortie. The cre
 post contracts have things to say once you've finished one. Contract writing lives in
 `src/content/contracts.ts` (placeholder text, edit freely).
 
+## The terrain: mesas and canyons
+
+The ground is the top of big, flat-ish rock mesas (the jungle grows on top), split by winding
+**canyons** about a third of the map. Their sandstone walls step down past a ledge into dark blue
+depths with glowing crystals (mostly teal, a few red). The ship flies at a steady height over both.
+
+- Everything that stands on the ground (towers, crawlers, pulsars, ground bosses, pylons, the
+  fortress, rescue pods, landing zones, contract pods and beacons, trees and plants) is placed on a
+  rock top, never over a canyon. Arena centres and the landing pad are always solid rock.
+- Crawlers and the Juggernaut won't drive off cliffs; the Escort convoy crosses canyons on bridges.
+- Everything is placeholder geometry for prototyping, to be replaced by Blender assets. Canyon
+  shape, depth and colours are at the top of `src/game/World.ts` (`CANYON`, `CANYON_DEPTH`,
+  `CANYON_WIDTH`). `world.heightAt` is the rock-top height, `world.surfaceAt` the real ground
+  (down in canyons), and `world.isRock` / `world.nearestRock` keep things on solid ground.
+
 ## Sorties (roguelite runs)
 
 Each run is a **sortie**: 2 rounds, then a **boss**. Every round is an arena around a jungle
