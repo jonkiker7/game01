@@ -29,7 +29,7 @@ export { Enemy, type Species } from './EnemyBase';
  */
 const TOWER_HEIGHT = (HOVER_HEIGHT - 6.5) / 2; // platform top (13 units); the gun head sits just above it
 
-class Turret extends Enemy {
+export class Turret extends Enemy {
   readonly radius = 2.6;
   readonly kind = 'turret';
   readonly species = 'turret';
@@ -118,7 +118,7 @@ class Turret extends Enemy {
 }
 
 /** Flying drone: closes in, circles you, and fires quick bursts. */
-class Drone extends Enemy {
+export class Drone extends Enemy {
   readonly radius: number;
   readonly kind = 'drone';
   readonly species = 'drone';
