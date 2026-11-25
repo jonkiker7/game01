@@ -125,8 +125,7 @@ post contracts have things to say once you've finished one. Contract writing liv
 
 The ground is the top of big, flat-ish rock mesas (the jungle grows on top), split by winding
 **canyons** about a third of the map. Their sandstone walls step down past a ledge to a glowing
-blue lake, with pink atmosphere rising off it (thickest at the water, thinning toward the rim) and
-glowing crystals (mostly teal, a few red). Decor rocks only sit where their whole footprint is on
+blue lake, with pink atmosphere rising off it (thickest at the water, thinning toward the rim). Decor rocks only sit where their whole footprint is on
 solid ground, so nothing hangs over a cliff edge. The ship flies at a steady height over both.
 
 - Everything that stands on the ground (towers, crawlers, pulsars, ground bosses, pylons, the
