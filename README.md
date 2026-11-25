@@ -84,6 +84,83 @@ in conversation, and the name in the code, are listed so nothing gets lost.
 | **Salvage** | | The currency | `salvage` |
 | **Tower** | turret | Ground gun that lobs plasma bombs | kind `'turret'` |
 
+## Sound and music
+
+Everything you hear is synthesized in code in a retro-future style: analog-synth zaps, filtered
+noise, tape echo and big reverb, with synthwave music played live by a little sequencer. There
+are three songs: the **station** (slow and dreamy), **sorties** (driving) and **bosses** (faster
+and darker). The music muffles while the pause menu or a power-up choice is open, and the
+ship's engine hum rises with your speed.
+
+- **🔊 button** (top of the screen, next to the fps counter): mute or unmute, at the base or in a sortie.
+- **Pause menu → SOUND:** Master, Music and Effects volume. Saved on your device.
+
+### Using your own sounds
+
+1. Put the file in `public/sfx/` (`.wav`, `.mp3`, `.ogg` or `.m4a`; keep effects short and trimmed).
+2. Name it in `public/sfx/sounds.json` against the sound it replaces, for example:
+
+   ```json
+   { "gun": "my-gun.wav", "explosionBig": "boom.wav", "music-sortie": "sortie-loop.mp3" }
+   ```
+
+3. Anything not listed keeps its synthesized sound. Or just send me the files with what each is for.
+
+Music files loop, so trim them to loop cleanly. Rapid sounds (gun, hits, enemy shots) are
+automatically limited and slightly re-pitched each time so they never pile up.
+
+| Sound name | When it plays |
+|---|---|
+| **Your ship** | |
+| `gun` | Machine gun shot |
+| `scatter` | Scatter Cannon blast |
+| `rail` | Rail Lance shot |
+| `hit` | Your bullet hits an enemy |
+| `charge` | Start charging a missile |
+| `chargeFull` | Missile fully charged |
+| `lock` | Missile locks onto a target |
+| `missile` | Missile launch |
+| `missileEmpty` | Out of missiles |
+| `boost` | Boost |
+| `roll` | Barrel roll |
+| `nova` | Nova blast |
+| `novaReady` | Nova charged |
+| `playerHit` | Your ship takes damage |
+| `shipDown` | Your ship is destroyed |
+| `heal` | Healing orb collected |
+| **Enemies** | |
+| `enemyShot` | An enemy fires |
+| `mortarLaunch` | A tower lobs a plasma bomb |
+| `mortarImpact` | A plasma bomb lands |
+| `explosionSmall` | Small enemy destroyed |
+| `explosionBig` | Big explosion (towers, missiles, big enemies) |
+| `bossAppear` | Boss arrives |
+| **Sortie flow** | |
+| `sectorStart` | A sector begins |
+| `sectorClear` | Sector cleared |
+| `fail` | Mission failed |
+| `powerOrb` | Fly into the power orb |
+| `powerUp` | Pick a power-up card |
+| `salvage` | Salvage reward |
+| `repair` | Hull repaired |
+| `gate` | Fly through a gate |
+| `victory` | Sortie won |
+| **Base and menus** | |
+| `uiTap` | Button tap |
+| `uiConfirm` | Confirm / open |
+| `uiDeny` | Can't do that |
+| `door` | Sliding door |
+| `talk` | Dialogue text blip |
+| `buy` | Buy something |
+| `launch` | Ship launches from the hangar |
+| **Music** | |
+| `music-base` | Station music (loops) |
+| `music-sortie` | Sortie music (loops) |
+| `music-boss` | Boss fight music (loops) |
+
+The code is in `src/audio/`: `Audio.ts` (volumes, mixing, loading your files), `Sfx.ts` (every
+sound effect recipe) and `Music.ts` (the songs: chords, bass lines, arpeggios and drum patterns).
+
 ## Home base
 
 The game starts on **Halcyon Station**, a huge retro-futuristic station orbiting the jungle planet.

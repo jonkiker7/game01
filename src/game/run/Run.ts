@@ -12,6 +12,7 @@ import type { ContractTracker } from './Contracts';
 import { createMission, type Mission, type MissionDeps, MISSION_RADIUS, MISSION_TITLES, type MissionKind } from './Missions';
 import { type ArenaVisual, type Gate, REWARD_STYLE, type Reward } from './Arena';
 import type { RunUI } from './RunUI';
+import { audio } from '../../audio/Audio';
 import { defaultStats, PRIMARY_NAMES, rollUpgrades, rollWeapons, SECONDARY_NAMES, type Stats, type Upgrade, UPGRADES } from './Upgrades';
 
 /** Rounds per sortie, the last one being the boss (2 rounds, then the boss). */
@@ -235,6 +236,8 @@ export class Run {
     }
     this.d.contracts.enterSector(s, cx, cz, R);
     this.phase = 'fight';
+    audio.song(this.boss ? 'boss' : 'sortie');
+    audio.play(this.boss ? 'bossAppear' : 'sectorStart');
     hud.show(this.boss ? `BOSS · ${this.boss.name}` : `SECTOR ${s} · ${TITLES[this.kind]}`, 2.6);
   }
 
@@ -363,12 +366,14 @@ export class Run {
     enemies.destroyAll();
     if (this.sector === SECTORS) {
       hud.show(this.boss ? `${this.boss.name} DESTROYED` : 'STRONGHOLD DESTROYED', 3);
+      audio.play('victory');
       this.won = true;
       this.phase = 'over';
       this.overTimer = 2.5;
       return;
     }
     hud.show('SECTOR CLEARED', 2.2);
+    audio.play('sectorClear');
     // The reward floats in the middle of the arena at flying height.
     const y = this.d.ship.root.position.y;
     this.d.arena.showReward(this.reward, this.tmp.set(this.center.x, y, this.center.y));
@@ -386,6 +391,7 @@ export class Run {
     enemies.destroyAll();
     this.mission?.onFail();
     hud.show(this.mission?.failText ?? 'OBJECTIVE FAILED', 3.4);
+    audio.play('fail');
     hud.flashDamage();
     this.phase = 'failed';
     this.failTimer = 3.6;
@@ -399,6 +405,7 @@ export class Run {
   private collectReward(): void {
     const { ship, hud, arena, ui } = this.d;
     arena.hideReward();
+    audio.play('powerOrb');
     if (this.reward === 'upgrade' || this.reward === 'weapon') {
       const isWeapon = this.reward === 'weapon';
       const options = isWeapon ? this.weaponOptions() : rollUpgrades(this.levels, this.stats);
@@ -416,6 +423,7 @@ export class Run {
           this.d.setPaused(false);
           this.d.releaseInput();
           hud.show(u.name.toUpperCase(), 1.6);
+          audio.play('powerUp');
           this.openGates();
         }, isWeapon ? 'ARMORY · CHOOSE A WEAPON' : 'CHOOSE A POWER-UP');
         return;
@@ -424,10 +432,12 @@ export class Run {
       ship.heal(this.stats.maxArmor * 0.4);
       hud.flashHeal();
       hud.show('HULL REPAIRED', 1.6);
+      audio.play('repair');
     } else if (this.reward === 'salvage') {
       const amount = Math.round((50 + 10 * this.sector) * this.stats.salvageMul);
       this.salvage += amount;
       hud.show(`+${amount} SALVAGE`, 1.6);
+      audio.play('salvage');
     }
     this.openGates();
   }
@@ -465,6 +475,7 @@ export class Run {
   private takeGate(gate: Gate): void {
     this.phase = 'transition';
     this.reward = gate.reward;
+    audio.play('gate');
     this.d.ui.fade(() => {
       const { arena, enemies, ship, world } = this.d;
       arena.hideGates();

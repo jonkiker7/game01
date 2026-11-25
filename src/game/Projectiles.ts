@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { audio } from '../audio/Audio';
 import type { Effects } from './Effects';
 import { glow } from './materials';
 
@@ -309,6 +310,7 @@ export class EnemyShots {
    * `targetY` (the ship's altitude) after about `travel` units, then fly level.
    */
   fire(from: THREE.Vector3, dirX: number, dirZ: number, speed: number, targetY: number, travel: number, damage = ORB_DAMAGE, life = 4): void {
+    audio.play('enemyShot');
     const climb = targetY - from.y;
     const vy = climb > 0 ? (climb * speed) / Math.max(travel, 6) : 0;
     this.pool.add({

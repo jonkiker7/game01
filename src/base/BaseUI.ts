@@ -1,3 +1,4 @@
+import { audio } from '../audio/Audio';
 export interface ShopRow {
   name: string;
   text: string;
@@ -85,7 +86,8 @@ export class BaseUI {
           b.disabled = !!r.disabled;
           b.addEventListener('pointerup', (e) => {
             e.stopPropagation();
-            if (b.disabled) return;
+            if (b.disabled) return void audio.play('uiDeny');
+            audio.play(r.button?.startsWith('⬢') ? 'buy' : 'uiConfirm');
             r.onClick?.();
             render();
           });

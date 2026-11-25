@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { audio, type Volumes } from '../../audio/Audio';
 import { addOutlines, glow } from '../materials';
 import { buildShipDesign, type ShipDesignId } from '../ShipDesigns';
 import { PRIMARY_NAMES, SECONDARY_NAMES, type Stats, UPGRADES } from './Upgrades';
@@ -40,7 +41,13 @@ export class PauseMenu {
          <div class="panel">
            <h2>PAUSED</h2>
            <div class="cols">
-             <div class="ship-col"><canvas class="ship-view"></canvas><div class="ship-name"></div></div>
+             <div class="ship-col"><canvas class="ship-view"></canvas><div class="ship-name"></div>
+               <section class="sound"><h3>SOUND</h3><div class="body">
+                 <label>Master<input type="range" min="0" max="100" data-vol="master"></label>
+                 <label>Music<input type="range" min="0" max="100" data-vol="music"></label>
+                 <label>Effects<input type="range" min="0" max="100" data-vol="sfx"></label>
+               </div></section>
+             </div>
              <div class="info-col">
                <section class="stats"><h3>SHIP</h3><div class="body"></div></section>
                <section class="missions"><h3>MISSIONS</h3><div class="body"></div></section>
@@ -66,6 +73,13 @@ export class PauseMenu {
       this.onDevToggle?.(on);
     });
     this.el.addEventListener('pointerdown', (e) => e.stopPropagation());
+    // Volume sliders (saved on this device).
+    for (const input of this.el.querySelectorAll<HTMLInputElement>('input[data-vol]')) {
+      const key = input.dataset.vol as 'master' | 'music' | 'sfx';
+      input.value = String(Math.round(audio.volumes[key] * 100));
+      input.addEventListener('input', () => audio.setVolumes({ [key]: Number(input.value) / 100 } as Partial<Volumes>));
+      input.addEventListener('change', () => audio.play('uiTap'));
+    }
 
     this.camera.position.set(0, 9, 13);
     this.camera.lookAt(0, 0, 0);

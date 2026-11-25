@@ -1382,3 +1382,41 @@ body.mode-base #btn-pause {
   color: #c8d0ff;
   font-size: 11px;
 }
+
+/* ---- Sound ---- */
+#btn-sound {
+  position: absolute;
+  top: calc(2px + env(safe-area-inset-top));
+  left: calc(50% + 72px);
+  width: 30px;
+  height: 26px;
+  border: none;
+  background: none;
+  font-size: 15px;
+  opacity: 0.75;
+  pointer-events: auto;
+}
+#btn-sound.off {
+  opacity: 0.45;
+}
+#pause .ship-col .sound {
+  width: 100%;
+  margin-top: 4px;
+}
+#pause .ship-col .ship-view {
+  max-height: 46%;
+}
+#pause .sound label {
+  display: flex;
+  font-size: 10px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 2px 0;
+}
+#pause .sound input[type='range'] {
+  flex: 1;
+  max-width: 130px;
+  height: 14px;
+  accent-color: var(--gold);
+}
