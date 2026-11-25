@@ -62,8 +62,14 @@ so you can see what each one costs on your phone (these switches aren't saved). 
 **📋 Copy settings** copies them so they can be made the game's defaults; **↺ Reset** goes back.
 Gameplay defaults live in `src/game/Tuning.ts`.
 
+**Glow:** four ways to draw it, chosen in the dev panel's Performance section (saved on the device):
+**full bloom** (blurs every bright pixel; the best look, several full-screen passes), **light bloom**
+(the blur at half resolution, no antialiasing on the off-screen image), **halos** (no post-processing
+at all: anything bright enough to bloom gets its own soft glow shell automatically, see
+`src/game/Halos.ts`) and **off**. The default, **auto**, uses full bloom on HIGH and halos on LOW.
+
 **Graphics quality:** tap the fps counter at the top to switch between HIGH (with bloom glow) and
-LOW (faster, for older phones). The game drops to LOW automatically if HIGH runs below 45 fps.
+LOW (faster, for older phones, with halos instead of bloom). The game drops to LOW automatically if HIGH runs below 45 fps.
 You can also force it with `?quality=low` or `?quality=high` in the URL. Adding `?debug` exposes
 `window.__game` (ship, enemies, missiles) for tinkering and automated tests.
 

@@ -1,6 +1,7 @@
 import GUI from 'lil-gui';
 import * as THREE from 'three';
 import type { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import type { Halos } from '../game/Halos';
 import type { ShadowMode, SunShadows } from '../game/Shadows';
 import { TUNING } from '../game/Tuning';
 import { CANYON_FOG } from '../game/World';
@@ -33,6 +34,10 @@ export interface DevHooks {
   getQuality: () => 'high' | 'low';
   setResScale: (v: number) => void;
   setOutlines: (on: boolean) => void;
+  /** Glow: 'auto' (full bloom on HIGH, halos on LOW), 'full', 'light', 'halos' or 'off'. */
+  setGlow: (g: 'auto' | 'full' | 'light' | 'halos' | 'off') => void;
+  getGlow: () => 'auto' | 'full' | 'light' | 'halos' | 'off';
+  halos: Halos;
   setProps: (on: boolean) => void;
 }
 
@@ -51,6 +56,7 @@ const LOOK_DEFAULTS = {
   glowStrength: 0.35,
   glowSpread: 0.4,
   glowThreshold: 1.2,
+  haloStrength: 0.8,
   vignette: 0.9,
   canyonFogColor: CANYON_FOG.color,
   canyonFogDensity: CANYON_FOG.density,
@@ -93,6 +99,7 @@ export function openDevPanel(h: DevHooks): void {
     h.bloom.strength = look.glowStrength;
     h.bloom.radius = look.glowSpread;
     h.bloom.threshold = look.glowThreshold;
+    h.halos.strength = look.haloStrength;
     h.setCanyonFog(look.canyonFogColor, look.canyonFogDensity, look.canyonFogHeight);
     const root = document.documentElement.style;
     root.setProperty('--vig', String(look.vignette));
@@ -138,9 +145,19 @@ export function openDevPanel(h: DevHooks): void {
   perfF.add(p, 'drawCalls').name('draw calls').listen().disable();
   perfF.add(p, 'triangles').name('triangles').listen().disable();
   perfF.add(p, 'bakeMs').name('last shadow bake ms').listen().disable();
-  const sw = { quality: h.getQuality(), glow: true, outlines: true, plants: true, resolution: 1 };
+  const sw = { quality: h.getQuality(), glow: h.getGlow(), outlines: true, plants: true, resolution: 1 };
   perfF.add(sw, 'quality', { HIGH: 'high', LOW: 'low' }).name('quality').onChange((q: 'high' | 'low') => h.setQuality(q));
-  perfF.add(sw, 'glow').name('glow (bloom)').onChange((on: boolean) => (h.bloom.enabled = on));
+  perfF
+    .add(sw, 'glow', {
+      'auto (full on HIGH, halos on LOW)': 'auto',
+      'full bloom': 'full',
+      'light bloom (½ res)': 'light',
+      'halos (no post-processing)': 'halos',
+      off: 'off',
+    })
+    .name('glow (saved)')
+    .onChange((g: 'auto' | 'full' | 'light' | 'halos' | 'off') => h.setGlow(g));
+
   perfF.add(sw, 'outlines').name('ink outlines').onChange((on: boolean) => h.setOutlines(on));
   perfF.add(sw, 'plants').name('trees, plants, rocks').onChange((on: boolean) => h.setProps(on));
   perfF.add(sw, 'resolution', 0.4, 1, 0.05).name('resolution ×').onChange((v: number) => h.setResScale(v));
@@ -158,6 +175,7 @@ export function openDevPanel(h: DevHooks): void {
   post.add(look, 'glowStrength', 0, 3, 0.05).name('glow strength').onChange(changed);
   post.add(look, 'glowSpread', 0, 1, 0.05).name('glow spread').onChange(changed);
   post.add(look, 'glowThreshold', 0, 3, 0.05).name('glow threshold').onChange(changed);
+  post.add(look, 'haloStrength', 0, 2, 0.05).name('halo strength (halos mode)').onChange(changed);
   post.add(look, 'vignette', 0, 1, 0.05).name('vignette strength').onChange(changed);
   post.add(look, 'vignetteSize', 0, 90, 1).name('vignette clear centre %').onChange(changed);
 

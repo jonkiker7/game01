@@ -66,6 +66,7 @@ export function glow(
 ): THREE.MeshBasicMaterial {
   const m = new THREE.MeshBasicMaterial({ toneMapped: false, ...opts });
   m.color.set(color).multiplyScalar(intensity);
+  m.userData.glow = true; // halos look for this (see Halos.ts)
   return m;
 }
 

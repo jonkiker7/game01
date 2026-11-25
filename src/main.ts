@@ -37,6 +37,7 @@ import { defaultStats } from './game/run/Upgrades';
 import { RunUI } from './game/run/RunUI';
 import { Ship } from './game/Ship';
 import { TUNING } from './game/Tuning';
+import { Halos } from './game/Halos';
 import { ShadowBaker, type ShadowMode, SunShadows } from './game/Shadows';
 import { isShipDesign } from './game/ShipDesigns';
 import { World } from './game/World';
@@ -182,7 +183,7 @@ const radar = new Radar($('hud'));
 
 // ?debug in the URL exposes game objects for automated tests and console tinkering.
 if (new URLSearchParams(location.search).has('debug')) {
-  Object.assign(window, { __game: { audio, baker, get perf() { return perf; }, get rig() { return rig; }, ship, enemies, enemyShots, missiles, pickups, combat, mortars, save, get base() { return base; }, get run() { return run; }, chargeNova: () => (specialCharge = 1) } });
+  Object.assign(window, { __game: { audio, baker, get halos() { return halos; }, get perf() { return perf; }, get rig() { return rig; }, ship, enemies, enemyShots, missiles, pickups, combat, mortars, save, get base() { return base; }, get run() { return run; }, chargeNova: () => (specialCharge = 1) } });
 }
 
 const rig = new CameraRig(window.innerWidth / window.innerHeight);
@@ -285,6 +286,56 @@ base.onLaunch = () =>
 const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.35, 0.4, 1.2);
 composer.addPass(bloom);
 
+/**
+ * Glow, from most to least expensive:
+ * - full:  bloom at full quality (blurs every bright pixel; several full-screen passes)
+ * - light: bloom with the blur at half resolution and no antialiasing on the off-screen image
+ * - halos: no post-processing at all; each glowing object gets its own soft glow shell
+ * - off:   no glow
+ * 'auto' picks full on HIGH and halos on LOW. Chosen in the dev panel, saved on this device.
+ */
+type GlowMode = 'full' | 'light' | 'halos' | 'off';
+type GlowSetting = GlowMode | 'auto';
+const GLOW_KEY = 'star-rotor-glow';
+let glowSetting: GlowSetting = (() => {
+  try {
+    const v = localStorage.getItem(GLOW_KEY);
+    return v === 'full' || v === 'light' || v === 'halos' || v === 'off' ? v : 'auto';
+  } catch {
+    return 'auto';
+  }
+})();
+let bloomScale = 1; // bloom's blur resolution (light bloom halves it)
+const halos = new Halos(() => [scene, base.scene]);
+function glowMode(): GlowMode {
+  return glowSetting === 'auto' ? (quality === 'high' ? 'full' : 'halos') : glowSetting;
+}
+/** Apply the glow mode (call after quality or the setting changes). */
+function applyGlow(): void {
+  const g = glowMode();
+  halos.enabled = g === 'halos';
+  const light = g === 'light';
+  if ((bloomScale !== 1) !== light) {
+    bloomScale = light ? 0.5 : 1;
+    // The off-screen image: 4× antialiasing for full bloom, none for light (much cheaper).
+    for (const rt of [composer.renderTarget1, composer.renderTarget2]) {
+      rt.samples = light ? 0 : 4;
+      rt.dispose();
+    }
+    resize();
+  }
+}
+function setGlow(s: GlowSetting): void {
+  glowSetting = s;
+  try {
+    if (s === 'auto') localStorage.removeItem(GLOW_KEY);
+    else localStorage.setItem(GLOW_KEY, s);
+  } catch {
+    /* private mode */
+  }
+  applyGlow();
+}
+
 // Developer panel: `?dev` in the URL adds sliders for lighting, shadows, glow and tuning.
 let devPanelLoaded = false;
 /** Load and show the dev panel (from ?dev, or the switch in the pause menu). */
@@ -315,6 +366,9 @@ function showDevPanel(on: boolean): void {
         resScale = v;
         resize();
       },
+      setGlow,
+      getGlow: () => glowSetting,
+      halos,
       setOutlines: (on) =>
         [scene, base.scene].forEach((root) =>
           root.traverse((o) => {
@@ -587,6 +641,7 @@ function resize(): void {
   renderer.setSize(w, h);
   composer.setPixelRatio(ratio);
   composer.setSize(w, h);
+  bloom.setSize(w * ratio * bloomScale, h * ratio * bloomScale);
   rig.setAspect(w / h);
   base.setAspect(w / h);
 }
@@ -594,6 +649,7 @@ function resize(): void {
 function setQuality(q: Quality, remember: boolean): void {
   quality = q;
   applyShadows(); // live shadows on HIGH only; baked ones cost almost nothing, so they stay on LOW
+  applyGlow();
   if (remember) {
     qualityChosen = true;
     try {
@@ -606,6 +662,7 @@ function setQuality(q: Quality, remember: boolean): void {
 }
 window.addEventListener('resize', resize);
 resize();
+applyGlow();
 
 // On Android, the first touch goes fullscreen and locks landscape.
 // (iPhone Safari doesn't allow this; use "Add to Home Screen" there instead.)
@@ -782,7 +839,10 @@ renderer.info.autoReset = false; // count every pass of a frame (shadows, scene,
 
 /** Draw the frame (base or sortie), then housekeeping: input, fps readout, auto quality. */
 function present(realDt: number): void {
-  if (quality === 'high') composer.render(realDt);
+  // Bloom needs the post-processing chain; halos and no glow draw straight to the screen.
+  const g = glowMode();
+  halos.update(realDt);
+  if (g === 'full' || g === 'light') composer.render(realDt);
   else if (mode === 'base') renderer.render(base.scene, base.camera);
   else renderer.render(scene, rig.camera);
   input.endFrame();
