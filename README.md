@@ -124,8 +124,10 @@ post contracts have things to say once you've finished one. Contract writing liv
 ## The terrain: mesas and canyons
 
 The ground is the top of big, flat-ish rock mesas (the jungle grows on top), split by winding
-**canyons** about a third of the map. Their sandstone walls step down past a ledge into dark blue
-depths with glowing crystals (mostly teal, a few red). The ship flies at a steady height over both.
+**canyons** about a third of the map. Their sandstone walls step down past a ledge to a glowing
+blue lake, with pink atmosphere rising off it (thickest at the water, thinning toward the rim) and
+glowing crystals (mostly teal, a few red). Decor rocks only sit where their whole footprint is on
+solid ground, so nothing hangs over a cliff edge. The ship flies at a steady height over both.
 
 - Everything that stands on the ground (towers, crawlers, pulsars, ground bosses, pylons, the
   fortress, rescue pods, landing zones, contract pods and beacons, trees and plants) is placed on a
