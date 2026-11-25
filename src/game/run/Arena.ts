@@ -4,7 +4,7 @@ import { glow } from '../materials';
 export type Reward = 'upgrade' | 'weapon' | 'repair' | 'salvage' | 'final';
 
 export const REWARD_STYLE: Record<Reward, { color: string; label: string }> = {
-  upgrade: { color: '#ffd36b', label: '★ UPGRADE' },
+  upgrade: { color: '#ffd36b', label: '★ POWER-UP' },
   weapon: { color: '#e0b3ff', label: '⚔ ARMORY' },
   repair: { color: '#5dff8a', label: '✚ REPAIR' },
   salvage: { color: '#6ff7ff', label: '⬢ SALVAGE' },
