@@ -568,8 +568,11 @@ export class Juggernaut extends Boss {
     if (this.state === 'drive' && dist > 28) {
       const fx = -Math.sin(this.root.rotation.y);
       const fz = -Math.cos(this.root.rotation.y);
-      p.x += fx * 5 * dt;
-      p.z += fz * 5 * dt;
+      // Tanks don't drive off cliffs.
+      if (world.isRock(p.x + fx * 5 * dt, p.z + fz * 5 * dt, this.radius)) {
+        p.x += fx * 5 * dt;
+        p.z += fz * 5 * dt;
+      }
     }
     p.y = world.heightAt(p.x, p.z);
     this.placeParts();

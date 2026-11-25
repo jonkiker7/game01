@@ -297,9 +297,11 @@ export class Crawler extends Enemy {
     // Turn slowly to keep the shield toward you, and crawl to medium range.
     this.root.rotation.y = approachAngle(this.root.rotation.y, facing(dx, dz), 0.9 * dt);
     const want = dist > 26 ? 1 : dist < 16 ? -0.6 : 0;
-    if (want !== 0 && dist > 0.01) {
-      p.x += (dx / dist) * 7 * want * dt;
-      p.z += (dz / dist) * 7 * want * dt;
+    const nx = p.x + (dx / Math.max(dist, 0.01)) * 7 * want * dt;
+    const nz = p.z + (dz / Math.max(dist, 0.01)) * 7 * want * dt;
+    if (want !== 0 && dist > 0.01 && world.isRock(nx, nz, this.radius)) {
+      p.x = nx;
+      p.z = nz;
       for (const [i, leg] of this.legs.entries()) leg.rotation.x = Math.sin(this.time * 8 + i * 1.3) * 0.35;
     }
     p.y = world.heightAt(p.x, p.z);

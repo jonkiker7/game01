@@ -3,6 +3,7 @@ import type { EnemyManager } from '../Enemies';
 import { type Ctx, Enemy, ENEMY_ARMOR, ENEMY_BODY, ENEMY_GLOW } from '../EnemyBase';
 import type { Hud } from '../Hud';
 import { addOutlines, GLOW, glow, toon } from '../materials';
+import { castShadows } from '../Shadows';
 import { approachAngle } from '../math';
 import type { Blip } from '../Radar';
 import { HOVER_HEIGHT, type Ship } from '../Ship';
@@ -351,7 +352,8 @@ class Rescue extends Mission {
 
   protected setup(): void {
     // The landing zone near the arena's south edge (where you come in).
-    this.lz.set(this.cx, 0, this.cz + this.R * 0.55);
+    const lzSpot = this.d.world.nearestRock(this.cx, this.cz + this.R * 0.55, 9);
+    this.lz.set(lzSpot.x, 0, lzSpot.z);
     this.lz.y = this.d.world.heightAt(this.lz.x, this.lz.z);
     const pad = new THREE.Mesh(new THREE.CylinderGeometry(7, 7.6, 0.6, 6), toon('#2a3150'));
     pad.position.copy(this.lz);
@@ -362,8 +364,7 @@ class Rescue extends Mission {
     for (let i = 0; i < this.total; i++) {
       const a = (i / this.total) * Math.PI * 2 + Math.random() * 0.8 - Math.PI / 2;
       const r = this.R * (0.45 + Math.random() * 0.4);
-      const x = this.cx + Math.cos(a) * r;
-      const z = this.cz + Math.sin(a) * r;
+      const { x, z } = this.d.world.nearestRock(this.cx + Math.cos(a) * r, this.cz + Math.sin(a) * r, 3);
       const ground = this.d.world.heightAt(x, z);
       const obj = new THREE.Group();
       const pod = new THREE.Mesh(new THREE.CapsuleGeometry(1.3, 2, 6, 12), toon('#e8dfcc'));
@@ -510,8 +511,11 @@ class Escort extends Mission {
   protected setup(): void {
     // Across the arena, west to east, through the middle.
     const span = this.R * 0.8;
-    this.from.set(this.cx - span, 0, this.cz + 10);
-    this.to.set(this.cx + span, 0, this.cz - 10);
+    const a = this.d.world.nearestRock(this.cx - span, this.cz + 10, 5);
+    const b = this.d.world.nearestRock(this.cx + span, this.cz - 10, 5);
+    this.from.set(a.x, 0, a.z);
+    this.to.set(b.x, 0, b.z);
+    this.buildBridges();
     const hull = new THREE.Mesh(new THREE.BoxGeometry(5, 2.6, 9), toon('#e8dfcc'));
     hull.position.y = 1.6;
     const cab = new THREE.Mesh(new THREE.BoxGeometry(4, 2, 3), toon('#2f8f95'));
@@ -538,6 +542,57 @@ class Escort extends Mission {
     dest.position.set(this.to.x, g + HOVER_HEIGHT - 1, this.to.z);
     this.group.add(dest, beam(GREEN, this.to.x, g, this.to.z, 2));
     this.place();
+  }
+
+  /** Bridges wherever the convoy's road crosses a canyon (it drives at rock-top height). */
+  private buildBridges(): void {
+    const w = this.d.world;
+    const len = this.from.distanceTo(this.to);
+    const yaw = Math.atan2(-(this.to.x - this.from.x), -(this.to.z - this.from.z));
+    const deckMat = toon('#a98a5a');
+    const railMat = toon('#e2733a');
+    let start = -1;
+    for (let d = 0; d <= len + 2; d += 1.5) {
+      const k = Math.min(1, d / len);
+      const x = this.from.x + (this.to.x - this.from.x) * k;
+      const z = this.from.z + (this.to.z - this.from.z) * k;
+      const gap = !w.isRock(x, z, 3.5) && d <= len;
+      if (gap && start < 0) start = d;
+      if (!gap && start >= 0) {
+        // Span from a little before the gap to a little after it.
+        const s0 = Math.max(0, start - 4);
+        const s1 = Math.min(len, d + 3);
+        const mid = (s0 + s1) / 2 / len;
+        const mx = this.from.x + (this.to.x - this.from.x) * mid;
+        const mz = this.from.z + (this.to.z - this.from.z) * mid;
+        const y = w.heightAt(mx, mz);
+        const span = s1 - s0;
+        const bridge = new THREE.Group();
+        const deck = new THREE.Mesh(new THREE.BoxGeometry(7.5, 0.8, span), deckMat);
+        deck.position.y = -0.4;
+        bridge.add(deck);
+        for (const side of [-1, 1]) {
+          const rail = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.35, span), railMat);
+          rail.position.set(side * 3.6, 1.1, 0);
+          bridge.add(rail);
+          for (let p = -span / 2; p <= span / 2; p += 3) {
+            const post = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.1, 0.3), deckMat);
+            post.position.set(side * 3.6, 0.55, p);
+            bridge.add(post);
+          }
+        }
+        // A truss under the deck.
+        const truss = new THREE.Mesh(new THREE.BoxGeometry(5, 1.6, span), toon('#3a3448'));
+        truss.position.y = -1.6;
+        bridge.add(truss);
+        bridge.position.set(mx, y, mz);
+        bridge.rotation.y = yaw;
+        addOutlines(bridge);
+        castShadows(bridge);
+        this.group.add(bridge);
+        start = -1;
+      }
+    }
   }
 
   private place(): void {
@@ -677,8 +732,7 @@ class Hold extends Mission {
     for (let i = 0; i < 3; i++) {
       const a = (i / 3) * Math.PI * 2 + Math.random() * 0.7;
       const r = this.R * (0.4 + Math.random() * 0.3);
-      const x = this.cx + Math.cos(a) * r;
-      const z = this.cz + Math.sin(a) * r;
+      const { x, z } = this.d.world.nearestRock(this.cx + Math.cos(a) * r, this.cz + Math.sin(a) * r, 4);
       const y = this.flyY(x, z) - 1;
       const edge = ring(GOLD, ZONE_R, 0.7, 0.8);
       edge.position.set(x, y, z);
