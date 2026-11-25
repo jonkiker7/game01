@@ -16,7 +16,7 @@ import { TUNING } from '../Tuning';
 import { defaultStats, PRIMARY_NAMES, rollUpgrades, rollWeapons, SECONDARY_NAMES, type Stats, type Upgrade, UPGRADES } from './Upgrades';
 
 /** Rounds per sortie, the last one being the boss (2 rounds, then the boss). */
-export const SECTORS = 3;
+export const SECTORS = 5;
 
 /** How a sortie ended. */
 export interface RunResult {

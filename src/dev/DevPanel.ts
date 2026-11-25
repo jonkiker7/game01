@@ -192,6 +192,12 @@ export function openDevPanel(h: DevHooks): void {
   sc.add(TUNING.score, 'clear', 0, 5000, 50).name('mission clear bonus').onChange(changed);
   sc.add(TUNING.score, 'bossClear', 0, 10000, 100).name('boss clear bonus').onChange(changed);
   sc.add(TUNING.score, 'protect', 0, 5000, 50).name('protect bonus (full health)').onChange(changed);
+  const pul = play.addFolder('Pulsars');
+  pul.add(TUNING.pulsar, 'arms', 1, 4, 1).name('spiral arms').onChange(changed);
+  pul.add(TUNING.pulsar, 'volleyGap', 0.08, 0.6, 0.01).name('seconds between orbs').onChange(changed);
+  pul.add(TUNING.pulsar, 'minDamage', 0, 10, 0.5).name('damage when clustered').onChange(changed);
+  pul.add(TUNING.pulsar, 'maxDamage', 0, 10, 0.5).name('damage when spread out').onChange(changed);
+  pul.add(TUNING.pulsar, 'fullDamageSpacing', 5, 150, 5).name('spacing for full damage').onChange(changed);
   const nova = play.addFolder('Nova');
   nova.add(TUNING.nova, 'cooldown', 1, 30, 0.5).name('cooldown s').onChange(changed);
   nova.add(TUNING.nova, 'damagePerSecond', 20, 1000, 10).name('damage per second off').onChange(changed);

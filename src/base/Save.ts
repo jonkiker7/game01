@@ -61,16 +61,16 @@ const BOARD_SIZE = 10;
 
 /** Other pilots already on the board, so there's something to beat. */
 const SEED_LEADERBOARD: LeaderEntry[] = [
-  { name: 'VEX', score: 18420 },
-  { name: 'NOVA-7', score: 16150 },
-  { name: 'KITE', score: 14380 },
-  { name: 'ROOK JR.', score: 12900 },
-  { name: 'HALCYON', score: 11240 },
-  { name: 'MOTH', score: 9870 },
-  { name: 'ZERO-ONE', score: 8310 },
-  { name: 'SABLE', score: 6920 },
-  { name: 'PIXIE', score: 5480 },
-  { name: 'GRUNT', score: 4150 },
+  { name: 'VEX', score: 31300 },
+  { name: 'NOVA-7', score: 27450 },
+  { name: 'KITE', score: 24400 },
+  { name: 'ROOK JR.', score: 21900 },
+  { name: 'HALCYON', score: 19100 },
+  { name: 'MOTH', score: 16800 },
+  { name: 'ZERO-ONE', score: 14100 },
+  { name: 'SABLE', score: 11800 },
+  { name: 'PIXIE', score: 9300 },
+  { name: 'GRUNT', score: 7100 },
 ];
 
 /** Add a sortie's score to the leaderboard; returns your rank (1-based) or 0 if it didn't place. */
@@ -110,7 +110,7 @@ export function rollContracts(): Contract[] {
   return clients.map((client, i) => {
     const options = CONTRACT_TEMPLATES.filter((t) => t.client === client && t.type === types[i]);
     const t = options[Math.floor(Math.random() * options.length)];
-    const sector = 1 + Math.floor(Math.random() * 2); // 1–2: the rounds before the boss
+    const sector = 1 + Math.floor(Math.random() * 4); // 1–4: the missions before the boss
     return {
       id: `${t.type}-${client}-${Date.now().toString(36)}-${i}`,
       type: t.type,
@@ -129,12 +129,17 @@ export function loadSave(): SaveData {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const loaded = { ...fresh(), ...JSON.parse(raw) } as SaveData;
-      // Sorties got shorter (2 rounds, then the boss): move old contracts into range.
-      if (!loaded.contracts.offers?.length || loaded.contracts.offers.some((o) => o.sector > 2)) loaded.contracts.offers = rollContracts();
+      // Keep contracts within the missions before the boss (4 of them).
+      if (!loaded.contracts.offers?.length || loaded.contracts.offers.some((o) => o.sector > 4)) loaded.contracts.offers = rollContracts();
       const a = loaded.contracts.active;
-      if (a && a.sector > 2) {
-        a.sector = 2;
-        a.text = a.text.replace(/sector \d+/, 'sector 2');
+      if (a && a.sector > 4) {
+        a.sector = 4;
+        a.text = a.text.replace(/sector \d+/, 'sector 4');
+      }
+      // Sorties got longer (4 missions, then the boss): rival scores on the board grow to match.
+      if (loaded.leaderboard.some((e) => e.name === 'VEX' && e.score === 18420)) {
+        const you = loaded.leaderboard.filter((e) => e.you);
+        loaded.leaderboard = [...SEED_LEADERBOARD.map((e) => ({ ...e })), ...you].sort((x, y) => y.score - x.score).slice(0, BOARD_SIZE);
       }
       return loaded;
     }

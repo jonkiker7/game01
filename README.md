@@ -83,7 +83,7 @@ in conversation, and the name in the code, are listed so nothing gets lost.
 
 | Term (on screen) | Also called | What it is | In the code |
 |---|---|---|---|
-| **Sortie** | run | One trip from the base: 2 sectors, then a boss | `Run` |
+| **Sortie** | run | One trip from the base: 4 sectors, then a boss | `Run` |
 | **Sector** | arena, round, encounter, mission | One stage of a sortie, boss fight included, and the area it's fought in | `sector`, `buildArena`, `ArenaShape` |
 | **Mission type** | objective | What a sector asks of you: Destroy the Towers, Rescue, Defend, Escort... | `Missions.ts` |
 | **Contract** | NPC mission, base mission | Optional side job from BOLT's board, paid in salvage | `Contracts.ts` |
@@ -266,7 +266,7 @@ solid ground, so nothing hangs over a cliff edge. The ship flies at a steady hei
 
 ## Sorties (roguelite runs)
 
-Each run is a **sortie**: 2 rounds, then a **boss**. Every round is an arena around a jungle
+Each run is a **sortie**: 4 missions, then a **boss**. Every round is an arena around a jungle
 outpost, fenced in by a glowing energy wall:
 
 - **Destroy the outpost:** hunt down every tower in a big arena (the radar points the way).
