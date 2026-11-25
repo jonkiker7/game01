@@ -186,6 +186,12 @@ export function openDevPanel(h: DevHooks): void {
   ship.add(TUNING.ship, 'boostSpeed', 40, 300, 5).name('boost speed').onChange(changed);
   ship.add(TUNING.ship, 'rollSpeed', 20, 200, 5).name('roll speed').onChange(changed);
   ship.add(TUNING.ship, 'rollCooldown', 0.1, 3, 0.05).name('roll cooldown s').onChange(changed);
+  const sc = play.addFolder('Score');
+  sc.add(TUNING.score, 'perDamage', 0, 5, 0.1).name('points per damage').onChange(changed);
+  sc.add(TUNING.score, 'perSecond', 0, 100, 1).name('time bonus per second').onChange(changed);
+  sc.add(TUNING.score, 'clear', 0, 5000, 50).name('mission clear bonus').onChange(changed);
+  sc.add(TUNING.score, 'bossClear', 0, 10000, 100).name('boss clear bonus').onChange(changed);
+  sc.add(TUNING.score, 'protect', 0, 5000, 50).name('protect bonus (full health)').onChange(changed);
   const nova = play.addFolder('Nova');
   nova.add(TUNING.nova, 'cooldown', 1, 30, 0.5).name('cooldown s').onChange(changed);
   nova.add(TUNING.nova, 'damagePerSecond', 20, 1000, 10).name('damage per second off').onChange(changed);

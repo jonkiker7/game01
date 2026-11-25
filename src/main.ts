@@ -174,6 +174,7 @@ function chargeNova(seconds: number): void {
 }
 combat.onDamage = (amount, source) => {
   if (source !== 'nova') chargeNova(amount / TUNING.nova.damagePerSecond);
+  run.addDamage(amount);
 };
 
 // ---- Cluster bomblets waiting to go off ----
@@ -234,10 +235,13 @@ const run = new Run({
     save.contracts.offers = rollContracts(); // a fresh board after every sortie
     save.lastRun = { won: r.won, sectors: r.sectorsCleared, kills: r.kills };
     save.runs++;
+    const newBest = r.score > save.best;
+    const prevBest = save.best;
+    if (newBest) save.best = r.score;
     if (r.won) save.wins++;
     else save.deaths++;
     writeSave(save);
-    runUI.showEnd({ ...r, totalSalvage: save.salvage }, () => runUI.fade(() => goToBase('landed')), 'RETURN TO STATION ▸');
+    runUI.showEnd({ ...r, totalSalvage: save.salvage, best: Math.max(prevBest, r.score), newBest }, () => runUI.fade(() => goToBase('landed')), 'RETURN TO STATION ▸');
   },
   releaseInput: () => input.releaseAll(),
 });
@@ -814,6 +818,7 @@ renderer.setAnimationLoop((now: number) => {
   hud.setArmor(ship.armor, ship.stats.maxArmor);
   hud.setMissiles(ship.missiles, ship.missileRecharge, ship.stats.missileMax);
   hud.setSalvage(run.salvage);
+  hud.setScore(run.score);
   specialBtn.style.setProperty('--charge', String(specialCharge));
   specialBtn.classList.toggle('ready', specialCharge >= 1);
   hud.setObjective(run.objective());

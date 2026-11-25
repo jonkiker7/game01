@@ -810,7 +810,7 @@ export class HomeBase {
             const price = SHIP_PRICES[d.id];
             return {
               name: d.name,
-              text: d.blurb,
+              text: `${d.blurb}. Carries ${d.cargo} cargo.`,
               status: selected ? 'IN USE' : owned ? 'OWNED' : '',
               button: selected ? null : owned ? 'FLY' : `⬢ ${price}`,
               disabled: !owned && save.salvage < price,

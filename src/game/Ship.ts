@@ -90,7 +90,11 @@ export class Ship {
   private hitFlash = 0;
   private muzzleFlash = 0;
 
+  /** Which ship design is flying (decides cargo capacity). */
+  design: ShipDesignId;
+
   constructor(scene: THREE.Scene, design: ShipDesignId = 'b') {
+    this.design = design;
     this.root.add(this.tilt);
     this.parts = buildShipDesign(design, this.tilt, this.engineMat);
     addOutlines(this.tilt);
@@ -101,6 +105,7 @@ export class Ship {
 
   /** Swap to a different ship design (chosen at the Mechanic in home base). */
   setDesign(design: ShipDesignId): void {
+    this.design = design;
     this.tilt.clear();
     this.parts = buildShipDesign(design, this.tilt, this.engineMat);
     addOutlines(this.tilt);

@@ -334,6 +334,55 @@ body {
   text-shadow: 0 1px 2px #000;
 }
 
+#score {
+  font-family: var(--display);
+  position: absolute;
+  top: calc(24px + env(safe-area-inset-top));
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--gold);
+  text-shadow: 0 1px 3px #000;
+  pointer-events: none;
+}
+
+/* Points earned when a sector is cleared. */
+#score-pop {
+  font-family: var(--display);
+  position: absolute;
+  top: 44%;
+  left: 50%;
+  transform: translate(-50%, 8px);
+  min-width: 230px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: rgba(14, 8, 20, 0.72);
+  border: 1px solid rgba(242, 196, 109, 0.35);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #efe9f7;
+  opacity: 0;
+  transition: opacity 0.25s, transform 0.25s;
+  pointer-events: none;
+}
+#score-pop.visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+#score-pop div {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 2px 0;
+}
+#score-pop b {
+  color: var(--gold);
+}
+
 #objective {
   font-family: var(--display);
   position: absolute;
@@ -737,6 +786,8 @@ body {
 /* In the base only the stick and the action button are shown. */
 body.mode-base #armor,
 body.mode-base #salvage,
+body.mode-base #score,
+body.mode-base #score-pop,
 body.mode-base #radar,
 body.mode-base #objective,
 body.mode-base #btn-missile,
@@ -1428,4 +1479,26 @@ body.mode-base #btn-pause {
   max-width: 130px;
   height: 14px;
   accent-color: var(--gold);
+}
+
+/* Final score on the end-of-sortie screen. */
+.end-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 4px 0 10px;
+  font-family: var(--display);
+}
+.end-score b {
+  font-size: 34px;
+  font-weight: 900;
+  color: var(--gold);
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 14px rgba(242, 196, 109, 0.5);
+}
+.end-score span {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: #9ef3ff;
 }

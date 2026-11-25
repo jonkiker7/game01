@@ -29,6 +29,8 @@ export interface SaveData {
   lastRun: { won: boolean; sectors: number; kills: number } | null;
   runs: number;
   wins: number;
+  /** Best sortie score. */
+  best: number;
   deaths: number;
   /** Conversations already heard (see src/content/dialogue.ts). */
   seen: string[];
@@ -55,6 +57,7 @@ function fresh(): SaveData {
     helmets: ['dome'],
     helmet: 'dome',
     lastRun: null,
+    best: 0,
     runs: 0,
     wins: 0,
     deaths: 0,

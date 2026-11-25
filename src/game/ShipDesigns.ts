@@ -10,12 +10,16 @@ import type { MeshData, ShipModelData } from './models/modelTypes';
  */
 export type ShipDesignId = 'a' | 'b' | 'c' | 'd';
 
-export const SHIP_DESIGNS: { id: ShipDesignId; name: string; blurb: string }[] = [
-  { id: 'a', name: 'Valkyrie', blurb: 'Armored wedge gunship with ducted fans on the wingtips' },
-  { id: 'b', name: 'Manta', blurb: 'Armored gunship with two big ducted fans on drooped wings (Blender model)' },
-  { id: 'c', name: 'Kestrel', blurb: 'Slim dart with open rotors on wingtip nacelles' },
-  { id: 'd', name: 'Atlas', blurb: 'Heavy lifter with big fan pods and a belly turret' },
+/** The ships, and how many loads of cargo each can carry at once (cargo missions). */
+export const SHIP_DESIGNS: { id: ShipDesignId; name: string; blurb: string; cargo: number }[] = [
+  { id: 'a', name: 'Valkyrie', blurb: 'Armored wedge gunship with ducted fans on the wingtips', cargo: 3 },
+  { id: 'b', name: 'Manta', blurb: 'Armored gunship with two big ducted fans on drooped wings (Blender model)', cargo: 2 },
+  { id: 'c', name: 'Kestrel', blurb: 'Slim dart with open rotors on wingtip nacelles', cargo: 2 },
+  { id: 'd', name: 'Atlas', blurb: 'Heavy lifter with big fan pods and a belly turret', cargo: 4 },
 ];
+
+/** How many loads of cargo a ship design carries at once. */
+export const cargoCapacity = (id: ShipDesignId): number => SHIP_DESIGNS.find((d) => d.id === id)?.cargo ?? 2;
 
 export function isShipDesign(v: string | null): v is ShipDesignId {
   return v === 'a' || v === 'b' || v === 'c' || v === 'd';
