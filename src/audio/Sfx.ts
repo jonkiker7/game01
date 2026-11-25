@@ -98,6 +98,11 @@ interface ToneSpec extends Send {
   filter?: { type: BiquadFilterType; freq: number; to?: number; q?: number };
   /** Vibrato: [speed in Hz, depth in Hz]. */
   vibrato?: [number, number];
+  /**
+   * FM: a second oscillator wobbling this one's pitch, for metallic or alien tones:
+   * [modulator frequency as a multiple of the note, depth as a multiple of the note].
+   */
+  fm?: [number, number];
 }
 
 interface NoiseSpec extends Send {
@@ -155,6 +160,15 @@ function tone(bus: Bus, out: GainNode, t0: number, pitch: number, s: ToneSpec): 
     o.type = s.type ?? 'square';
     o.detune.value = cents;
     glide(o.frequency, t, s.freq * pitch, s.to !== undefined ? s.to * pitch : undefined, s.dur);
+    if (s.fm) {
+      const mod = ctx.createOscillator();
+      const depth = ctx.createGain();
+      glide(mod.frequency, t, s.freq * pitch * s.fm[0], s.to !== undefined ? s.to * pitch * s.fm[0] : undefined, s.dur);
+      depth.gain.value = s.freq * pitch * s.fm[1];
+      mod.connect(depth).connect(o.frequency);
+      mod.start(t);
+      mod.stop(t + s.dur + 0.05);
+    }
     if (s.vibrato) {
       const lfo = ctx.createOscillator();
       const depth = ctx.createGain();
@@ -216,29 +230,44 @@ function boom(bus: Bus, out: GainNode, t: number, p: number, size: number): numb
 type Synth = (bus: Bus, out: GainNode, t: number, p: number) => number;
 
 const SYNTHS: Record<SoundId, Synth> = {
+  // ---- Your weapons: mechanical, like real guns (a sharp crack, a body thump, bolt clicks).
   gun: (b, o, t, p) =>
     Math.max(
-      tone(b, o, t, p, { type: 'square', freq: 1100, to: 260, dur: 0.07, gain: 0.11, filter: { type: 'lowpass', freq: 4000, to: 900 } }),
-      noise(b, o, t, p, { dur: 0.03, gain: 0.08, filter: { type: 'highpass', freq: 3000 } }),
+      noise(b, o, t, p, { dur: 0.04, gain: 0.18, filter: { type: 'highpass', freq: 1800 } }),
+      noise(b, o, t, p, { dur: 0.09, gain: 0.13, filter: { type: 'bandpass', freq: 650, to: 240, q: 1.2 } }),
+      tone(b, o, t, p, { type: 'sine', freq: 130, to: 55, dur: 0.08, gain: 0.16 }),
+      noise(b, o, t, p, { dur: 0.012, gain: 0.05, at: 0.04, filter: { type: 'bandpass', freq: 3200, q: 4 } }),
     ),
   scatter: (b, o, t, p) =>
     Math.max(
-      noise(b, o, t, p, { dur: 0.16, gain: 0.28, filter: { type: 'bandpass', freq: 2200, to: 380, q: 0.8 } }),
-      tone(b, o, t, p, { type: 'square', freq: 320, to: 80, dur: 0.14, gain: 0.12, filter: { type: 'lowpass', freq: 1600 } }),
+      noise(b, o, t, p, { dur: 0.3, gain: 0.36, filter: { type: 'lowpass', freq: 5000, to: 500 }, verb: 0.2 }),
+      tone(b, o, t, p, { type: 'sine', freq: 110, to: 38, dur: 0.22, gain: 0.3 }),
+      // Pump action: two clacks.
+      noise(b, o, t, p, { dur: 0.02, gain: 0.1, at: 0.2, filter: { type: 'bandpass', freq: 2600, q: 5 } }),
+      noise(b, o, t, p, { dur: 0.025, gain: 0.12, at: 0.27, filter: { type: 'bandpass', freq: 1900, q: 5 } }),
     ),
   rail: (b, o, t, p) =>
     Math.max(
-      tone(b, o, t, p, { type: 'sawtooth', freq: 2600, to: 180, dur: 0.38, gain: 0.16, detune: 18, filter: { type: 'lowpass', freq: 6000, to: 600, q: 6 }, echo: 0.35 }),
-      tone(b, o, t, p, { type: 'sine', freq: 180, to: 60, dur: 0.25, gain: 0.18 }),
+      noise(b, o, t, p, { dur: 0.08, gain: 0.3, filter: { type: 'highpass', freq: 1200 } }),
+      tone(b, o, t, p, { type: 'sine', freq: 95, to: 32, dur: 0.38, gain: 0.32 }),
+      noise(b, o, t, p, { dur: 0.3, gain: 0.2, filter: { type: 'lowpass', freq: 2500, to: 300 }, verb: 0.35 }),
+      // The barrel rings like struck steel.
+      tone(b, o, t, p, { type: 'sine', freq: 1180, dur: 0.45, gain: 0.03, fm: [1.41, 0.3], verb: 0.3 }),
     ),
-  hit: (b, o, t, p) => tone(b, o, t, p, { type: 'triangle', freq: 1500, to: 900, dur: 0.04, gain: 0.07 }),
+  hit: (b, o, t, p) =>
+    Math.max(
+      noise(b, o, t, p, { dur: 0.035, gain: 0.12, filter: { type: 'bandpass', freq: 2600, q: 3 } }),
+      tone(b, o, t, p, { type: 'sine', freq: 420, to: 210, dur: 0.045, gain: 0.06 }),
+    ),
   charge: (b, o, t, p) => tone(b, o, t, p, { type: 'sawtooth', freq: 180, to: 720, dur: 0.6, gain: 0.07, attack: 0.08, detune: 14, filter: { type: 'lowpass', freq: 500, to: 3000, q: 5 } }),
   chargeFull: (b, o, t, p) => arp(b, o, t, p, [hz(15), hz(22)], 0.06, { type: 'square', dur: 0.09, gain: 0.08, echo: 0.3 }),
   lock: (b, o, t, p) => arp(b, o, t, p, [hz(27), hz(27)], 0.07, { type: 'square', dur: 0.045, gain: 0.07, filter: { type: 'lowpass', freq: 5000 } }),
   missile: (b, o, t, p) =>
     Math.max(
-      noise(b, o, t, p, { dur: 0.5, gain: 0.3, attack: 0.02, filter: { type: 'bandpass', freq: 500, to: 2400, q: 1.5 }, echo: 0.2 }),
-      tone(b, o, t, p, { type: 'sawtooth', freq: 160, to: 520, dur: 0.35, gain: 0.08, detune: 20, filter: { type: 'lowpass', freq: 1800 } }),
+      // Clunk of the launcher, then the rocket motor's hiss.
+      tone(b, o, t, p, { type: 'sine', freq: 150, to: 55, dur: 0.12, gain: 0.32 }),
+      noise(b, o, t, p, { dur: 0.04, gain: 0.15, filter: { type: 'bandpass', freq: 1100, q: 2 } }),
+      noise(b, o, t, p, { dur: 0.55, gain: 0.26, attack: 0.05, at: 0.03, filter: { type: 'bandpass', freq: 700, to: 2400, q: 1.2 }, echo: 0.15 }),
     ),
   missileEmpty: (b, o, t, p) => arp(b, o, t, p, [110, 98], 0.08, { type: 'square', dur: 0.07, gain: 0.08, filter: { type: 'lowpass', freq: 700 } }),
   boost: (b, o, t, p) =>
@@ -265,14 +294,16 @@ const SYNTHS: Record<SoundId, Synth> = {
       tone(b, o, t, p, { type: 'sawtooth', freq: 700, to: 40, dur: 1.6, gain: 0.15, detune: 30, filter: { type: 'lowpass', freq: 3000, to: 200 }, echo: 0.4 }),
     ),
   heal: (b, o, t, p) => arp(b, o, t, p, [hz(15), hz(19), hz(22), hz(27)], 0.05, { type: 'triangle', dur: 0.22, gain: 0.1, echo: 0.4 }),
-  enemyShot: (b, o, t, p) => tone(b, o, t, p, { type: 'triangle', freq: 420, to: 1100, dur: 0.11, gain: 0.11, filter: { type: 'lowpass', freq: 2500 } }),
+  // ---- Enemy weapons: alien and electronic (warbling FM tones).
+  enemyShot: (b, o, t, p) =>
+    tone(b, o, t, p, { type: 'sine', freq: 700, to: 1500, dur: 0.17, gain: 0.1, fm: [1.5, 2.5], vibrato: [26, 70], echo: 0.2 }),
   mortarLaunch: (b, o, t, p) =>
     Math.max(
-      tone(b, o, t, p, { type: 'sine', freq: 200, to: 55, dur: 0.28, gain: 0.35 }),
-      noise(b, o, t, p, { dur: 0.15, gain: 0.15, filter: { type: 'lowpass', freq: 1200 } }),
-      tone(b, o, t, p, { type: 'sawtooth', freq: 300, to: 900, dur: 0.5, gain: 0.035, at: 0.05, filter: { type: 'lowpass', freq: 1500 }, echo: 0.3 }),
+      tone(b, o, t, p, { type: 'sine', freq: 170, to: 70, dur: 0.45, gain: 0.3, fm: [0.5, 3.5] }),
+      tone(b, o, t, p, { type: 'sine', freq: 380, to: 1700, dur: 0.6, gain: 0.05, at: 0.04, fm: [2.01, 1.5], vibrato: [11, 45], echo: 0.3 }),
     ),
-  mortarImpact: (b, o, t, p) => boom(b, o, t, p * 0.8, 0.8),
+  mortarImpact: (b, o, t, p) =>
+    Math.max(boom(b, o, t, p * 0.8, 0.8), tone(b, o, t, p, { type: 'sine', freq: 320, to: 60, dur: 0.45, gain: 0.12, fm: [3.7, 5], verb: 0.3 })),
   explosionSmall: (b, o, t, p) => boom(b, o, t, p, 0.35),
   explosionBig: (b, o, t, p) => boom(b, o, t, p, 0.9),
   bossAppear: (b, o, t, p) =>
