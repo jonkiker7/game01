@@ -8,6 +8,7 @@ import { CONVERSATIONS, IDLE, type Line, type StoryState } from '../content/dial
 import type { BaseUI, ShopRow } from './BaseUI';
 import type { ConversationUI } from './Conversation';
 import { CORRIDORS, DESTINATIONS, heightAt, HOLES, inRect, type Rect, ROOMS, roomAt, SPOTS, WALKABLE } from './Layout';
+import { LeaderboardSign } from './Leaderboard';
 import { Pilot } from './Pilot';
 import { Robot } from './Robot';
 import { HELMETS, PERKS, type SaveData, SHIP_PRICES, SUITS, writeSave } from './Save';
@@ -173,6 +174,12 @@ export class HomeBase {
 
     this.shipHolder.scale.setScalar(1.35);
     this.scene.add(this.shipHolder);
+    // The leaderboard, high on the concourse's north wall above the hangar doorway.
+    // Tilted out from the wall, like a hanging screen, so the high camera can read it.
+    this.board.root.position.set(0, 8.3, -12.6);
+    this.board.root.rotation.x = -0.55;
+    this.scene.add(this.board.root);
+    this.board.draw(this.save.leaderboard);
     this.parkShip();
     this.setShip(save.ship);
 
@@ -184,8 +191,11 @@ export class HomeBase {
   }
 
   /** Arrive at the base: wake up in your quarters (first load) or step off the ship (after a sortie). */
+  private readonly board = new LeaderboardSign();
+
   enter(spawn: Spawn = 'wake'): void {
     this.launching = -1;
+    this.board.draw(this.save.leaderboard); // new scores from the sortie you just flew
     this.pilot.root.visible = true;
     this.pilot.root.scale.setScalar(1);
     const at = SPOTS[spawn];

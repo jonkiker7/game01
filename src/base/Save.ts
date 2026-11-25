@@ -31,6 +31,8 @@ export interface SaveData {
   wins: number;
   /** Best sortie score. */
   best: number;
+  /** The station's leaderboard (top 10), you and other pilots. */
+  leaderboard: LeaderEntry[];
   deaths: number;
   /** Conversations already heard (see src/content/dialogue.ts). */
   seen: string[];
@@ -46,6 +48,40 @@ export interface SaveData {
 const KEY = 'star-rotor-save';
 const OLD_SALVAGE_KEY = 'star-rotor-salvage';
 
+export interface LeaderEntry {
+  name: string;
+  score: number;
+  /** Your own entries (highlighted on the board). */
+  you?: boolean;
+}
+
+/** Your name on the leaderboard until callsigns can be entered. */
+export const PLAYER_NAME = 'PLAYER 1';
+const BOARD_SIZE = 10;
+
+/** Other pilots already on the board, so there's something to beat. */
+const SEED_LEADERBOARD: LeaderEntry[] = [
+  { name: 'VEX', score: 18420 },
+  { name: 'NOVA-7', score: 16150 },
+  { name: 'KITE', score: 14380 },
+  { name: 'ROOK JR.', score: 12900 },
+  { name: 'HALCYON', score: 11240 },
+  { name: 'MOTH', score: 9870 },
+  { name: 'ZERO-ONE', score: 8310 },
+  { name: 'SABLE', score: 6920 },
+  { name: 'PIXIE', score: 5480 },
+  { name: 'GRUNT', score: 4150 },
+];
+
+/** Add a sortie's score to the leaderboard; returns your rank (1-based) or 0 if it didn't place. */
+export function addToLeaderboard(save: SaveData, score: number): number {
+  if (score <= 0) return 0;
+  const entry: LeaderEntry = { name: PLAYER_NAME, score, you: true };
+  const board = [...save.leaderboard, entry].sort((a, b) => b.score - a.score).slice(0, BOARD_SIZE);
+  save.leaderboard = board;
+  return board.indexOf(entry) + 1;
+}
+
 function fresh(): SaveData {
   return {
     salvage: 0,
@@ -58,6 +94,7 @@ function fresh(): SaveData {
     helmet: 'dome',
     lastRun: null,
     best: 0,
+    leaderboard: SEED_LEADERBOARD.map((e) => ({ ...e })),
     runs: 0,
     wins: 0,
     deaths: 0,

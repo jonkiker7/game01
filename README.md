@@ -304,7 +304,9 @@ shows the arena wall as a dashed circle.
 
 ## Score
 
-Every sortie keeps a score (top centre), and the best one is saved as your high score.
+Every sortie keeps a score (top centre), and the best one is saved as your high score. The top 10
+scores go up on the **leaderboard** in the Concourse (the screen above the hangar doorway, behind
+the info desk), as PLAYER 1 for now, alongside ten other pilots to beat.
 
 - **Damage:** 1 point per point of damage dealt.
 - **Mission complete:** +1000 (beating the boss: +2500).
