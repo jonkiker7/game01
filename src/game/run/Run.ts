@@ -21,6 +21,8 @@ export const SECTORS = 3;
 /** How a sortie ended. */
 export interface RunResult {
   won: boolean;
+  /** Lost by failing a mission (the generator or convoy was destroyed) rather than being shot down. */
+  failed?: boolean;
   sectorsCleared: number;
   totalSectors: number;
   kills: number;
@@ -109,6 +111,7 @@ export class Run {
   private timer = 0;
   private overTimer = 0;
   private failTimer = 0;
+  private missionFailed = false;
   private won = false;
   private reward: Reward = 'upgrade';
   private gates: Gate[] = [];
@@ -134,6 +137,7 @@ export class Run {
     this.lastRoundKind = null;
     this.kills = 0;
     this.salvage = 0;
+    this.missionFailed = false;
     this.won = false;
     this.reward = 'upgrade';
     const fixed = Number(new URLSearchParams(location.search).get('seed'));
@@ -333,9 +337,13 @@ export class Run {
       }
       case 'failed':
         this.failTimer -= dt;
+        // Failing a mission ends the sortie, just like being shot down.
         if (this.failTimer <= 0) {
-          this.openGates();
-          this.d.hud.show('NO REWARD · CHOOSE YOUR PATH', 2.2);
+          this.phase = 'over';
+          this.won = false;
+          this.missionFailed = true;
+          this.overTimer = -10;
+          this.finish();
         }
         break;
       case 'reward': {
@@ -380,10 +388,9 @@ export class Run {
     this.phase = 'reward';
   }
 
-  /** A mission was failed (generator or convoy destroyed): no reward, straight to the gates. */
   /**
    * A mission was failed (generator or convoy destroyed): it blows up, a red banner holds for
-   * a few seconds, no reward orb appears, and then the gates open.
+   * a few seconds, and then the sortie ends, just like being shot down.
    */
   private failEncounter(): void {
     const { enemies, hud } = this.d;
@@ -498,6 +505,7 @@ export class Run {
     this.d.releaseInput();
     this.d.onFinish({
       won: this.won,
+      failed: this.missionFailed,
       sectorsCleared: this.won ? SECTORS : this.sector - 1,
       totalSectors: SECTORS,
       kills: this.kills,

@@ -16,7 +16,7 @@ import type { World } from '../World';
  *   Escort    guard a convoy crawling across the arena (saboteurs latch on and stall it)
  *   Sabotage  destroy the power pylons to drop the fortress shield, then destroy the fortress
  *   Hold      capture three zones by staying inside each one
- * Defend and Escort can be failed: the sector ends without its reward.
+ * Defend and Escort can be failed, which ends the sortie (like being shot down).
  */
 
 export type MissionKind = 'rescue' | 'defend' | 'escort' | 'sabotage' | 'hold';

@@ -15,6 +15,7 @@ const CATEGORY: Record<UpgradeCategory, { icon: string; color: string; name: str
 
 export interface RunSummary {
   won: boolean;
+  failed?: boolean;
   sectorsCleared: number;
   totalSectors: number;
   kills: number;
@@ -79,7 +80,7 @@ export class RunUI {
 
   showEnd(s: RunSummary, restart: () => void, buttonLabel = 'NEW SORTIE ▸'): void {
     this.endEl.innerHTML = `
-      <h1 class="${s.won ? 'won' : 'lost'}">${s.won ? 'SORTIE COMPLETE' : 'SHOT DOWN'}</h1>
+      <h1 class="${s.won ? 'won' : 'lost'}">${s.won ? 'SORTIE COMPLETE' : s.failed ? 'MISSION FAILED' : 'SHOT DOWN'}</h1>
       <div class="stats">
         <div><b>${s.sectorsCleared}/${s.totalSectors}</b><span>SECTORS CLEARED</span></div>
         <div><b>${s.kills}</b><span>ENEMIES DESTROYED</span></div>

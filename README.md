@@ -88,7 +88,7 @@ in conversation, and the name in the code, are listed so nothing gets lost.
 
 Everything you hear is synthesized in code in a retro-future style: analog-synth zaps, filtered
 noise, tape echo and big reverb, with synthwave music played live by a little sequencer. There
-are three songs: the **station** (slow and dreamy), **sorties** (driving) and **bosses** (faster
+are three songs: the **station** (slow and dreamy), **sorties** (driving) and **bosses** (lower
 and darker). The music muffles while the pause menu or a power-up choice is open, and the
 ship's engine hum rises with your speed.
 
@@ -269,9 +269,9 @@ outpost, fenced in by a glowing energy wall:
 - **Boss (round 3):** one of three bosses (below). Destroy it to complete the sortie.
 
 Each round before the boss is one of these at random (never the same type twice in a row). If you lose the generator or the convoy,
-the round ends without its reward: what you were protecting has a health bar across the top, and
-if it reaches zero it blows up, a red MISSION FAILED banner holds for a few seconds, no power orb
-appears, and then the gates open. To test one, add `?sortie&mission=rescue` (or `defend`,
+the sortie is over, just like being shot down: what you were protecting has a health bar across
+the top, and if it reaches zero it blows up, a red MISSION FAILED banner holds for a few seconds,
+and you head back to the station with the salvage you've earned. To test one, add `?sortie&mission=rescue` (or `defend`,
 `escort`, `sabotage`, `hold`, `outpost`, `survive`) to the URL.
 
 Clearing a sector drops a **power orb** in the middle of the arena. Fly into it:
