@@ -46,8 +46,8 @@ towers, ground enemies and ground bosses (flying things keep a simple shadow rig
 helps you aim). LOW skips real shadows. A soft vignette darkens the screen edges on both.
 
 **Pause:** the ❚❚ button (top left, or P / Esc) pauses a sortie and shows your ship, its current
-stats, your missions (this round's objective and your contract), upgrades taken this sortie and
-your station upgrades. Switching away from the app pauses automatically.
+stats, your missions (this round's objective and your contract), power-ups taken this sortie and
+your base upgrades. Switching away from the app pauses automatically.
 
 **Dev panel:** switch it on with **DEV PANEL: ON** in the pause menu (works in the Home Screen app,
 and stays on until you switch it off), or add `?dev` to the URL (e.g. `?dev&sortie`) for a **DEV** panel at the top. Its
@@ -64,6 +64,25 @@ You can also force it with `?quality=low` or `?quality=high` in the URL. Adding 
 
 Play in landscape.
 On iPhone, use Share → **Add to Home Screen** for full-screen play.
+
+## Glossary
+
+The words we use when talking about the game. Players see the first name; other names we might use
+in conversation, and the name in the code, are listed so nothing gets lost.
+
+| Term (on screen) | Also called | What it is | In the code |
+|---|---|---|---|
+| **Sortie** | run | One trip from the base: 2 sectors, then a boss | `Run` |
+| **Sector** | arena, round, encounter, mission | One stage of a sortie, boss fight included, and the area it's fought in | `sector`, `buildArena`, `ArenaShape` |
+| **Mission type** | objective | What a sector asks of you: Destroy the Towers, Rescue, Defend, Escort... | `Missions.ts` |
+| **Contract** | NPC mission, base mission | Optional side job from BOLT's board, paid in salvage | `Contracts.ts` |
+| **Base** | station, Halcyon Station | The hub between sorties | `HomeBase`, `Station` |
+| **Upgrade** | perk | Permanent, bought from Rook with salvage | `perks` in `Save.ts` |
+| **Power-up** | | Picked during a sortie, lost when it ends | `Upgrade` in `run/Upgrades.ts` |
+| **Power orb** | reward orb | Drops when a sector is cleared; fly in to get its reward | `Reward` in `Arena.ts` |
+| **Gate** | path gate | Choose the next sector's reward | `Arena.ts` |
+| **Salvage** | | The currency | `salvage` |
+| **Tower** | turret | Ground gun that lobs plasma bombs | kind `'turret'` |
 
 ## Home base
 
@@ -174,13 +193,13 @@ outpost, fenced in by a glowing energy wall:
 
 Each round before the boss is one of these at random (never the same type twice in a row). If you lose the generator or the convoy,
 the round ends without its reward: what you were protecting has a health bar across the top, and
-if it reaches zero it blows up, a red MISSION FAILED banner holds for a few seconds, no reward orb
+if it reaches zero it blows up, a red MISSION FAILED banner holds for a few seconds, no power orb
 appears, and then the gates open. To test one, add `?sortie&mission=rescue` (or `defend`,
 `escort`, `sabotage`, `hold`, `outpost`, `survive`) to the URL.
 
-Clearing a sector drops a **reward orb** in the middle of the arena. Fly into it:
+Clearing a sector drops a **power orb** in the middle of the arena. Fly into it:
 
-- **Upgrade:** pick 1 of 3 upgrades (see `src/game/run/Upgrades.ts`).
+- **Power-up:** pick 1 of 3 power-ups (see `src/game/run/Upgrades.ts`).
 - **Armory:** pick a new weapon for one of your slots.
 - **Repair:** restore 40% armor.
 - **Salvage:** currency for home base (coming in a later milestone). Kills earn salvage too.
@@ -231,7 +250,7 @@ For testing, `?enemies=swarmer,sniper` forces a zone's pair (or one type: `?enem
 drone, swarmer, lancer, crawler, sniper, minelayer, pulsar. On a very slow test machine,
 `?dtmax=0.3` lets the game keep real time (it runs the logic in small steps per frame).
 
-## Weapons, upgrades and Nova
+## Weapons, power-ups and Nova
 
 - **Gun slot:** Machine Gun (default), **Scatter Cannon** (6-pellet short-range blasts) or
   **Rail Lance** (slow, heavy bolts that pierce every enemy in a line).
@@ -239,12 +258,12 @@ drone, swarmer, lancer, crawler, sniper, minelayer, pulsar. On a very slow test 
   out 5 bomblets) or **Swarm Rockets** (a volley of homing rockets; charge for more).
 - **Nova:** the NOVA button charges as you deal damage. When it glows, tap it for a shockwave
   that damages everything around you and wipes out enemy shots.
-- **Upgrade families** (coloured cards):
+- **Power-up families** (coloured cards):
   - **Arc (lightning):** Arc Rounds, Arc Warheads, Static Field
   - **Cryo (ice):** Cryo Rounds (chill; 5 chills freeze), Cryo Warheads, Frostbite
   - **Plasma (fire):** Plasma Rounds, Plasma Warheads, Meltdown
   - **Duos** (need two families): Superconductor (Arc + Cryo), Thermal Shock (Cryo + Plasma)
-- Plus core upgrades for the gun, missiles, boost, hull and Nova.
+- Plus core power-ups for the gun, missiles, boost, hull and Nova.
 
 ## Ship designs
 
@@ -280,8 +299,8 @@ npm run preview   # serve the production build
 - `src/game/Hud.ts`: armor bar, salvage, objective, missile pips, messages, and damage/heal flashes
 - `src/base/`: home base: `HomeBase.ts` (scene, crew, launch cutscene), `Layout.ts` (the floor plan: rooms, corridors, levels, stairs, floor holes, doors, key spots), `Station.ts` (builds the rooms, cutaway walls, decor and the view), `Robot.ts` (BOLT), `Pilot.ts` (the on-foot character), `BaseUI.ts` (dialogue and shops), `Save.ts` (progress, perks, outfits, ships)
 - `src/game/Mortars.ts`: tower plasma mortars with landing warnings
-- `src/game/Combat.ts`: every hit goes through here so elemental upgrades can react
-- `src/game/run/`: the roguelite run: `Run.ts` (sectors and flow), `Upgrades.ts` (stats and upgrade pool), `Arena.ts` (wall, reward orb, gates), `RunUI.ts` (upgrade cards and summary)
+- `src/game/Combat.ts`: every hit goes through here so elemental power-ups can react
+- `src/game/run/`: the roguelite run: `Run.ts` (sectors and flow), `Upgrades.ts` (stats and the power-up pool), `Arena.ts` (wall, power orb, gates), `RunUI.ts` (power-up cards and summary)
 - `src/game/Radar.ts`: the radar
 - `src/game/AimIndicator.ts`: the charging aim line and target ring
 - `src/game/CameraRig.ts`: follow camera with look-ahead, FOV kick, and shake

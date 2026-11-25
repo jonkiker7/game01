@@ -34,7 +34,7 @@ export class RunUI {
     root.insertAdjacentHTML(
       'beforeend',
       `<div id="fade"></div>
-       <div id="upgrade-screen" class="overlay"><h2>CHOOSE AN UPGRADE</h2><div class="cards"></div></div>
+       <div id="upgrade-screen" class="overlay"><h2>CHOOSE A POWER-UP</h2><div class="cards"></div></div>
        <div id="end-screen" class="overlay"></div>`,
     );
     this.fadeEl = root.querySelector('#fade') as HTMLElement;
@@ -52,7 +52,7 @@ export class RunUI {
   }
 
   /** Show three upgrade cards; calls `pick` with the chosen one. */
-  chooseUpgrade(options: Upgrade[], levels: Map<string, number>, pick: (u: Upgrade) => void, title = 'CHOOSE AN UPGRADE'): void {
+  chooseUpgrade(options: Upgrade[], levels: Map<string, number>, pick: (u: Upgrade) => void, title = 'CHOOSE A POWER-UP'): void {
     (this.cardsEl.querySelector('h2') as HTMLElement).textContent = title;
     const list = this.cardsEl.querySelector('.cards') as HTMLElement;
     list.replaceChildren();
@@ -94,7 +94,7 @@ export class RunUI {
             }</div>`
           : ''
       }
-      <div class="upgrades">${s.upgrades.length ? s.upgrades.map((u) => `<span>${u}</span>`).join('') : '<em>No upgrades taken</em>'}</div>
+      <div class="upgrades">${s.upgrades.length ? s.upgrades.map((u) => `<span>${u}</span>`).join('') : '<em>No power-ups taken</em>'}</div>
       <div class="total">Salvage banked: ⬢ ${s.totalSalvage} <small>(spend it with the crew back on the station)</small></div>
       <button class="again">${buttonLabel}</button>`;
     this.endEl.querySelector('.again')!.addEventListener('pointerup', (e) => {

@@ -44,8 +44,8 @@ export class PauseMenu {
              <div class="info-col">
                <section class="stats"><h3>SHIP</h3><div class="body"></div></section>
                <section class="missions"><h3>MISSIONS</h3><div class="body"></div></section>
-               <section class="perks"><h3>UPGRADES THIS SORTIE</h3><div class="body"></div></section>
-               <section class="station"><h3>STATION UPGRADES</h3><div class="body"></div></section>
+               <section class="perks"><h3>POWER-UPS THIS SORTIE</h3><div class="body"></div></section>
+               <section class="station"><h3>BASE UPGRADES</h3><div class="body"></div></section>
              </div>
            </div>
            <div class="buttons"><button class="dev"></button><button class="resume">RESUME ▸</button></div>
@@ -123,7 +123,7 @@ export class PauseMenu {
         return u ? `<div class="chip" title="${u.text}"><b>${u.name}</b>${n > 1 ? ` ×${n}` : ''}<small>${u.text}</small></div>` : '';
       })
       .join('');
-    this.body('.perks', taken || '<div class="line dim">None yet: clear a sector and grab its reward</div>');
+    this.body('.perks', taken || '<div class="line dim">None yet: clear a sector and grab its power orb</div>');
     const perks = i.perks
       .filter(([, lv]) => lv > 0)
       .map(([name, lv, max]) => `<div class="chip"><b>${name}</b> LV ${lv}/${max}</div>`)

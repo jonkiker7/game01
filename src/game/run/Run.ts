@@ -417,7 +417,7 @@ export class Run {
           this.d.releaseInput();
           hud.show(u.name.toUpperCase(), 1.6);
           this.openGates();
-        }, isWeapon ? 'ARMORY · CHOOSE A WEAPON' : 'CHOOSE AN UPGRADE');
+        }, isWeapon ? 'ARMORY · CHOOSE A WEAPON' : 'CHOOSE A POWER-UP');
         return;
       }
     } else if (this.reward === 'repair') {
@@ -519,7 +519,7 @@ export class Run {
       case 'reward':
         return `${head}\nCOLLECT ${REWARD_STYLE[this.reward].label.slice(2)}`;
       case 'choosing':
-        return `${head}\nCHOOSE AN UPGRADE`;
+        return `${head}\nCHOOSE A POWER-UP`;
       case 'gates':
         return `${head}\nCHOOSE YOUR PATH`;
       case 'failed':
