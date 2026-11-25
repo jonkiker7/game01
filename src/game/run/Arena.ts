@@ -80,6 +80,8 @@ export class ArenaVisual {
       blending: THREE.AdditiveBlending,
     }, 0.9);
     this.wall = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 96, 1, true), this.wallMat);
+    // The energy wall is retired: arenas now end in a band of trees that fades to black.
+    this.wall.visible = false;
     scene.add(this.wall);
 
     this.rewardCore = new THREE.Mesh(new THREE.IcosahedronGeometry(1.6, 1), glow('#ffffff'));

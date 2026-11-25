@@ -266,6 +266,8 @@ export const ZONE_SPECIES: Species[] = ['drone', 'swarmer', 'lancer', 'crawler',
 
 /** A circular arena the fight is confined to. */
 export interface ArenaBounds {
+  /** Is (x, z) at least `margin` inside the arena's (organic) edge? */
+  inside?: (x: number, z: number, margin: number) => boolean;
   x: number;
   z: number;
   r: number;
@@ -539,13 +541,19 @@ export class EnemyManager {
       const r = 75 + this.rand() * 20;
       x = p.x + Math.cos(a) * r;
       z = p.z + Math.sin(a) * r;
-      if (Math.hypot(x - this.arena.x, z - this.arena.z) < this.arena.r - 4) break;
+      if (this.arena.inside ? this.arena.inside(x, z, 6) : Math.hypot(x - this.arena.x, z - this.arena.z) < this.arena.r - 4) break;
     }
     // Still outside after a few tries: pull it in to the arena's edge.
     const dx = x - this.arena.x;
     const dz = z - this.arena.z;
     const d = Math.hypot(dx, dz);
-    if (d > this.arena.r - 4) {
+    if (this.arena.inside) {
+      // Organic edge: step toward the ship (always inside) until the spot is in the arena.
+      for (let k = 0; k < 12 && !this.arena.inside(x, z, 6); k++) {
+        x += (p.x - x) * 0.25;
+        z += (p.z - z) * 0.25;
+      }
+    } else if (d > this.arena.r - 4) {
       x = this.arena.x + (dx / d) * (this.arena.r - 4);
       z = this.arena.z + (dz / d) * (this.arena.r - 4);
     }

@@ -5,8 +5,9 @@ import { SPECIES_NAMES } from '../EnemyTypes';
 import { type Boss, BOSS_NAMES, type BossId } from '../Bosses';
 import type { Hud } from '../Hud';
 import type { Blip } from '../Radar';
-import { HOVER_HEIGHT, type Ship } from '../Ship';
-import { LANDING_PAD, OUTPOSTS, type World } from '../World';
+import type { Ship } from '../Ship';
+import type { World } from '../World';
+import { type ArenaShape, blobArena, corridorArena } from '../ArenaShape';
 import type { ContractTracker } from './Contracts';
 import { createMission, type Mission, type MissionDeps, MISSION_RADIUS, MISSION_TITLES, type MissionKind } from './Missions';
 import { type ArenaVisual, type Gate, REWARD_STYLE, type Reward } from './Arena';
@@ -29,7 +30,8 @@ export interface RunResult {
 }
 /** Arena size per encounter: tower hunts are big (fly around and find them), swarms are tight. */
 const ARENA_RADIUS: Record<EncounterKind, number> = { outpost: 180, survive: 110, stronghold: 110, boss: 130, ...MISSION_RADIUS };
-const MAP_EDGE = 354; // keep arenas inside the playable map
+/** Escort runs left to right through a snaking corridor about one screen tall. */
+const CORRIDOR = { length: 330, halfWidth: 44 };
 const SURVIVE_TIME = 40;
 
 type EncounterKind = 'outpost' | 'survive' | 'stronghold' | 'boss' | MissionKind;
@@ -99,13 +101,16 @@ export class Run {
   mission: Mission | null = null;
   private radius = ARENA_RADIUS.outpost;
   private center = new THREE.Vector2();
+  /** This round's arena shape (a fresh level every round). */
+  shape: ArenaShape = blobArena(150, 1);
+  /** The sortie's level seed (`?seed=` to replay one); each round adds its sector number. */
+  seed = 1;
   private timer = 0;
   private overTimer = 0;
   private failTimer = 0;
   private won = false;
   private reward: Reward = 'upgrade';
   private gates: Gate[] = [];
-  private readonly used = new Set<number>();
   private readonly tmp = new THREE.Vector3();
 
   constructor(private readonly d: Deps) {}
@@ -129,8 +134,9 @@ export class Run {
     this.kills = 0;
     this.salvage = 0;
     this.won = false;
-    this.used.clear();
     this.reward = 'upgrade';
+    const fixed = Number(new URLSearchParams(location.search).get('seed'));
+    this.seed = Number.isFinite(fixed) && fixed > 0 ? Math.floor(fixed) : 1 + Math.floor(Math.random() * 99999);
     this.d.resetRunState();
     this.d.clearField();
     enemies.reset();
@@ -138,31 +144,69 @@ export class Run {
     this.endMission();
     this.d.arena.hideGates();
     this.d.arena.hideReward();
-    ship.reset(world, LANDING_PAD.x, LANDING_PAD.z, this.stats);
-    this.d.snapCamera();
     // `?boss=flyer|tank|titan` (or `?boss`) skips straight to a boss fight, for testing.
-    const bossTest = new URLSearchParams(location.search).has('boss');
-    if (bossTest) this.sector = SECTORS;
-    // The first arena is the outpost nearest the landing zone.
+    if (new URLSearchParams(location.search).has('boss')) this.sector = SECTORS;
     this.kind = this.pickKind();
-    this.enter(0);
-    if (bossTest) {
-      ship.teleport(world, this.center.x, this.center.y + this.radius - 14);
-      this.d.snapCamera();
+    this.buildArena();
+    ship.reset(world, this.shape.entry.x, this.shape.entry.z, this.stats);
+    this.d.snapCamera();
+    this.enter();
+  }
+
+  /** Generate this round's level: an organic arena shaped for the mission, fresh terrain. */
+  private buildArena(): void {
+    const seed = this.seed * 10 + this.sector;
+    this.shape =
+      this.kind === 'escort'
+        ? corridorArena(CORRIDOR.length, CORRIDOR.halfWidth, seed)
+        : blobArena(ARENA_RADIUS[this.kind] * 0.92, seed);
+    this.d.world.generate(this.shape, seed);
+    this.center.set(this.shape.center.x, this.shape.center.z);
+    this.radius = this.shape.radius;
+  }
+
+  /**
+   * Where the camera should look. In the corridor it leans toward the corridor's middle, so
+   * both edges (and the fade beyond them) stay in view.
+   */
+  cameraTarget(ship: THREE.Vector3, out: THREE.Vector3): THREE.Vector3 {
+    out.copy(ship);
+    const cz = this.shape.centreZ?.(ship.x);
+    if (cz !== undefined) out.z = ship.z * 0.75 + cz * 0.25;
+    return out;
+  }
+
+  /** Keep the ship inside the arena's (organic) edge: a soft wall. */
+  private confineShip(): void {
+    const { ship } = this.d;
+    const p = ship.root.position;
+    const margin = 3;
+    const d = this.shape.depth(p.x, p.z);
+    if (d >= margin) return;
+    const e = 1;
+    let gx = this.shape.depth(p.x + e, p.z) - this.shape.depth(p.x - e, p.z);
+    let gz = this.shape.depth(p.x, p.z + e) - this.shape.depth(p.x, p.z - e);
+    const g = Math.hypot(gx, gz) || 1;
+    gx /= g;
+    gz /= g;
+    p.x += gx * (margin - d);
+    p.z += gz * (margin - d);
+    const into = ship.velocity.x * gx + ship.velocity.y * gz; // < 0 = heading out
+    if (into < 0) {
+      ship.velocity.x -= gx * into;
+      ship.velocity.y -= gz * into;
     }
   }
 
-  /** Begin the encounter at OUTPOSTS[index] for the current sector. */
-  private enter(index: number): void {
-    const { enemies, arena, hud } = this.d;
-    this.used.add(index);
-    const [cx, cz] = this.arenaAt(index);
+  /** Begin this round's encounter in the freshly built arena. */
+  private enter(): void {
+    const { enemies, hud } = this.d;
+    const cx = this.center.x;
+    const cz = this.center.y;
     const R = this.radius;
-    this.center.set(cx, cz);
-    arena.setArena(cx, cz, R, this.d.world.heightAt(cx, cz) + HOVER_HEIGHT);
-
     const s = this.sector;
-    const bounds = { x: cx, z: cz, r: R };
+    const shape = this.shape;
+    const bounds = { x: cx, z: cz, r: R, inside: (x: number, z: number, m: number) => shape.depth(x, z) > m };
     const hpMul = 1 + 0.15 * (s - 1);
     const types = (this.pair = this.kind === 'boss' ? [] : this.pickPair());
     this.boss = null;
@@ -240,13 +284,6 @@ export class Run {
     return kind;
   }
 
-  /** The arena's centre for an outpost, nudged inward so the whole arena fits on the map. */
-  private arenaAt(index: number): [number, number] {
-    const lim = MAP_EDGE - this.radius;
-    const [x, z] = OUTPOSTS[index];
-    return [THREE.MathUtils.clamp(x, -lim, lim), THREE.MathUtils.clamp(z, -lim, lim)];
-  }
-
   /** Called when the player destroys an enemy. */
   onKill(_kind: Enemy['kind'], enemy: Enemy): void {
     this.kills++;
@@ -264,7 +301,7 @@ export class Run {
 
   update(dt: number): void {
     const { ship, enemies, arena } = this.d;
-    if (this.phase !== 'over' && this.phase !== 'transition') ship.confine(this.center.x, this.center.y, this.radius - 3);
+    if (this.phase !== 'over' && this.phase !== 'transition') this.confineShip();
     if (this.phase !== 'transition') this.d.contracts.update(dt, ship);
     // Health bar across the top: the boss, or what a mission has you protecting.
     const guard = this.phase === 'fight' ? this.mission?.healthBar() : null;
@@ -407,17 +444,17 @@ export class Run {
   /** Two gates on the far side of the arena, each showing the next encounter's reward. */
   private openGates(): void {
     const y = this.d.ship.root.position.y;
-    const edge = this.radius - 24;
+    const [g1, g2] = this.shape.exits;
     if (this.sector + 1 === SECTORS) {
-      this.gates = [{ x: this.center.x, z: this.center.y - edge, reward: 'final' }];
+      this.gates = [{ x: (g1.x + g2.x) / 2, z: (g1.z + g2.z) / 2, reward: 'final' }];
     } else {
       const pool: Reward[] = ['upgrade', 'upgrade', 'upgrade', 'weapon', 'salvage', 'repair'];
       const a = pool[Math.floor(Math.random() * pool.length)];
       let b = pool[Math.floor(Math.random() * pool.length)];
       while (b === a) b = pool[Math.floor(Math.random() * pool.length)];
       this.gates = [
-        { x: this.center.x - 18, z: this.center.y - edge, reward: a },
-        { x: this.center.x + 18, z: this.center.y - edge, reward: b },
+        { x: g1.x, z: g1.z, reward: a },
+        { x: g2.x, z: g2.z, reward: b },
       ];
     }
     this.d.arena.showGates(this.gates, y);
@@ -436,19 +473,13 @@ export class Run {
       this.d.clearField();
       enemies.reset();
       this.sector++;
-      // Next arena: one of the unused outposts closest to this one.
-      const next = OUTPOSTS.map((o, i) => ({ i, d: Math.hypot(o[0] - this.center.x, o[1] - this.center.y) }))
-        .filter((o) => !this.used.has(o.i))
-        .sort((p, q) => p.d - q.d)
-        .slice(0, 3);
-      const pick = next[Math.floor(Math.random() * next.length)].i;
+      // A brand new level for the next round, built behind the fade.
       this.kind = this.pickKind();
-      const [cx, cz] = this.arenaAt(pick);
-      // Enter from the south edge of the new arena, facing north.
-      ship.teleport(world, cx, cz + this.radius - 14);
+      this.buildArena();
+      ship.teleport(world, this.shape.entry.x, this.shape.entry.z);
       ship.invulnerable = Math.max(ship.invulnerable, 1.5);
       this.d.snapCamera();
-      this.enter(pick);
+      this.enter();
     });
   }
 

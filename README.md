@@ -126,6 +126,17 @@ sortie (or drop it from the board). New offers go up after every sortie. The cre
 post contracts have things to say once you've finished one. Contract writing lives in
 `src/content/contracts.ts` (placeholder text, edit freely).
 
+## Levels: a new one every round
+
+Every round builds a fresh level: new hills, new canyons, and new tree and plant placement, all on
+the same jungle planet. Arena edges are organic (lumpy blobs, never perfect circles). The Escort
+mission runs left to right through a **snaking corridor** about one screen tall, and the convoy
+follows its centre line. Outside every arena there are a few rows of tall, thick trees that fade
+to black from the arena's edge to the end of the trees.
+
+The pause menu shows the sortie's **level seed**. Add `?seed=1234` to the URL to replay the same
+levels (handy for reporting a strange spot). Arena shapes are in `src/game/ArenaShape.ts`.
+
 ## The terrain: mesas and canyons
 
 The ground is the top of big, flat-ish rock mesas (the jungle grows on top), split by winding

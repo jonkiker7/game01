@@ -502,6 +502,9 @@ class Escort extends Mission {
   private readonly from = new THREE.Vector3();
   private readonly to = new THREE.Vector3();
   private progress = 0;
+  private route: { x: number; z: number }[] = [];
+  private cum: number[] = [];
+  private routeLen = 1;
   private spawnTimer = 4;
   private readonly saboteurs: Saboteur[] = [];
   private readonly lights: THREE.MeshBasicMaterial[] = [];
@@ -509,10 +512,25 @@ class Escort extends Mission {
   private stalled = false;
 
   protected setup(): void {
-    // Across the arena, west to east, through the middle.
-    const span = this.R * 0.8;
-    const a = this.d.world.nearestRock(this.cx - span, this.cz + 10, 5);
-    const b = this.d.world.nearestRock(this.cx + span, this.cz - 10, 5);
+    // Along the corridor's snaking centre line, left to right (or straight across otherwise).
+    const path = this.d.world.shape.path;
+    if (path && path.length > 1) this.route = path.map((p) => ({ x: p.x, z: p.z }));
+    else {
+      const span = this.R * 0.8;
+      this.route = [
+        { x: this.cx - span, z: this.cz + 10 },
+        { x: this.cx + span, z: this.cz - 10 },
+      ];
+    }
+    this.cum = [0];
+    for (let i = 1; i < this.route.length; i++) {
+      const a = this.route[i - 1];
+      const b = this.route[i];
+      this.cum.push(this.cum[i - 1] + Math.hypot(b.x - a.x, b.z - a.z));
+    }
+    this.routeLen = this.cum[this.cum.length - 1];
+    const a = this.route[0];
+    const b = this.route[this.route.length - 1];
     this.from.set(a.x, 0, a.z);
     this.to.set(b.x, 0, b.z);
     this.buildBridges();
@@ -545,28 +563,38 @@ class Escort extends Mission {
   }
 
   /** Bridges wherever the convoy's road crosses a canyon (it drives at rock-top height). */
+  /** A point `d` along the route, and the heading there. */
+  private along(d: number): { x: number; z: number; yaw: number } {
+    const r = this.route;
+    d = Math.max(0, Math.min(this.routeLen, d));
+    let i = 1;
+    while (i < r.length - 1 && this.cum[i] < d) i++;
+    const a = r[i - 1];
+    const b = r[i];
+    const seg = this.cum[i] - this.cum[i - 1] || 1;
+    const k = (d - this.cum[i - 1]) / seg;
+    return { x: a.x + (b.x - a.x) * k, z: a.z + (b.z - a.z) * k, yaw: Math.atan2(-(b.x - a.x), -(b.z - a.z)) };
+  }
+
+  /** Bridges wherever the convoy's road crosses a canyon (it drives at rock-top height). */
   private buildBridges(): void {
     const w = this.d.world;
-    const len = this.from.distanceTo(this.to);
-    const yaw = Math.atan2(-(this.to.x - this.from.x), -(this.to.z - this.from.z));
+    const len = this.routeLen;
     const deckMat = toon('#a98a5a');
     const railMat = toon('#e2733a');
     let start = -1;
     for (let d = 0; d <= len + 2; d += 1.5) {
-      const k = Math.min(1, d / len);
-      const x = this.from.x + (this.to.x - this.from.x) * k;
-      const z = this.from.z + (this.to.z - this.from.z) * k;
-      const gap = !w.isRock(x, z, 3.5) && d <= len;
+      const p = this.along(d);
+      const gap = !w.isRock(p.x, p.z, 3.5) && d <= len;
       if (gap && start < 0) start = d;
       if (!gap && start >= 0) {
-        // Span from a little before the gap to a little after it.
-        const s0 = Math.max(0, start - 4);
-        const s1 = Math.min(len, d + 3);
-        const mid = (s0 + s1) / 2 / len;
-        const mx = this.from.x + (this.to.x - this.from.x) * mid;
-        const mz = this.from.z + (this.to.z - this.from.z) * mid;
+        // A straight span from a little before the gap to a little after it.
+        const p0 = this.along(Math.max(0, start - 4));
+        const p1 = this.along(Math.min(len, d + 3));
+        const mx = (p0.x + p1.x) / 2;
+        const mz = (p0.z + p1.z) / 2;
         const y = w.heightAt(mx, mz);
-        const span = s1 - s0;
+        const span = Math.hypot(p1.x - p0.x, p1.z - p0.z);
         const bridge = new THREE.Group();
         const deck = new THREE.Mesh(new THREE.BoxGeometry(7.5, 0.8, span), deckMat);
         deck.position.y = -0.4;
@@ -575,18 +603,17 @@ class Escort extends Mission {
           const rail = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.35, span), railMat);
           rail.position.set(side * 3.6, 1.1, 0);
           bridge.add(rail);
-          for (let p = -span / 2; p <= span / 2; p += 3) {
+          for (let q = -span / 2; q <= span / 2; q += 3) {
             const post = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.1, 0.3), deckMat);
-            post.position.set(side * 3.6, 0.55, p);
+            post.position.set(side * 3.6, 0.55, q);
             bridge.add(post);
           }
         }
-        // A truss under the deck.
         const truss = new THREE.Mesh(new THREE.BoxGeometry(5, 1.6, span), toon('#3a3448'));
         truss.position.y = -1.6;
         bridge.add(truss);
         bridge.position.set(mx, y, mz);
-        bridge.rotation.y = yaw;
+        bridge.rotation.y = Math.atan2(-(p1.x - p0.x), -(p1.z - p0.z));
         addOutlines(bridge);
         castShadows(bridge);
         this.group.add(bridge);
@@ -596,10 +623,10 @@ class Escort extends Mission {
   }
 
   private place(): void {
-    this.pos.lerpVectors(this.from, this.to, this.progress);
-    this.pos.y = this.d.world.heightAt(this.pos.x, this.pos.z);
+    const p = this.along(this.progress * this.routeLen);
+    this.pos.set(p.x, this.d.world.heightAt(p.x, p.z), p.z);
     this.convoy.position.copy(this.pos);
-    this.convoy.rotation.y = Math.atan2(-(this.to.x - this.from.x), -(this.to.z - this.from.z));
+    this.convoy.rotation.y = approachAngle(this.convoy.rotation.y, p.yaw, 0.15);
   }
 
   update(dt: number): void {
@@ -608,7 +635,7 @@ class Escort extends Mission {
     for (let i = this.saboteurs.length - 1; i >= 0; i--) if (!this.saboteurs[i].alive) this.saboteurs.splice(i, 1);
     // Latched saboteurs stall the convoy until you shoot them off.
     this.stalled = this.saboteurs.some((s) => s.latched);
-    const len = this.from.distanceTo(this.to);
+    const len = this.routeLen;
     if (!this.stalled) this.progress = Math.min(1, this.progress + (7 * dt) / len);
     this.place();
     for (const l of this.lights) l.color.set(this.hurt > 0 ? '#ff6b6b' : this.stalled ? GOLD : GREEN).multiplyScalar(GLOW * 1.6);
