@@ -89,13 +89,18 @@ export const ROOMS: Room[] = [
     id: 'hangar',
     name: 'HANGAR BAY',
     subtitle: "Pip's workshop · Launch deck",
-    rect: { x0: -20, z0: -54, x1: 22, z1: -22 },
+    rect: { x0: -21, z0: -54, x1: 21, z1: -22 },
     floor: '#bfb6a6',
     level: -4,
-    height: 8,
+    height: 16, // double height, so the ship clears the bay door on the way out
     gaps: [
       { side: 's', a: -4, b: 4 },
-      { side: 'n', a: -9, b: 13 }, // the bay door to space
+      { side: 'n', a: -11, b: 11 }, // the bay door to space, lined up with the entrance and pad
+    ],
+    // Windows either side of Pip's workbench on the west wall.
+    windows: [
+      { side: 'w', a: -47, b: -41 },
+      { side: 'w', a: -31, b: -26 },
     ],
     holes: [{ x0: 13, z0: -51, x1: 20, z1: -44 }], // cargo lift shaft
   },
@@ -171,20 +176,20 @@ export const SPOTS = {
   /** Where you're standing after landing from a sortie. */
   landed: { x: 1, z: -28 },
   /** The launch pad (ship parked here). */
-  pad: { x: 2, z: -40 },
+  pad: { x: 0, z: -40 },
   /** The ship leaves through the bay door toward here. */
-  bayExit: { x: 2, z: -120 },
+  bayExit: { x: 0, z: -120 },
   bot: { x: 0, z: -5 },
   rook: { x: -36, z: -5 },
   juno: { x: 37, z: -4 },
-  pip: { x: -13, z: -33 },
+  pip: { x: -15.5, z: -36 },
 };
 
 /** Room centres for the robot's directions. */
 export const DESTINATIONS: { id: string; label: string; x: number; z: number }[] = [
   { id: 'armory', label: 'the Armory', x: -36, z: 0 },
   { id: 'boutique', label: 'the Boutique', x: 36, z: 0 },
-  { id: 'hangar', label: 'the Hangar Bay', x: 1, z: -30 },
+  { id: 'hangar', label: 'the Hangar Bay', x: 0, z: -30 },
   { id: 'quarters', label: 'your quarters', x: -26, z: 23 },
 ];
 

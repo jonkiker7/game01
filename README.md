@@ -166,7 +166,7 @@ sound effect recipe) and `Music.ts` (the songs: chords, bass lines, arpeggios an
 
 The game starts on **Halcyon Station**, a huge retro-futuristic station orbiting the jungle planet.
 You see it from an isometric angle (like Diablo or the old Fallouts): rectangular rooms joined by
-corridors. Walls between the camera and your pilot (and the near walls of the room you are in) turn see-through, so you can always see
+corridors. Walls that actually block the camera's view of your pilot turn see-through (and only those), so you can always see
 yourself. Doors slide open as you walk up to them. Some rooms are down flights of stairs (the
 Armory, the Hangar and your quarters), and railed openings in the floor look down shafts into the
 depths of the station. Many doors to the rest of the station are sealed (for now).
@@ -185,7 +185,9 @@ says **TALK** near someone and **LAUNCH** at your ship. The room's name shows as
 - **Juno, Outfitter:** suits and helmets for your pilot (purely cosmetic).
 - **Pip, Mechanic:** buy and choose your ship (Manta, Valkyrie, Kestrel, Atlas).
 
-Board your ship to launch: a short cutscene flies you out of the hangar bay door into a sortie.
+Board your ship to launch: it lifts off the pad on its thrusters, turns to face the bay door and
+flies out into a sortie. The hangar is double height, with the pad lined up between the entrance
+and the bay door, and Pip works between his desk and a wall workbench.
 After the run, the summary banks your salvage and you land back in the hangar. Progress is saved in the
 browser. Add `?sortie` to the URL to skip straight into a run (handy for testing).
 

@@ -34,7 +34,7 @@ interface WallLook {
   lines: THREE.Object3D[];
   faded: boolean;
 }
-const SHIP_YAW = 0.45; // parked nose-north, angled toward the camera a little
+const SHIP_YAW = 0.45 + Math.PI / 2; // parked nose-west (turned 270° clockwise from nose-north)
 
 export type Spawn = 'wake' | 'landed';
 
@@ -347,20 +347,52 @@ export class HomeBase {
     }
   }
 
+  /** Each wall piece's bounds in the world (walls never move, so measured once). */
+  private wallBoxes: THREE.Box3[] | null = null;
+  private readonly ray = new THREE.Ray();
+  private readonly sightPoints = Array.from({ length: 6 }, () => new THREE.Vector3());
+  private readonly hitPoint = new THREE.Vector3();
+
   /**
-   * See-through walls: any wall between the camera and the pilot fades to a ghost of itself,
-   * so you can always see yourself (and the room you're in) without losing the room's shape.
+   * See-through walls: a wall fades to a ghost of itself only when it actually blocks the line
+   * of sight from the camera to the pilot (a few points: feet, middle, head and either side).
+   * Walls anywhere else stay solid, however near they are. Walls are axis-aligned boxes, so a
+   * ray-box test is exact enough.
    */
   private updateWalls(dt: number, at: THREE.Vector3): void {
-    const here = areasAt(at.x, at.z);
+    const cam = this.camera;
+    cam.updateMatrixWorld();
+    if (!this.wallBoxes) {
+      this.scene.updateMatrixWorld();
+      this.wallBoxes = this.walls.map((w) => new THREE.Box3().setFromObject(w.obj).expandByScalar(-0.05));
+    }
+    const eye = cam.position;
+    // Camera-right on the ground (for the side points), from the diagonal camera.
+    const rx = CAM_RIGHT.x * 1.3;
+    const rz = CAM_RIGHT.y * 1.3;
+    const pts = this.sightPoints;
+    pts[0].set(at.x, at.y + 0.3, at.z);
+    pts[1].set(at.x, at.y + 1.3, at.z);
+    pts[2].set(at.x, at.y + 2.5, at.z);
+    pts[3].set(at.x + rx, at.y + 1.3, at.z + rz);
+    pts[4].set(at.x - rx, at.y + 1.3, at.z - rz);
+    pts[5].set(at.x, at.y + 4, at.z);
+
     this.walls.forEach((w, i) => {
-      const ox = w.x - at.x;
-      const oz = w.z - at.z;
-      const front = (ox + oz) / Math.SQRT2; // toward the camera
-      const side = (ox - oz) / Math.SQRT2;
-      // Directly between you and the camera, or the near (south/east) walls of where you are.
-      const hide = (front > 0.6 && front < 30 && Math.abs(side) < 26) || (!!w.nearSideOf && here.includes(w.nearSideOf));
-      const goal = hide ? SEE_THROUGH : 1;
+      const box = this.wallBoxes![i];
+      let blocks = false;
+      for (const pt of pts) {
+        this.ray.origin.copy(eye);
+        this.ray.direction.subVectors(pt, eye);
+        const dist = this.ray.direction.length();
+        this.ray.direction.divideScalar(dist);
+        const hit = this.ray.intersectBox(box, this.hitPoint);
+        if (hit && hit.distanceTo(eye) < dist - 0.3) {
+          blocks = true;
+          break;
+        }
+      }
+      const goal = blocks ? SEE_THROUGH : 1;
       const before = w.cut;
       w.cut = w.cut < 0 ? goal : damp(w.cut, goal, 10, dt);
       if (Math.abs(w.cut - before) > 1e-4 || before < 0) applyFade(this.wallLooks[i], w.cut);
@@ -599,6 +631,9 @@ export class HomeBase {
   private parkShip(): void {
     this.shipHolder.position.set(PAD.x, PAD.y + 1.8, PAD.z);
     this.shipHolder.rotation.set(0, SHIP_YAW, 0);
+    this.flameLen = 0;
+    this.thrust = [0, 0];
+    this.animateShip(0, 0, 0, 0);
   }
 
   private startLaunch(): void {
@@ -608,11 +643,38 @@ export class HomeBase {
     this.setGuide(null);
   }
 
+  private flameLen = 0;
+  private thrust = [0, 0];
+
+  /**
+   * The parked ship's engines, animated like the flying ship's (see Ship.updateVisuals): rear
+   * flames grow with `throttle`, and each side thruster fires with its own push (0..1).
+   */
+  private animateShip(dt: number, throttle: number, left: number, right: number): void {
+    const parts = this.shipParts;
+    if (!parts) return;
+    this.flameLen = dt ? damp(this.flameLen, throttle, throttle > this.flameLen ? 10 : 6, dt) : throttle;
+    for (const [i, f] of parts.flames.entries()) {
+      const flicker = 0.88 + Math.sin(this.time * 47 + i * 1.7) * 0.12;
+      f.visible = this.flameLen > 0.02;
+      f.scale.set(1, 1, Math.max(0.01, this.flameLen * flicker));
+    }
+    for (const th of parts.thrusters) {
+      const i = th.side < 0 ? 0 : 1;
+      const want = th.side < 0 ? left : right;
+      this.thrust[i] = dt ? damp(this.thrust[i], want, want > this.thrust[i] ? 25 : 8, dt) : want;
+      const k = this.thrust[i];
+      th.obj.visible = k > 0.03;
+      const flicker = 0.85 + Math.sin(this.time * 55 + i * 2) * 0.15;
+      th.obj.scale.set(0.6 + k * 0.6, Math.max(0.01, k * flicker * 1.4), 0.6 + k * 0.6);
+    }
+  }
+
   /**
    * 0.0–1.0 s  the pilot walks to the ship
    * 1.0–1.3 s  climbs in (shrinks away)
-   * 1.3–2.6 s  the ship lifts off the pad, fans spinning up
-   * 2.6–4.6 s  turns toward the bay door and accelerates out into space
+   * 1.3–3.1 s  the ship lifts off the pad on its thrusters, turning to face the bay door
+   * 3.1–5.1 s  accelerates out through the bay door into space
    */
   private updateLaunch(dt: number): void {
     const t = (this.launching += dt);
@@ -632,26 +694,42 @@ export class HomeBase {
     }
 
     const ship = this.shipHolder;
-    if (t >= 1.3 && t < 2.6) {
-      const k = (t - 1.3) / 1.3;
-      ship.position.y = PAD.y + 1.8 + k * k * 5;
+    const dir = BAY_EXIT.clone().sub(PAD).normalize();
+    const exitYaw = Math.atan2(-dir.x, -dir.z);
+    const before = ship.rotation.y;
+    let throttle = 0;
+    let lift = 0;
+    if (t >= 1.3 && t < 3.1) {
+      // Lift off, and turn (smoothly) from the parked heading to face the bay door.
+      const k = (t - 1.3) / 1.8;
+      ship.position.y = PAD.y + 1.8 + (k * k * (3 - 2 * k)) * 5;
+      const turn = Math.min(1, Math.max(0, (t - 1.7) / 1.3));
+      ship.rotation.y = SHIP_YAW + (exitYaw - SHIP_YAW) * turn * turn * (3 - 2 * turn);
       ship.rotation.z = Math.sin(t * 9) * 0.03;
-    } else if (t >= 2.6) {
-      const k = Math.min(1, (t - 2.6) / 2);
-      const dir = BAY_EXIT.clone().sub(PAD).normalize();
-      ship.rotation.y = approachAngle(ship.rotation.y, Math.atan2(-dir.x, -dir.z), 3 * dt);
+      throttle = 0.9;
+      lift = 0.75;
+    } else if (t >= 3.1) {
+      const k = Math.min(1, (t - 3.1) / 2);
+      ship.rotation.y = exitYaw;
       ship.rotation.x = -0.25 * k;
+      ship.rotation.z = 0;
       const dist = 70 * k * k * k; // accelerate
       ship.position.set(PAD.x + dir.x * dist, PAD.y + 6.8 + dir.y * dist * 0.4, PAD.z + dir.z * dist);
+      throttle = 2 + k * 4.5;
+      lift = k < 0.5 ? 1 : 0.3;
     }
-    this.engineMat.color.set('#6ff7ff').multiplyScalar(1.8 * (t > 1.3 ? 1.6 : 1));
+    // Side thrusters: both push it up while lifting; while turning, the outside one fires harder.
+    const turnRate = dt > 0 ? (ship.rotation.y - before) / dt : 0;
+    const turnPush = Math.min(1, Math.abs(turnRate) / 1.5);
+    this.animateShip(dt, throttle, lift + (turnRate < 0 ? turnPush : 0), lift + (turnRate > 0 ? turnPush : 0));
+    this.engineMat.color.set('#6ff7ff').multiplyScalar(1.8 * (t > 1.3 ? 1.6 : 1) * (t > 3.1 ? 1.3 : 1));
 
     // Camera: drift from the pilot to the ship, pulling back as it leaves.
     const look = t < 1.3 ? pilot.position : ship.position;
     this.focus.lerp(look, 1 - Math.exp(-3 * dt));
-    this.placeCamera(1 + Math.max(0, t - 2.6) * 0.25);
+    this.placeCamera(1 + Math.max(0, t - 3.1) * 0.25);
 
-    if (t >= 4.1 && t - dt < 4.1) this.onLaunch?.();
+    if (t >= 4.6 && t - dt < 4.6) this.onLaunch?.();
   }
 
   // ---------------------------------------------------------------- the crew
@@ -756,7 +834,7 @@ export class HomeBase {
     }
     // Rook stands behind the counter, BOLT behind the desk: face the doorway.
     rook.model.root.rotation.y = Math.atan2(-1, -0.6);
-    pip.model.root.rotation.y = Math.atan2(-1, -0.4);
+    pip.model.root.rotation.y = -Math.PI / 2; // faces east, across his desk
     addOutlines(this.robot.root);
   }
 
@@ -792,6 +870,7 @@ export class HomeBase {
     this.shipHolder.clear();
     this.shipParts = buildShipDesign(id, this.shipHolder, this.engineMat);
     addOutlines(this.shipHolder);
+    if (this.launching < 0) this.animateShip(0, 0, 0, 0); // parked: engines off
   }
 }
 

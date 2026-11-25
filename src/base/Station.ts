@@ -756,18 +756,54 @@ function hangar(g: THREE.Group, parts: StationParts, m: Mats): void {
     lane.position.set(s * 3.5, 0.02, -29);
     g.add(lane);
   }
-  // Pip's workbench, tool wall and robot arm.
-  const bench = new THREE.Mesh(new THREE.BoxGeometry(6, 1.4, 2), m.navy);
-  bench.position.set(-13, 0.7, -37);
-  const benchTop = new THREE.Mesh(new THREE.BoxGeometry(6.2, 0.2, 2.2), m.orange);
-  benchTop.position.set(-13, 1.45, -37);
-  const tools = new THREE.Mesh(new THREE.BoxGeometry(5, 3, 0.4), m.creamDark);
-  tools.position.set(-13, 2.8, -38.8);
-  const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 1.6, 4, 8), m.cream);
-  arm.position.set(-10.8, 2.5, -37);
-  arm.rotation.z = -0.6;
-  g.add(bench, benchTop, tools, arm);
-  parts.colliders.push({ x: -15, z: -37, r: 1.6 }, { x: -11, z: -37, r: 1.6 });
+  // Pip's corner (west side): his desk faces the room, he stands behind it, and behind him a
+  // workbench runs along the wall under a pegboard of hanging parts, with windows either side.
+  const desk = new THREE.Mesh(new THREE.BoxGeometry(2, 1.3, 5.5), m.navy);
+  desk.position.set(-11.5, 0.65, -36);
+  const deskTop = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.2, 5.8), m.orange);
+  deskTop.position.set(-11.5, 1.4, -36);
+  const screen = new THREE.Mesh(new THREE.BoxGeometry(0.15, 1.1, 1.8), glow(STATION.tealGlow, {}, 1.2));
+  screen.position.set(-12.1, 2.15, -37.3);
+  screen.rotation.y = 0.15;
+  const datapad = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.08, 0.9), m.cream);
+  datapad.position.set(-11.3, 1.55, -34.8);
+  g.add(desk, deskTop, screen, datapad);
+  parts.colliders.push({ x: -11.5, z: -37.6, r: 1.4 }, { x: -11.5, z: -34.4, r: 1.4 });
+
+  const bench = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.4, 8), m.navy);
+  bench.position.set(-19.6, 0.7, -36);
+  const benchTop = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.2, 8.2), m.creamDark);
+  benchTop.position.set(-19.6, 1.45, -36);
+  const vice = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.6, 0.8), m.dark);
+  vice.position.set(-19.4, 1.85, -38.5);
+  const engine = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, 1.6, 8), m.cream);
+  engine.rotation.x = Math.PI / 2;
+  engine.position.set(-19.6, 2.25, -35);
+  g.add(bench, benchTop, vice, engine);
+  parts.colliders.push({ x: -19.6, z: -38.5, r: 1.5 }, { x: -19.6, z: -33.5, r: 1.5 });
+  // Pegboard with tools and spare parts hanging on it.
+  const board = new THREE.Mesh(new THREE.BoxGeometry(0.2, 5, 8.6), m.creamDark);
+  board.position.set(-20.6, 4.2, -36);
+  g.add(board);
+  const hang = (mesh: THREE.Mesh, y: number, z: number, rx = 0) => {
+    mesh.position.set(-20.35, y, z);
+    mesh.rotation.x = rx;
+    g.add(mesh);
+  };
+  hang(new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.18, 6, 10), m.orange), 5.2, -38.6, 0);
+  hang(new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.12, 6, 10), m.teal), 3.4, -38.9, 0);
+  for (const [z, len] of [[-37.2, 1.6], [-36.6, 1.2], [-36.1, 1.9]] as const) hang(new THREE.Mesh(new THREE.BoxGeometry(0.12, len, 0.22), m.dark), 4.6, z);
+  const blade = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.5, 3.4), m.cream);
+  hang(blade, 6.2, -34.6, 0.25);
+  hang(new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 1.6, 8), m.teal), 3.6, -33.6, Math.PI / 2);
+  hang(new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.9, 1.3), m.navy), 3.4, -35.2);
+  // Robot arm over the bench.
+  const armBase = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.5, 0.5, 8), m.dark);
+  armBase.position.set(-19.8, 1.8, -32.6);
+  const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 1.8, 4, 8), m.cream);
+  arm.position.set(-19.4, 2.8, -33.2);
+  arm.rotation.x = 0.7;
+  g.add(armBase, arm);
   // Fuel tanks and crates.
   for (const [x, z] of [[18, -27], [18, -31.5], [14.5, -27]] as const) {
     const tank = new THREE.Mesh(new THREE.CapsuleGeometry(1.3, 2, 4, 12), m.cream);
