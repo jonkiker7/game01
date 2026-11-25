@@ -39,7 +39,10 @@ const SURVIVE_TIME = 40;
 type EncounterKind = 'outpost' | 'survive' | 'stronghold' | 'boss' | MissionKind;
 /** Encounters the rounds before the boss can be. */
 const ROUND_KINDS: EncounterKind[] = ['outpost', 'survive', 'rescue', 'defend', 'escort', 'sabotage', 'hold'];
-type Phase = 'fight' | 'failed' | 'reward' | 'choosing' | 'gates' | 'transition' | 'over';
+type Phase = 'intro' | 'fight' | 'failed' | 'reward' | 'choosing' | 'gates' | 'transition' | 'over';
+
+/** How long the mission title stays up at the start of a round (enemies arrive 1 s before it goes). */
+const INTRO_TIME = 4.6;
 
 const TITLES: Record<EncounterKind, string> = {
   outpost: 'DESTROY THE OUTPOST',
@@ -202,8 +205,24 @@ export class Run {
     }
   }
 
-  /** Begin this round's encounter in the freshly built arena. */
+  /**
+   * Begin this round in the freshly built arena: the mission's title shows big for a few
+   * seconds, and the enemies (and the mission itself) only arrive a second before it fades,
+   * so nothing attacks while the text is up.
+   */
   private enter(): void {
+    const boss = this.kind === 'boss';
+    this.phase = 'intro';
+    this.introTimer = INTRO_TIME - 1;
+    audio.song(boss ? 'boss' : 'sortie');
+    audio.play(boss ? 'bossAppear' : 'sectorStart');
+    this.d.hud.show(TITLES[this.kind], INTRO_TIME, true); // just the mission (which sector doesn't matter)
+  }
+
+  private introTimer = 0;
+
+  /** The enemies, objective and contract for this round arrive. */
+  private beginFight(): void {
     const { enemies, hud } = this.d;
     const cx = this.center.x;
     const cz = this.center.y;
@@ -239,9 +258,7 @@ export class Run {
     }
     this.d.contracts.enterSector(s, cx, cz, R);
     this.phase = 'fight';
-    audio.song(this.boss ? 'boss' : 'sortie');
-    audio.play(this.boss ? 'bossAppear' : 'sectorStart');
-    hud.show(this.boss ? `BOSS · ${this.boss.name}` : TITLES[this.kind], 2.6); // just the mission (which sector doesn't matter)
+    if (this.boss) hud.show(this.boss.name, 2.2, true);
   }
 
   /**
@@ -316,6 +333,10 @@ export class Run {
     else this.d.hud.setBoss(null);
 
     switch (this.phase) {
+      case 'intro':
+        this.introTimer -= dt;
+        if (this.introTimer <= 0) this.beginFight();
+        break;
       case 'fight': {
         if (this.mission) {
           this.mission.update(dt);
