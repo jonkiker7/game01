@@ -62,14 +62,14 @@ export const CANYON = {
   sandstoneDark: '#a98a5a',
   deep: '#16233d', // the canyon floor, far below
   floor: '#22405a',
-  fog: '#0e1a36', // haze in the canyons (darker and bluer the deeper you look)
+  fog: '#e856ed', // haze in the canyons (darker and bluer the deeper you look)
   redGlow: '#ff5a4a',
 };
 
 /** How far the canyons drop below the rock tops. */
 export const CANYON_DEPTH = 48;
 /** Canyon fog: colour, density (opacity of each layer) and height (fraction of the depth it reaches up to). */
-export const CANYON_FOG = { color: CANYON.fog, density: 0.22, height: 0.8 };
+export const CANYON_FOG = { color: CANYON.fog, density: 0.23, height: 0.8 };
 const FOG_LAYERS = 6;
 /** Depth fraction of the stepped ledge part way down the canyon walls. */
 const LEDGE = 0.38;

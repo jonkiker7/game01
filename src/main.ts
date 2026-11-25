@@ -77,16 +77,16 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(JUNGLE.sky);
 // No distance fog and no sky fill light: the canyon fog and the blue rim light do those jobs, and
 // leaving them out (rather than at zero) saves shader work on every surface.
-const sun = new THREE.DirectionalLight('#ffdcc4', 4.25);
+const sun = new THREE.DirectionalLight('#ffffff', 4.25);
 sun.position.set(-40, 60, 25);
 scene.add(sun);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 const sunShadows = new SunShadows(sun, scene);
-sunShadows.setDirection(79, 57); // compass direction the light comes from, and height above the horizon
+sunShadows.setDirection(79, 31); // compass direction the light comes from, and height above the horizon
 sunShadows.darkness = 1;
 sunShadows.enabled = quality === 'high';
-const rim = new THREE.DirectionalLight('#5fd8ff', 0.9); // cool back light for colour contrast
+const rim = new THREE.DirectionalLight('#5fd8ff', 2.8); // cool back light for colour contrast
 rim.position.set(30, 20, -40);
 scene.add(rim);
 
@@ -230,7 +230,7 @@ base.onLaunch = () =>
     run.start();
   });
 // Only colours brighter than 1.2 (glows; not even sunlit white hulls) bloom, so the ground and models stay crisp.
-const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.75, 0.45, 1.2);
+const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.35, 0.4, 1.2);
 composer.addPass(bloom);
 
 // Developer panel: `?dev` in the URL adds sliders for lighting, shadows, glow and tuning.
