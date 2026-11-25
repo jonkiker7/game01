@@ -86,9 +86,10 @@ in conversation, and the name in the code, are listed so nothing gets lost.
 
 ## Sound and music
 
-Everything you hear is synthesized in code in a retro-future style: analog-synth zaps, filtered
-noise, tape echo and big reverb, with synthwave music played live by a little sequencer. There
-are three songs: the **station** (slow and dreamy), **sorties** (driving) and **bosses** (lower
+Everything you hear is synthesized in code in a retro-future style: analog synths, filtered
+noise, tape echo and big reverb. Your weapons sound mechanical, like real guns (crack, thump,
+bolt clicks); enemy weapons sound alien and electronic (warbling FM tones). Synthwave music is
+played live by a little sequencer, with three songs: the **station** (slow and dreamy), **sorties** (driving) and **bosses** (lower
 and darker). The music muffles while the pause menu or a power-up choice is open, and the
 ship's engine hum rises with your speed.
 
