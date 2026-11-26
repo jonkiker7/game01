@@ -40,6 +40,7 @@ import { TUNING } from './game/Tuning';
 import { Halos } from './game/Halos';
 import { Tutorial } from './game/Tutorial';
 import { applySavedControlLayout, openControlLayoutEditor } from './game/ControlLayout';
+import { readChoice, writeChoice } from './game/Choices';
 import { ShadowBaker, type ShadowMode, SunShadows } from './game/Shadows';
 import { isShipDesign } from './game/ShipDesigns';
 import { World } from './game/World';
@@ -100,14 +101,8 @@ const world = new World(scene);
 // ---------- Shadows: baked for the static arena, live only for moving things ----------
 const SHADOW_KEY = 'star-rotor-shadows';
 const baker = new ShadowBaker(renderer);
-let shadowMode: ShadowMode = (() => {
-  try {
-    const v = localStorage.getItem(SHADOW_KEY);
-    return v === 'live' || v === 'off' || v === 'baked' ? v : 'baked';
-  } catch {
-    return 'baked';
-  }
-})();
+const SHADOW_DEFAULT: ShadowMode = 'baked';
+let shadowMode: ShadowMode = readChoice<ShadowMode>(SHADOW_KEY, SHADOW_DEFAULT, ['baked', 'live', 'off']);
 let shadowStrength = 1;
 function rebakeShadows(): void {
   if (shadowMode === 'baked') baker.bake(world.group, sunShadows.toSun, world.region());
@@ -122,11 +117,7 @@ function applyShadows(): void {
 }
 function setShadowMode(m: ShadowMode): void {
   shadowMode = m;
-  try {
-    localStorage.setItem(SHADOW_KEY, m);
-  } catch {
-    /* private mode */
-  }
+  writeChoice(SHADOW_KEY, m, SHADOW_DEFAULT);
   applyShadows();
 }
 world.patchGround = (mat) => baker.patch(mat);
@@ -307,14 +298,8 @@ composer.addPass(bloom);
 type GlowMode = 'full' | 'light' | 'halos' | 'off';
 type GlowSetting = GlowMode | 'auto';
 const GLOW_KEY = 'star-rotor-glow';
-let glowSetting: GlowSetting = (() => {
-  try {
-    const v = localStorage.getItem(GLOW_KEY);
-    return v === 'full' || v === 'light' || v === 'halos' || v === 'off' ? v : 'auto';
-  } catch {
-    return 'auto';
-  }
-})();
+const GLOW_DEFAULT: GlowSetting = 'auto';
+let glowSetting: GlowSetting = readChoice<GlowSetting>(GLOW_KEY, GLOW_DEFAULT, ['auto', 'full', 'light', 'halos', 'off']);
 let bloomScale = 1; // bloom's blur resolution (light bloom halves it)
 const halos = new Halos(() => [scene, base.scene]);
 function glowMode(): GlowMode {
@@ -337,12 +322,7 @@ function applyGlow(): void {
 }
 function setGlow(s: GlowSetting): void {
   glowSetting = s;
-  try {
-    if (s === 'auto') localStorage.removeItem(GLOW_KEY);
-    else localStorage.setItem(GLOW_KEY, s);
-  } catch {
-    /* private mode */
-  }
+  writeChoice(GLOW_KEY, s, GLOW_DEFAULT);
   applyGlow();
 }
 

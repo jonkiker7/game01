@@ -4,6 +4,7 @@ import type { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPas
 import type { Halos } from '../game/Halos';
 import type { ShadowMode, SunShadows } from '../game/Shadows';
 import { TUNING } from '../game/Tuning';
+import { sameValue } from '../game/Choices';
 import { CAMERA_DISTANCE } from '../game/CameraRig';
 import { CANYON_FOG } from '../game/World';
 
@@ -79,12 +80,28 @@ const TUNING_DEFAULTS = clone(TUNING);
 
 export function openDevPanel(h: DevHooks): void {
   const look: Look = { ...LOOK_DEFAULTS, shadowMode: h.getShadowMode() };
-  // Restore what was set last time on this device.
+  // Restore what was set last time on this device: each value only while the game's default
+  // for it is still the one it replaced (a newer default wins). Saves from before defaults were
+  // recorded are out of date, so they're skipped.
   try {
-    const saved = JSON.parse(localStorage.getItem(KEY) ?? 'null') as { look?: Partial<Look>; tuning?: typeof TUNING } | null;
-    if (saved?.look) Object.assign(look, { ...saved.look, shadowMode: h.getShadowMode() }); // the game remembers the mode itself
-    if (!['baked', 'live', 'off'].includes(look.shadowMode)) look.shadowMode = 'baked';
-    if (saved?.tuning) for (const k of Object.keys(TUNING) as (keyof typeof TUNING)[]) Object.assign(TUNING[k], saved.tuning[k] ?? {});
+    type Saved = { look?: Partial<Look>; tuning?: typeof TUNING; defaults?: { look?: Partial<Look>; tuning?: typeof TUNING } };
+    const saved = JSON.parse(localStorage.getItem(KEY) ?? 'null') as Saved | null;
+    const was = saved?.defaults;
+    if (saved?.look && was?.look) {
+      for (const k of Object.keys(LOOK_DEFAULTS) as (keyof Look)[]) {
+        if (k === 'shadowMode' || !(k in saved.look)) continue; // the game remembers the shadow mode itself
+        if (sameValue(was.look[k], LOOK_DEFAULTS[k])) (look as Record<string, unknown>)[k] = saved.look[k];
+      }
+    }
+    if (saved?.tuning && was?.tuning) {
+      for (const g of Object.keys(TUNING) as (keyof typeof TUNING)[]) {
+        const mine = saved.tuning[g] as Record<string, number> | undefined;
+        const old = was.tuning[g] as Record<string, number> | undefined;
+        const now = TUNING_DEFAULTS[g] as Record<string, number>;
+        if (!mine || !old) continue;
+        for (const k of Object.keys(now)) if (k in mine && sameValue(old[k], now[k])) (TUNING[g] as Record<string, number>)[k] = mine[k];
+      }
+    }
   } catch {
     /* ignore a broken save */
   }
@@ -116,7 +133,7 @@ export function openDevPanel(h: DevHooks): void {
   };
   const save = () => {
     try {
-      localStorage.setItem(KEY, JSON.stringify({ look, tuning: TUNING }));
+      localStorage.setItem(KEY, JSON.stringify({ look, tuning: TUNING, defaults: { look: LOOK_DEFAULTS, tuning: TUNING_DEFAULTS } }));
     } catch {
       /* private mode */
     }
