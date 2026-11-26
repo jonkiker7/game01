@@ -165,8 +165,25 @@ export class Hud {
   show(text: string, seconds = 2.2, big = false): void {
     this.message.classList.toggle('big', big);
     this.message.textContent = text;
+    this.message.style.fontSize = '';
+    if (big) this.fitWide();
     this.message.classList.add('visible');
     this.messageTimer = seconds;
+  }
+
+  /**
+   * Size the big title so its text spans 85% of the screen's width (like the area titles in
+   * Control: huge, over everything).
+   */
+  private fitWide(): void {
+    const m = this.message;
+    const probe = document.createElement('span');
+    probe.textContent = m.textContent;
+    probe.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;font-size:100px;letter-spacing:0.08em;font-family:var(--display);font-weight:900';
+    m.appendChild(probe);
+    const w = probe.getBoundingClientRect().width;
+    probe.remove();
+    if (w > 0) m.style.fontSize = `${Math.min((100 * 0.85 * window.innerWidth) / w, window.innerHeight * 0.4)}px`;
   }
 
   /** Brief green glow at the screen edges when armor is restored. */
