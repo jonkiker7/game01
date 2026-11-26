@@ -68,11 +68,14 @@ export class LeaderboardSign {
       c.textAlign = 'left';
       c.fillStyle = i < 3 ? '#f2c46d' : '#9a90ae';
       c.fillText(`${i + 1}.`, x0 + 20, y);
+      // The name gets the room left of the score; extra-wide names are squeezed to fit.
+      const score = e.score.toLocaleString('en-US');
+      const room = colW - 40 - 120 - c.measureText(score).width - 24;
       c.fillStyle = e.you ? '#6ff7ff' : '#efe9f7';
-      c.fillText(e.name, x0 + 120, y);
+      c.fillText(e.name, x0 + 120, y, room);
       c.textAlign = 'right';
       c.fillStyle = e.you ? '#6ff7ff' : '#f2c46d';
-      c.fillText(e.score.toLocaleString('en-US'), x0 + colW - 40, y);
+      c.fillText(score, x0 + colW - 40, y);
     });
     this.texture.needsUpdate = true;
   }
