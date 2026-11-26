@@ -8,6 +8,8 @@ interface Tip {
   text: string;
   /** Element ids to highlight (their combined box). Empty: a box in the bottom-left corner. */
   targets: string[];
+  /** No highlight: just the tip, in the middle of the screen. */
+  center?: boolean;
 }
 
 const TIPS: Tip[] = [
@@ -20,6 +22,9 @@ const TIPS: Tip[] = [
   { text: 'Use your radar to find objectives.', targets: ['radar'] },
   { text: 'Red targets need to be destroyed.', targets: ['radar'] },
   { text: 'Yellow targets need to be collected.', targets: ['radar'] },
+  { text: 'Wrecked enemies sometimes drop green orbs. Fly into them to repair your armor.', targets: ['armor'] },
+  { text: 'Your mission and its clock are here. Finish faster for a bigger time bonus.', targets: ['objective'] },
+  { text: 'After each mission, grab the power orb for a reward, then fly through a gate to choose your next mission.', targets: [] , center: true },
   { text: 'Points and pause are up here.', targets: ['score', 'btn-pause'] },
 ];
 
@@ -91,6 +96,13 @@ export class Tutorial {
     const rects = tip.targets.map((id) => document.getElementById(id)?.getBoundingClientRect()).filter((b): b is DOMRect => !!b && b.width > 0);
     if (rects.length) r = { x0: Math.min(...rects.map((b) => b.left)), y0: Math.min(...rects.map((b) => b.top)), x1: Math.max(...rects.map((b) => b.right)), y1: Math.max(...rects.map((b) => b.bottom)) };
     const pad = 8;
+    this.hole.style.display = tip.center ? 'none' : '';
+    this.arrow.style.display = tip.center ? 'none' : '';
+    if (tip.center) {
+      const bw = Math.min(380, W * 0.6);
+      Object.assign(this.box.style, { left: `${(W - bw) / 2}px`, top: `${H * 0.3}px`, width: `${bw}px` });
+      return;
+    }
     Object.assign(this.hole.style, { left: `${r.x0 - pad}px`, top: `${r.y0 - pad}px`, width: `${r.x1 - r.x0 + pad * 2}px`, height: `${r.y1 - r.y0 + pad * 2}px` });
 
     // The tip box goes on the opposite side of the screen from the highlight, with an arrow
