@@ -434,10 +434,14 @@ body {
   opacity: 1;
   transform: scale(1);
 }
+#message.big.visible {
+  transform: translateY(-50%) scale(1);
+}
 
 /* The mission title at the start of each sector. */
 #message.big {
-  top: 37%; /* below the radar (top right), so the two never overlap */
+  top: 50%;
+  transform: translateY(-50%) scale(1.06);
   /* A dark purple band across the whole screen behind the title, fading at the top and bottom. */
   background: linear-gradient(
     to bottom,
@@ -446,10 +450,12 @@ body {
     rgba(36, 12, 52, 0.82) 82%,
     rgba(36, 12, 52, 0) 100%
   );
-  font-size: clamp(34px, 8vw, 58px);
-  line-height: 1.1;
-  padding: 16px 24px;
-  letter-spacing: 0.14em;
+  font-size: clamp(34px, 8vw, 58px); /* replaced at runtime: sized to span 85% of the width */
+  line-height: 1;
+  padding: 0.18em 0;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  z-index: 20; /* over everything, the radar included */
 }
 
 #damage {
