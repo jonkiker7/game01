@@ -658,16 +658,21 @@ function concourse(g: THREE.Group, parts: StationParts, m: Mats): void {
     g.add(bench);
     parts.colliders.push({ x: x - 1.6, z, r: 1 }, { x: x + 1.6, z, r: 1 });
   }
-  for (const [x, z] of [[-3.2, 14.5], [3.2, 14.5], [14, -11], [-14, -11]] as const) plant(g, parts, m, x, z);
+  for (const [x, z] of [[-3.2, 14.5], [3.2, 14.5], [-14, -11]] as const) plant(g, parts, m, x, z);
+  // A smaller one beside the north-west plant, turned to vary the pair.
+  plant(g, parts, m, -10.8, -12.2, 0.7, 0.9);
 
   // Holographic station map spinning over a plinth.
-  const plinth = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.5, 1, 16), m.cream);
-  plinth.position.set(10, 0.5, -6);
-  const holo = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1), glow(STATION.tealGlow, { wireframe: true, transparent: true, opacity: 0.7 }, 1.5));
-  holo.position.set(10, 2.6, -6);
+  const plinth = new THREE.Mesh(new THREE.CylinderGeometry(2, 2.5, 1.6, 20), m.cream);
+  plinth.position.set(10, 0.8, -6);
+  const plinthRing = new THREE.Mesh(new THREE.TorusGeometry(2.05, 0.12, 6, 32), glow(STATION.tealGlow, {}, 1.3));
+  plinthRing.rotation.x = Math.PI / 2;
+  plinthRing.position.set(10, 1.6, -6);
+  const holo = new THREE.Mesh(new THREE.IcosahedronGeometry(2, 1), glow(STATION.tealGlow, { wireframe: true, transparent: true, opacity: 0.7 }, 1.5));
+  holo.position.set(10, 4.4, -6);
   parts.holo = holo;
-  g.add(plinth, holo);
-  parts.colliders.push({ x: 10, z: -6, r: 1.6 });
+  g.add(plinth, plinthRing, holo);
+  parts.colliders.push({ x: 10, z: -6, r: 2.6 });
 }
 
 function armory(g: THREE.Group, parts: StationParts, m: Mats): void {
@@ -873,7 +878,16 @@ function quarters(g: THREE.Group, parts: StationParts, m: Mats): void {
   plant(g, parts, m, -19.5, 29.5);
 }
 
-function plant(g: THREE.Group, parts: StationParts, m: Mats, x: number, z: number): void {
+function plant(g: THREE.Group, parts: StationParts, m: Mats, x: number, z: number, scale = 1, turn = 0): void {
+  const all = new THREE.Group();
+  all.position.set(x, 0, z);
+  all.scale.setScalar(scale);
+  all.rotation.y = turn;
+  g.add(all);
+  parts.colliders.push({ x, z, r: 1.2 * scale });
+  g = all;
+  x = 0;
+  z = 0;
   const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.7, 1.2, 12), m.cream);
   pot.position.set(x, 0.6, z);
   g.add(pot);
@@ -889,7 +903,6 @@ function plant(g: THREE.Group, parts: StationParts, m: Mats, x: number, z: numbe
     leaves.setColorAt(i, new THREE.Color(['#e5609c', '#ff86b8', '#c84a8a'][i % 3]));
   }
   g.add(leaves, outlineInstanced(leaves));
-  parts.colliders.push({ x, z, r: 1.2 });
 }
 
 // ---------------------------------------------------------------- outside
