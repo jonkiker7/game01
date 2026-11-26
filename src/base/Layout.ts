@@ -85,7 +85,11 @@ export const ROOMS: Room[] = [
       { side: 'n', a: -16, b: -8 },
       { side: 'n', a: 8, b: 16 },
     ],
-    holes: [{ x0: -5, z0: 4, x1: 5, z1: 10 }], // the light well
+    // Two wide openings down into the station, either side of the logo floor in the middle.
+    holes: [
+      { x0: -16, z0: 4, x1: -8, z1: 14 },
+      { x0: 8, z0: 4, x1: 16, z1: 14 },
+    ],
   },
   {
     id: 'hangar',
@@ -174,7 +178,7 @@ export const SIGNS: { x: number; z: number; text: string }[] = [
 // Key spots.
 export const SPOTS = {
   /** Where you wake up when the game loads. */
-  wake: { x: -26, z: 24 },
+  wake: { x: 0, z: 5.5 }, // on the station logo, in the middle of the Concourse
   /** Where you're standing after landing from a sortie. */
   landed: { x: 1, z: -28 },
   /** The launch pad (ship parked here). */
