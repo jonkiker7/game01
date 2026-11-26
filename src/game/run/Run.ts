@@ -512,6 +512,12 @@ export class Run {
     if (path && path.length > 1) {
       const p = path[Math.round((path.length - 1) * 0.72)];
       this.d.arena.showReward(this.reward, this.tmp.set(p.x, y, p.z));
+    } else if (this.kind === 'defend') {
+      // The generator stands in the middle: put the reward halfway up toward the exit gates.
+      const [g1, g2] = this.shape.exits;
+      const mx = (g1.x + g2.x) / 2;
+      const mz = (g1.z + g2.z) / 2;
+      this.d.arena.showReward(this.reward, this.tmp.set(this.center.x + (mx - this.center.x) * 0.5, y, this.center.y + (mz - this.center.y) * 0.5));
     } else {
       this.d.arena.showReward(this.reward, this.tmp.set(this.center.x, y, this.center.y));
     }
