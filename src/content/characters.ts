@@ -19,6 +19,18 @@ export interface Character {
   art: Mood[];
 }
 
+/** Longest name that fits on the leaderboard (10 typical letters fit at full size). */
+export const NAME_MAX = 10;
+
+/** Tidy a typed name: capitals, digits, spaces and . - _ only, single spaces, NAME_MAX long. */
+export function cleanName(raw: string): string {
+  return raw
+    .toUpperCase()
+    .replace(/[^A-Z0-9 .\-_]/g, '')
+    .replace(/\s+/g, ' ')
+    .slice(0, NAME_MAX);
+}
+
 /** What you're called until you tell BOLT your name. */
 export const DEFAULT_PILOT_NAME = 'PLAYER 1';
 let pilotName = DEFAULT_PILOT_NAME;
@@ -28,7 +40,7 @@ export function getPilotName(): string {
   return pilotName;
 }
 export function setPilotName(name: string | undefined): void {
-  pilotName = (name ?? '').trim() || DEFAULT_PILOT_NAME;
+  pilotName = cleanName(name ?? '').trim() || DEFAULT_PILOT_NAME;
   CHARACTERS.pilot.name = pilotName;
 }
 

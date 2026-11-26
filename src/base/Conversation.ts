@@ -1,5 +1,5 @@
 import { audio } from '../audio/Audio';
-import { CHARACTERS, getPilotName, type CharacterId, type Mood } from '../content/characters';
+import { CHARACTERS, cleanName, getPilotName, NAME_MAX, type CharacterId, type Mood } from '../content/characters';
 import type { Line } from '../content/dialogue';
 import { portraitUrl } from './Portraits';
 
@@ -154,10 +154,15 @@ export class ConversationUI {
     this.waitingChoice = true;
     const form = document.createElement('form');
     form.className = 'ask';
-    form.innerHTML = `<input maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="done" /><button type="submit">OK</button><button type="button" class="skip">SKIP</button>`;
+    form.innerHTML = `<input maxlength="${NAME_MAX}" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="done" /><button type="submit">OK</button><button type="button" class="skip">SKIP</button>`;
     const input = form.querySelector('input')!;
     input.placeholder = placeholder;
-    input.value = initial;
+    input.value = cleanName(initial);
+    // Only what fits on the leaderboard: capitals, digits, spaces and . - _ (no emoji).
+    input.addEventListener('input', () => {
+      const v = cleanName(input.value);
+      if (v !== input.value) input.value = v;
+    });
     const finish = (answer: string | null) => {
       input.blur();
       this.choices.replaceChildren();
@@ -166,7 +171,7 @@ export class ConversationUI {
     };
     form.addEventListener('submit', (e) => {
       e.preventDefault();
-      const v = input.value.trim().toUpperCase();
+      const v = cleanName(input.value).trim();
       if (v) finish(v);
       else input.focus();
     });
