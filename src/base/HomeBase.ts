@@ -123,6 +123,38 @@ export class HomeBase {
   readonly camera = new THREE.PerspectiveCamera(40, 1, 2, 1400);
   /** Called when the launch cutscene is nearly done (start the fade into the sortie). */
   onLaunch?: () => void;
+  /** Set when you said yes to the flight tutorial: it plays at the start of the next sortie. */
+  tutorialNext = false;
+
+  /**
+   * BOLT asks whether you'd like the flight tutorial. Yes: launch, and it plays once the sortie
+   * starts. No: a reminder that BOLT can give it any time, then (if you were launching) carry on.
+   */
+  offerTutorial(launchAfterNo: boolean): void {
+    if (this.launching >= 0) return;
+    this.save.tutorialAsked = true;
+    writeSave(this.save);
+    this.convo.play('bot', [{ who: 'bot', mood: 'happy', text: 'Would you like a quick flight tutorial before you head out?' }], [
+      {
+        label: 'YES',
+        action: () => {
+          this.tutorialNext = true;
+          const p = this.pilot.root.position;
+          // Near the ship: off you go. Elsewhere: head to the hangar, and it plays on that launch.
+          if (Math.hypot(p.x - PAD.x, p.z - PAD.z) < 20) this.startLaunch();
+          else
+            this.convo.play('bot', [{ who: 'bot', mood: 'happy', text: "Great! Head to the Hangar Bay and launch your ship. I'll walk you through the controls once you're out there." }], [{ label: 'OK' }]);
+        },
+      },
+      {
+        label: 'NO',
+        action: () =>
+          this.convo.play('bot', [{ who: 'bot', mood: 'neutral', text: 'OK! But if you need it, you can always ask BOLT at the front desk.' }], [
+            { label: launchAfterNo ? 'LAUNCH' : 'OK', action: launchAfterNo ? () => this.startLaunch() : undefined },
+          ]),
+      },
+    ]);
+  }
 
   private readonly pilot: Pilot;
   private readonly npcs: Npc[] = [];
@@ -444,7 +476,9 @@ export class HomeBase {
 
   private act(t: Target): void {
     if (t.kind === 'ship') {
-      this.startLaunch();
+      // The first time you launch, BOLT offers the flight tutorial.
+      if (!this.save.tutorialAsked) this.offerTutorial(true);
+      else this.startLaunch();
       return;
     }
     const n = t.npc;
@@ -462,6 +496,7 @@ export class HomeBase {
     if (n.id === 'bot') {
       this.convo.play(n.id, lines, [
         { label: 'CONTRACTS', action: () => this.openContracts() },
+        { label: 'FLIGHT TRAINING', action: () => this.offerTutorial(false) },
         { label: 'DIRECTIONS', action: () => this.convo.play('bot', this.directions()) },
         { label: 'LEAVE' },
       ]);

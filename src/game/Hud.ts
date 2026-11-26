@@ -207,6 +207,12 @@ export class Hud {
     m.style.fontSize = `${best.size}px`;
   }
 
+  /** Take down the big message now (e.g. the mission title, when the tutorial starts). */
+  hideMessage(): void {
+    this.messageTimer = 0;
+    this.message.classList.remove('visible');
+  }
+
   /** Brief green glow at the screen edges when armor is restored. */
   flashHeal(): void {
     this.damage.classList.remove('hit', 'heal');

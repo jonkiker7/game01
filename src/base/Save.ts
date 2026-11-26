@@ -31,6 +31,8 @@ export interface SaveData {
   wins: number;
   /** Best sortie score. */
   best: number;
+  /** Whether you've been offered the flight tutorial (asked once, on your first launch). */
+  tutorialAsked: boolean;
   /** The station's leaderboard (top 10), you and other pilots. */
   leaderboard: LeaderEntry[];
   deaths: number;
@@ -94,6 +96,7 @@ function fresh(): SaveData {
     helmet: 'dome',
     lastRun: null,
     best: 0,
+    tutorialAsked: false,
     leaderboard: SEED_LEADERBOARD.map((e) => ({ ...e })),
     runs: 0,
     wins: 0,
