@@ -16,6 +16,7 @@ const CATEGORY: Record<UpgradeCategory, { icon: string; color: string; name: str
 export interface RunSummary {
   won: boolean;
   score: number;
+  tally: { damage: number; clear: number; time: number; protect: number };
   best: number;
   newBest: boolean;
   failed?: boolean;
@@ -85,6 +86,16 @@ export class RunUI {
     this.endEl.innerHTML = `
       <h1 class="${s.won ? 'won' : 'lost'}">${s.won ? 'SORTIE COMPLETE' : s.failed ? 'MISSION FAILED' : 'SHOT DOWN'}</h1>
       <div class="end-score"><b>${s.score.toLocaleString('en-US')}</b><span>${s.newBest ? '★ NEW HIGH SCORE ★' : `SCORE · BEST ${s.best.toLocaleString('en-US')}`}</span></div>
+      <div class="end-breakdown">${(
+        [
+          ['DAMAGE', s.tally.damage],
+          ['MISSIONS', s.tally.clear],
+          ['TIME BONUS', s.tally.time],
+          ['PROTECTION', s.tally.protect],
+        ] as [string, number][]
+      )
+        .map(([l, v]) => `<div><span>${l}</span><b>${Math.round(v).toLocaleString('en-US')}</b></div>`)
+        .join('')}</div>
       <div class="stats">
         <div><b>${s.sectorsCleared}/${s.totalSectors}</b><span>SECTORS CLEARED</span></div>
         <div><b>${s.kills}</b><span>ENEMIES DESTROYED</span></div>

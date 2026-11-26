@@ -23,6 +23,8 @@ export interface RunResult {
   won: boolean;
   /** Points scored this sortie. */
   score: number;
+  /** Where the points came from. */
+  tally: { damage: number; clear: number; time: number; protect: number };
   /** Lost by failing a mission (the generator or convoy was destroyed) rather than being shot down. */
   failed?: boolean;
   sectorsCleared: number;
@@ -161,6 +163,7 @@ export class Run {
     this.kills = 0;
     this.salvage = 0;
     this.score = 0;
+    this.tally = { damage: 0, clear: 0, time: 0, protect: 0 };
     this.missionFailed = false;
     this.won = false;
     this.reward = 'upgrade';
@@ -248,8 +251,16 @@ export class Run {
 
   /** Damage dealt to enemies scores points (only while a mission is on). */
   addDamage(amount: number): void {
-    if (this.phase === 'fight') this.score += amount * TUNING.score.perDamage;
+    if (this.phase !== 'fight') return;
+    const pts = amount * TUNING.score.perDamage;
+    this.score += pts;
+    this.missionDamage += pts;
+    this.tally.damage += pts;
   }
+
+  /** Damage points this mission, and the sortie's points by kind (for the end-of-sortie breakdown). */
+  private missionDamage = 0;
+  tally = { damage: 0, clear: 0, time: 0, protect: 0 };
 
   /** Seconds left on this mission's clock (null if it has none). */
   private timeLeft(): number | null {
@@ -295,6 +306,7 @@ export class Run {
     this.d.contracts.enterSector(s, cx, cz, R);
     this.phase = 'fight';
     this.elapsed = 0;
+    this.missionDamage = 0;
     if (this.boss) hud.show(this.boss.name, 2.2, true);
   }
 
@@ -439,13 +451,32 @@ export class Run {
   /** Bonus points for finishing a mission: clear, time left, and health of what you protected. */
   private awardBonus(): void {
     const S = TUNING.score;
-    const lines: [string, number][] = [[this.boss ? 'BOSS DEFEATED' : 'MISSION COMPLETE', this.boss ? S.bossClear : S.clear]];
+    const clear = this.boss ? S.bossClear : S.clear;
+    const lines: [string, number][] = [
+      ['DAMAGE DEALT', this.missionDamage],
+      [this.boss ? 'BOSS DEFEATED' : 'MISSION COMPLETE', clear],
+    ];
+    this.tally.clear += clear;
     const left = this.timeLeft();
-    if (left !== null && left > 0) lines.push([`TIME BONUS · ${clock(left)}`, left * S.perSecond]);
+    if (left !== null && left > 0) {
+      lines.push([`TIME BONUS · ${clock(left)}`, left * S.perSecond]);
+      this.tally.time += left * S.perSecond;
+    }
     const guard = this.mission?.healthBar();
-    if (guard && guard.fraction > 0) lines.push([`${guard.name} ${Math.round(guard.fraction * 100)}%`, guard.fraction * S.protect]);
-    for (const [, pts] of lines) this.score += pts;
-    this.d.hud.showScore(lines);
+    if (guard && guard.fraction > 0) {
+      lines.push([`${guard.name} ${Math.round(guard.fraction * 100)}%`, guard.fraction * S.protect]);
+      this.tally.protect += guard.fraction * S.protect;
+    }
+    // Damage was already counted as it happened; add the bonuses now.
+    let mission = 0;
+    for (const [label, pts] of lines) {
+      mission += pts;
+      if (label !== 'DAMAGE DEALT') this.score += pts;
+    }
+    this.d.hud.showScore(lines, [
+      ['THIS MISSION', mission],
+      ['TOTAL SCORE', this.score],
+    ]);
   }
 
   private clearEncounter(): void {
@@ -463,9 +494,16 @@ export class Run {
     }
     hud.show('SECTOR CLEARED', 2.2);
     audio.play('sectorClear');
-    // The reward floats in the middle of the arena at flying height.
+    // The reward floats in the middle of the arena at flying height. In the left-to-right
+    // corridor it goes three-quarters of the way along instead, on the way to the gates.
     const y = this.d.ship.root.position.y;
-    this.d.arena.showReward(this.reward, this.tmp.set(this.center.x, y, this.center.y));
+    const path = this.shape.path;
+    if (path && path.length > 1) {
+      const p = path[Math.round((path.length - 1) * 0.72)];
+      this.d.arena.showReward(this.reward, this.tmp.set(p.x, y, p.z));
+    } else {
+      this.d.arena.showReward(this.reward, this.tmp.set(this.center.x, y, this.center.y));
+    }
     this.phase = 'reward';
   }
 
@@ -587,6 +625,7 @@ export class Run {
     this.d.onFinish({
       won: this.won,
       score: Math.round(this.score),
+      tally: { ...this.tally },
       failed: this.missionFailed,
       sectorsCleared: this.won ? SECTORS : this.sector - 1,
       totalSectors: SECTORS,
