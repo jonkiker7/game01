@@ -38,6 +38,7 @@ import { RunUI } from './game/run/RunUI';
 import { Ship } from './game/Ship';
 import { TUNING } from './game/Tuning';
 import { Halos } from './game/Halos';
+import { Tutorial } from './game/Tutorial';
 import { ShadowBaker, type ShadowMode, SunShadows } from './game/Shadows';
 import { isShipDesign } from './game/ShipDesigns';
 import { World } from './game/World';
@@ -286,6 +287,8 @@ base.onLaunch = () =>
   runUI.fade(() => {
     ship.setDesign(save.ship);
     setMode('run');
+    tutorialPending = base.tutorialNext;
+    base.tutorialNext = false;
     run.start();
   });
 // Only colours brighter than 1.2 (glows; not even sunlit white hulls) bloom, so the ground and models stay crisp.
@@ -412,6 +415,16 @@ soundBtn.addEventListener('pointerdown', (e) => {
 // ---------- Pause menu ----------
 const pauseMenu = new PauseMenu($('hud'));
 let menuPaused = false;
+
+// ---------- Flight tutorial ----------
+const tutorial = new Tutorial($('hud'));
+let tutorialPending = false;
+// Always at the base, near the action (LAUNCH) button: offer the tutorial again.
+$('hud').insertAdjacentHTML('beforeend', '<button id="btn-tutorial">FLIGHT TUTORIAL</button>');
+$('btn-tutorial').addEventListener('pointerdown', (e) => {
+  e.stopPropagation();
+  base.offerTutorial(false);
+});
 function openPause(): void {
   if (mode !== 'run' || paused || menuPaused || run.phase === 'over' || run.phase === 'transition') return;
   menuPaused = true;
@@ -723,6 +736,17 @@ let wasDucked = false;
 
 /** One step of the sortie's game logic (movement, enemies, shots, effects). */
 function simulate(dt: number): void {
+  // The tutorial waits for the mission title to clear, then runs with the game paused.
+  if (tutorialPending && run.phase === 'fight') {
+    tutorialPending = false;
+    menuPaused = true;
+    hud.hideMessage();
+    input.releaseAll();
+    tutorial.start(() => {
+      menuPaused = false;
+      input.releaseAll();
+    });
+  }
   // The mission title is up: only its countdown runs; the world holds still underneath it.
   if (run.frozen && !paused && !menuPaused) {
     run.update(dt);
