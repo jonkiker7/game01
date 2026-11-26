@@ -626,17 +626,17 @@ function concourse(g: THREE.Group, parts: StationParts, m: Mats): void {
     post.position.set(x, 6.95, -11.1);
     upper.add(post);
   }
-  // Station directory board.
+  // Station directory board, high on the west wall over the Armory doorway.
   const directory = new THREE.Group();
   const board = new THREE.Mesh(new THREE.BoxGeometry(5, 3.2, 0.4), m.navy);
   board.position.y = 3.2;
   const screen = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 2.6), glow(STATION.tealGlow, { map: directoryTexture() }, 1.1));
   screen.position.set(0, 3.2, 0.22);
   directory.add(board, screen);
-  directory.position.set(-17.45, 0, 7);
+  directory.position.set(-17.45, 4.6, 0); // screen centre ~7.8 up, above the 5.7-tall doorway
   directory.rotation.y = Math.PI / 2;
   g.add(directory);
-  parts.walls.push({ obj: directory, x: -18, z: 7, cut: 1 });
+  parts.walls.push({ obj: directory, x: -18, z: 0, cut: 1 });
 
   // The station logo inlaid in the floor, where you start.
   const logo = new THREE.Mesh(new THREE.CircleGeometry(5, 64), new THREE.MeshBasicMaterial({ map: logoTexture(), transparent: true, toneMapped: false }));
