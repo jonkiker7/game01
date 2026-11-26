@@ -39,6 +39,8 @@ export interface DevHooks {
   getGlow: () => 'auto' | 'full' | 'light' | 'halos' | 'off';
   halos: Halos;
   setProps: (on: boolean) => void;
+  /** Wipe salvage and Rook's permanent upgrades (for testing). */
+  resetProgress: () => void;
 }
 
 const KEY = 'star-rotor-dev';
@@ -240,6 +242,17 @@ export function openDevPanel(h: DevHooks): void {
       'reset',
     )
     .name('↺ Reset to defaults');
+  gui
+    .add(
+      {
+        wipe: () => {
+          if (!confirm('Reset your salvage to 0 and remove all of Rook\'s upgrades?')) return;
+          h.resetProgress();
+        },
+      },
+      'wipe',
+    )
+    .name('⚠ Reset salvage & upgrades');
 
   // Keep shadows in step with the quality setting (tap the fps counter to switch).
   let wasHigh = h.isHigh();
