@@ -70,6 +70,45 @@ function ring(color: string, r: number, width = 0.6, opacity = 0.75): THREE.Mesh
   return m;
 }
 
+/**
+ * A drop-off point: a pad on the ground with a beam of light rising from it and a ring at flying
+ * height. `retire()` makes the beam and ring sink back into the pad, so you can see you're done.
+ */
+class Beacon {
+  private readonly light = new THREE.Group();
+  private fading = -1;
+  constructor(group: THREE.Group, x: number, ground: number, z: number, padR: number, ringR: number) {
+    const pad = new THREE.Mesh(new THREE.CylinderGeometry(padR, padR + 0.6, 0.6, 6), toon('#2a3150'));
+    pad.position.set(x, ground, z);
+    const trim = new THREE.Mesh(new THREE.TorusGeometry(padR * 0.55, 0.18, 6, 24), glow(GREEN, {}, 1.2));
+    trim.rotation.x = Math.PI / 2;
+    trim.position.set(x, ground + 0.35, z);
+    const r = ring(GREEN, ringR, 0.9);
+    r.position.set(x, ground + HOVER_HEIGHT - 1, z);
+    this.light.add(r, beam(GREEN, x, ground, z, 2.2));
+    this.light.userData.trim = trim;
+    group.add(pad, trim, this.light);
+    // Sink the light back into the pad over a moment (runs from the render loop).
+    const base = ground;
+    (this.light.children[1] as THREE.Mesh).onBeforeRender = () => this.step(base);
+  }
+
+  retire(): void {
+    if (this.fading < 0) this.fading = performance.now();
+  }
+
+  private step(ground: number): void {
+    if (this.fading < 0) return;
+    const k = Math.min(1, (performance.now() - this.fading) / 900);
+    const s = Math.max(0.001, 1 - k * k);
+    // Shrink the beam toward the pad and the ring down with it.
+    this.light.scale.set(1, s, 1);
+    this.light.position.y = ground * (1 - s);
+    ((this.light.userData.trim as THREE.Mesh).material as THREE.MeshBasicMaterial).color.set('#5a6a80'); // pad goes dark
+    if (k >= 1) this.light.visible = false;
+  }
+}
+
 /** Pick-up radius for crew and cargo (fly inside this ring). */
 const PICKUP_R = 7;
 
@@ -308,6 +347,8 @@ export abstract class Mission {
   protected time = 0;
   failed = false;
   done = false;
+  /** The drop-off point, for missions that have one. */
+  protected beacon: Beacon | null = null;
 
   constructor(protected readonly d: MissionDeps) {
     d.scene.add(this.group);
@@ -381,11 +422,7 @@ class Rescue extends Mission {
     const lzSpot = this.d.world.nearestRock(this.cx, this.cz + this.R * 0.55, 9);
     this.lz.set(lzSpot.x, 0, lzSpot.z);
     this.lz.y = this.d.world.heightAt(this.lz.x, this.lz.z);
-    const pad = new THREE.Mesh(new THREE.CylinderGeometry(7, 7.6, 0.6, 6), toon('#2a3150'));
-    pad.position.copy(this.lz);
-    const lzRing = ring(GREEN, 9, 0.8);
-    lzRing.position.set(this.lz.x, this.lz.y + HOVER_HEIGHT - 1, this.lz.z);
-    this.group.add(pad, lzRing, beam(GREEN, this.lz.x, this.lz.y, this.lz.z, 2));
+    this.beacon = new Beacon(this.group, this.lz.x, this.lz.y, this.lz.z, 7, 9);
     // Stranded crew: escape pods with a flare, spread around the arena.
     for (let i = 0; i < this.total; i++) {
       const a = (i / this.total) * Math.PI * 2 + Math.random() * 0.8 - Math.PI / 2;
@@ -426,7 +463,10 @@ class Rescue extends Mission {
       this.d.hud.show(`CREW SAFE · ${this.saved}/${this.total}`, 1.6);
       this.d.hud.flashHeal();
     }
-    if (this.saved >= this.total) this.done = true;
+    if (this.saved >= this.total) {
+      this.done = true;
+      this.beacon?.retire();
+    }
   }
 
   objective(): string {
@@ -582,9 +622,7 @@ class Escort extends Mission {
     this.group.add(this.convoy);
     // Destination marker.
     const g = this.d.world.heightAt(this.to.x, this.to.z);
-    const dest = ring(GREEN, 9, 0.8);
-    dest.position.set(this.to.x, g + HOVER_HEIGHT - 1, this.to.z);
-    this.group.add(dest, beam(GREEN, this.to.x, g, this.to.z, 2));
+    this.beacon = new Beacon(this.group, this.to.x, g, this.to.z, 7, 9);
     this.place();
   }
 
@@ -693,7 +731,10 @@ class Escort extends Mission {
       }
     }
     if (this.hp <= 0) this.failed = true;
-    else if (this.progress >= 1) this.done = true;
+    else if (this.progress >= 1) {
+      this.done = true;
+      this.beacon?.retire();
+    }
   }
 
   private readonly target = new THREE.Vector3();
@@ -898,11 +939,7 @@ class Cargo extends Mission {
     const end = path[path.length - 1];
     const zs = this.d.world.nearestRock(end.x, end.z, 10);
     this.zone.set(zs.x, this.d.world.heightAt(zs.x, zs.z), zs.z);
-    const pad = new THREE.Mesh(new THREE.CylinderGeometry(9, 9.6, 0.6, 6), toon('#2a3150'));
-    pad.position.copy(this.zone);
-    const zr = ring(GREEN, 12, 0.9);
-    zr.position.set(this.zone.x, this.zone.y + HOVER_HEIGHT - 1, this.zone.z);
-    this.group.add(pad, zr, beam(GREEN, this.zone.x, this.zone.y, this.zone.z, 2.4));
+    this.beacon = new Beacon(this.group, this.zone.x, this.zone.y, this.zone.z, 9, 12);
     // Crates spread along the way, off to either side of the route.
     for (let i = 0; i < this.total; i++) {
       const p = at(len * (0.12 + (0.7 * (i + Math.random() * 0.6)) / this.total));
@@ -947,7 +984,10 @@ class Cargo extends Mission {
       this.d.hud.show(`DELIVERED · ${this.delivered}/${this.total}`, 1.6);
       this.d.hud.flashHeal();
     }
-    if (this.delivered >= this.total) this.done = true;
+    if (this.delivered >= this.total) {
+      this.done = true;
+      this.beacon?.retire();
+    }
   }
 
   /** Little crates slung under the ship, one per load aboard. */

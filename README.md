@@ -283,7 +283,7 @@ outpost, fenced in by a glowing energy wall:
   slowly if you leave).
 - **Boss (round 3):** one of three bosses (below). Destroy it to complete the sortie.
 
-Each round before the boss is one of these at random (never the same type twice in a row). If you lose the generator or the convoy,
+Each round before the boss is one of these at random (never the same mission type twice in one sortie). If you lose the generator or the convoy,
 the sortie is over, just like being shot down: what you were protecting has a health bar across
 the top, and if it reaches zero it blows up, a red MISSION FAILED banner holds for a few seconds,
 and you head back to the station with the salvage you've earned. To test one, add `?sortie&mission=rescue` (or `defend`,
