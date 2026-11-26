@@ -39,6 +39,8 @@ export interface DevHooks {
   getGlow: () => 'auto' | 'full' | 'light' | 'halos' | 'off';
   halos: Halos;
   setProps: (on: boolean) => void;
+  /** Camera distance multiplier (1 = normal). */
+  setCameraDistance: (d: number) => void;
   /** Open the on-screen control layout editor. */
   editControls: () => void;
   /** Wipe salvage and Rook's permanent upgrades (for testing). */
@@ -66,6 +68,7 @@ const LOOK_DEFAULTS = {
   canyonFogDensity: CANYON_FOG.density,
   canyonFogHeight: CANYON_FOG.height,
   vignetteSize: 62,
+  cameraDistance: 1,
 };
 
 type Look = typeof LOOK_DEFAULTS;
@@ -105,6 +108,7 @@ export function openDevPanel(h: DevHooks): void {
     h.bloom.threshold = look.glowThreshold;
     h.halos.strength = look.haloStrength;
     h.setCanyonFog(look.canyonFogColor, look.canyonFogDensity, look.canyonFogHeight);
+    h.setCameraDistance(look.cameraDistance);
     const root = document.documentElement.style;
     root.setProperty('--vig', String(look.vignette));
     root.setProperty('--vig-size', `${look.vignetteSize}%`);
@@ -134,6 +138,9 @@ export function openDevPanel(h: DevHooks): void {
   light.add(look, 'sunAngle', -180, 180, 1).name('sun direction °').onChange(changed);
   light.add(look, 'sunHeight', 15, 89, 1).name('sun height °').onChange(changed);
   light.add(look, 'rimLight', 0, 3, 0.05).name('blue rim light').onChange(changed);
+
+  const camF = gui.addFolder('Camera');
+  camF.add(look, 'cameraDistance', 0.7, 3, 0.05).name('camera distance ×').onChange(changed);
 
   const shade = gui.addFolder('Shadows');
   shade.add(look, 'shadowMode', { 'baked (terrain once per arena)': 'baked', 'live (all, every frame)': 'live', off: 'off' }).name('mode').onChange(changed);

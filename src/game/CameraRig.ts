@@ -18,6 +18,9 @@ export class CameraRig {
   private readonly focus = new THREE.Vector3();
   private readonly offset = new THREE.Vector3(0, CAM_HEIGHT, CAM_BACK);
   private fovKick = 0;
+  /** Camera distance multiplier (dev panel): pulls back along the same angle. */
+  private distance = 1;
+  private aspectK = 1;
   private shake = 0;
 
   constructor(aspect: number) {
@@ -39,8 +42,20 @@ export class CameraRig {
   setAspect(aspect: number): void {
     this.camera.aspect = aspect;
     // Pull back on tall screens so you can still see enough around the ship.
-    const k = aspect < 1 ? 1.6 : 1;
+    this.aspectK = aspect < 1 ? 1.6 : 1;
+    this.applyOffset();
+  }
+
+  /** Move the camera further away (or closer), keeping its angle. 1 = normal. */
+  setDistance(d: number): void {
+    this.distance = d;
+    this.applyOffset();
+  }
+
+  private applyOffset(): void {
+    const k = this.aspectK * this.distance;
     this.offset.set(0, CAM_HEIGHT * k, CAM_BACK * k);
+    this.camera.far = 500 * Math.max(1, this.distance);
     this.camera.updateProjectionMatrix();
   }
 

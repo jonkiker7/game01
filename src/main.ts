@@ -386,6 +386,10 @@ function showDevPanel(on: boolean): void {
           }),
         ),
       setProps: (on) => world.setProps(on),
+      setCameraDistance: (d) => {
+        rig.setDistance(d);
+        enemies.cullDistance = 130 * Math.max(1, d); // so enemies don't pop in at the edges
+      },
       editControls: () => {
         const was = menuPaused;
         menuPaused = true; // hold the world still while the buttons are moved
