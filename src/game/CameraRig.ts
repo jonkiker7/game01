@@ -9,7 +9,7 @@ const FOLLOW = 5; // how tightly the camera follows (higher = less lag); balance
 const CAM_HEIGHT = 44; // camera height above the ship's focus point
 const CAM_BACK = 30; // and how far behind (south of) it
 /** Default camera distance multiplier (the dev panel's "camera distance ×"). */
-export const CAMERA_DISTANCE = 1.75;
+export const CAMERA_DISTANCE = 1.25;
 
 /**
  * Angled top-down camera (a 3/4 view) that follows the ship, leads slightly in
