@@ -8,6 +8,10 @@ export interface ShopRow {
   button: string | null;
   disabled?: boolean;
   onClick?: () => void;
+  /** Tapping the row (not its button) shows it in the shop's preview, if it has one. */
+  preview?: () => void;
+  /** Highlighted as the one being previewed. */
+  selected?: boolean;
 }
 
 /** Home base overlays: the salvage readout and the shop panels (conversations are in Conversation.ts). */
@@ -21,7 +25,7 @@ export class BaseUI {
       `<div id="base-salvage"></div>
        <div id="room-toast"><h3></h3><span></span></div>
        <div id="guide-tag"></div>
-       <div id="shop" class="overlay"><div class="panel"><div class="head"><h2></h2><span class="wallet"></span><button class="x" aria-label="Close">✕</button></div><div class="rows"></div><button class="close">DONE ▸</button></div></div>`,
+       <div id="shop" class="overlay"><div class="panel"><div class="head"><h2></h2><span class="wallet"></span><button class="x" aria-label="Close">✕</button></div><div class="body"><div class="rows"></div></div><button class="close">DONE ▸</button></div></div>`,
     );
     this.shop = root.querySelector('#shop') as HTMLElement;
     this.salvage = root.querySelector('#base-salvage') as HTMLElement;
@@ -70,15 +74,32 @@ export class BaseUI {
 
   private onShopClose: (() => void) | null = null;
 
-  openShop(title: string, rows: () => ShopRow[], onClose?: () => void): void {
+  /**
+   * Open a shop. `side` is an optional panel shown to the right of the list (the Outfitter's
+   * pilot preview); rows with `preview` show themselves there when tapped.
+   */
+  openShop(title: string, rows: () => ShopRow[], onClose?: () => void, side?: HTMLElement): void {
     (this.shop.querySelector('h2') as HTMLElement).textContent = title;
     this.onShopClose = onClose ?? null;
+    const body = this.shop.querySelector('.body') as HTMLElement;
+    body.querySelector('.preview')?.remove();
+    if (side) body.appendChild(side);
+    this.shop.classList.toggle('with-preview', !!side);
     const render = () => {
       const list = this.shop.querySelector('.rows') as HTMLElement;
       list.replaceChildren();
       for (const r of rows()) {
         const row = document.createElement('div');
-        row.className = 'row';
+        row.className = r.selected ? 'row selected' : 'row';
+        if (r.preview) {
+          row.classList.add('tappable');
+          row.addEventListener('pointerup', (e) => {
+            e.stopPropagation();
+            audio.play('uiTap');
+            r.preview!();
+            render();
+          });
+        }
         row.innerHTML = `<div class="info"><b>${r.name}</b><span>${r.text}</span></div><div class="status">${r.status}</div>`;
         if (r.button) {
           const b = document.createElement('button');
@@ -89,6 +110,7 @@ export class BaseUI {
             if (b.disabled) return void audio.play('uiDeny');
             audio.play(r.button?.startsWith('⬢') ? 'buy' : 'uiConfirm');
             r.onClick?.();
+            r.preview?.();
             render();
           });
           row.appendChild(b);

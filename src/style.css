@@ -970,6 +970,51 @@ body.mode-base #btn-gun.idle {
   align-self: center;
 }
 
+/* The list, plus (in the Outfitter) a preview of your pilot on the right. */
+#shop .body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  gap: 10px;
+}
+#shop .body .rows {
+  flex: 1 1 auto;
+}
+#shop.with-preview .panel {
+  width: min(820px, 100%);
+}
+#shop .preview {
+  flex: 0 0 38%;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  border: 1px solid rgba(242, 196, 109, 0.25);
+  background: radial-gradient(circle at 50% 55%, rgba(111, 247, 255, 0.16), rgba(0, 0, 0, 0) 70%), rgba(255, 255, 255, 0.03);
+  overflow: hidden;
+}
+#shop .preview canvas {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+}
+#shop .preview-label {
+  font-family: var(--display);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #9ef3ff;
+  text-align: center;
+  padding: 4px 6px 6px;
+}
+#shop .row.tappable {
+  cursor: pointer;
+}
+#shop .row.selected {
+  border-color: rgba(111, 247, 255, 0.7);
+  background: rgba(111, 247, 255, 0.1);
+}
+
 /* ---------- Conversation screen (Hades-style portraits) ---------- */
 #convo {
   position: absolute;
