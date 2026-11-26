@@ -129,25 +129,25 @@ body {
 }
 
 #btn-gun {
-  right: 15px;
-  bottom: 33px;
+  right: 30px;
+  bottom: 28px;
   --tilt: -20deg;
 }
 #btn-missile {
-  right: 111px;
-  bottom: 9px;
+  right: 135px;
+  bottom: 16px;
   --tilt: -15deg;
 }
-/* Boost in the middle, a crescent barrel-roll button hugging each side of it. The whole
-   group is tilted to follow the thumb's arc (the rolls turn about BOOST's centre). */
+/* Boost with a crescent barrel-roll button on each side, all tilted to follow the thumb's arc
+   (layout made in the dev panel's control layout editor). */
 #btn-boost {
-  right: 44px;
-  bottom: 132px;
+  right: 72px;
+  bottom: 117px;
   --tilt: -22deg;
 }
 #btn-roll-l,
 #btn-roll-r {
-  bottom: 128px;
+  transform-origin: 50% 50%;
   width: 31px;
   height: 66px;
   border: none;
@@ -160,13 +160,13 @@ body {
   overflow: visible;
 }
 #btn-roll-l {
-  right: 99px;
-  transform-origin: 57px 33px;
+  right: 133px;
+  bottom: 95px;
   clip-path: path('M8.9 8.5A54 54 0 0 0 8.9 57.5A10 10 0 0 0 26.7 48.4A34 34 0 0 1 26.7 17.6A10 10 0 0 0 8.9 8.5Z');
 }
 #btn-roll-r {
-  right: 16px;
-  transform-origin: -26px 33px;
+  right: 41px;
+  bottom: 134px;
   clip-path: path('M22.1 8.5A54 54 0 0 1 22.1 57.5A10 10 0 0 1 4.3 48.4A34 34 0 0 0 4.3 17.6A10 10 0 0 1 22.1 8.5Z');
 }
 .btn-roll svg {
@@ -234,8 +234,8 @@ body {
 }
 
 #btn-special {
-  right: 154px;
-  bottom: 91px;
+  right: 212px;
+  bottom: 0px;
   --tilt: -12deg;
   width: 52px;
   height: 52px;
@@ -543,8 +543,8 @@ body {
 /* ---------- Missile ammo pips around the MSL button ---------- */
 #msl-pips {
   position: absolute;
-  right: 111px;
-  bottom: 9px;
+  right: 135px;
+  bottom: 16px;
   width: 58px;
   height: 58px;
   pointer-events: none;
