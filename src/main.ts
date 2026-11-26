@@ -41,7 +41,8 @@ import { Halos } from './game/Halos';
 import { Tutorial } from './game/Tutorial';
 import { applySavedControlLayout, openControlLayoutEditor } from './game/ControlLayout';
 import { readChoice, writeChoice } from './game/Choices';
-import { setPilotName } from './content/characters';
+import { getPilotName, setPilotName } from './content/characters';
+import { submitScore } from './base/OnlineBoard';
 import { ShadowBaker, type ShadowMode, SunShadows } from './game/Shadows';
 import { isShipDesign } from './game/ShipDesigns';
 import { World } from './game/World';
@@ -231,6 +232,8 @@ const run = new Run({
     save.lastRun = { won: r.won, sectors: r.sectorsCleared, kills: r.kills };
     save.runs++;
     addToLeaderboard(save, r.score);
+    // And the shared board: the station's board refreshes once it's sent.
+    void submitScore(getPilotName(), r.score).then(() => base.refreshBoard());
     const newBest = r.score > save.best;
     const prevBest = save.best;
     if (newBest) save.best = r.score;

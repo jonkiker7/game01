@@ -17,7 +17,8 @@ import { BRIEFINGS } from '../game/run/MissionModels';
 import { Pilot } from './Pilot';
 import { Robot } from './Robot';
 import { HELMETS, PERKS, type SaveData, SHIP_PRICES, SUITS, writeSave } from './Save';
-import { setPilotName } from '../content/characters';
+import { getPilotName, setPilotName } from '../content/characters';
+import { fetchTop } from './OnlineBoard';
 import { buildStation, type Collider, type SlidingDoor, STATION, type WallSegment } from './Station';
 
 const WALK_SPEED = 11;
@@ -216,7 +217,7 @@ export class HomeBase {
     // Hung upright on the wall between the two halves of the balcony, facing the room.
     this.board.root.position.set(0, 9, -13.3);
     this.scene.add(this.board.root);
-    this.board.draw(this.save.leaderboard);
+    this.refreshBoard();
     this.parkShip();
     this.setShip(save.ship);
 
@@ -250,7 +251,7 @@ export class HomeBase {
 
   enter(spawn: Spawn = 'wake'): void {
     this.launching = -1;
-    this.board.draw(this.save.leaderboard); // new scores from the sortie you just flew
+    this.refreshBoard(); // new scores from the sortie you just flew
     this.pilot.root.visible = true;
     this.pilot.root.scale.setScalar(1);
     const at = SPOTS[spawn];
@@ -519,6 +520,17 @@ export class HomeBase {
     this.updateMarkers();
   }
 
+  /**
+   * Show the shared leaderboard (everyone's best scores). This device's own board shows first,
+   * and stays up if the shared one can't be reached or has no scores yet.
+   */
+  refreshBoard(): void {
+    this.board.draw(this.save.leaderboard);
+    void fetchTop(getPilotName()).then((top) => {
+      if (top?.length) this.board.draw(top);
+    });
+  }
+
   /** BOLT asks your name; it's used for {callsign} in lines and on the leaderboard. */
   private askName(then?: () => void): void {
     this.bubbles.hideAll();
@@ -534,7 +546,7 @@ export class HomeBase {
           setPilotName(name);
           // Your scores on the board carry your new name.
           for (const e of this.save.leaderboard) if (e.you) e.name = name;
-          this.board.draw(this.save.leaderboard);
+          this.refreshBoard();
         }
         writeSave(this.save);
         const reply = name ? `NICE TO MEET YOU, ${name}!` : "NO PROBLEM. I'LL CALL YOU PLAYER 1. TELL ME ANY TIME: ASK FOR 'MY NAME'.";
