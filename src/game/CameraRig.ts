@@ -8,6 +8,8 @@ const LOOK_AHEAD = 0.3; // seconds of velocity to lead the camera by
 const FOLLOW = 5; // how tightly the camera follows (higher = less lag); balanced with LOOK_AHEAD so the ship stays near centre
 const CAM_HEIGHT = 44; // camera height above the ship's focus point
 const CAM_BACK = 30; // and how far behind (south of) it
+/** Default camera distance multiplier (the dev panel's "camera distance ×"). */
+export const CAMERA_DISTANCE = 1.75;
 
 /**
  * Angled top-down camera (a 3/4 view) that follows the ship, leads slightly in
@@ -19,12 +21,13 @@ export class CameraRig {
   private readonly offset = new THREE.Vector3(0, CAM_HEIGHT, CAM_BACK);
   private fovKick = 0;
   /** Camera distance multiplier (dev panel): pulls back along the same angle. */
-  private distance = 1;
+  private distance = CAMERA_DISTANCE;
   private aspectK = 1;
   private shake = 0;
 
   constructor(aspect: number) {
     this.camera = new THREE.PerspectiveCamera(BASE_FOV, aspect, 1, 500);
+    this.applyOffset();
   }
 
   /** The point on the ground the camera is looking at. */

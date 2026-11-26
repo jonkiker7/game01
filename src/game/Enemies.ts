@@ -1,3 +1,4 @@
+import { CAMERA_DISTANCE } from './CameraRig';
 import * as THREE from 'three';
 import type { Effects } from './Effects';
 import {
@@ -292,7 +293,7 @@ export class EnemyManager {
   private readonly tmp = new THREE.Vector3();
   private readonly tmp2 = new THREE.Vector3();
   /** Enemies further than this from the ship are hidden (grows when the camera pulls back). */
-  cullDistance = CULL_DISTANCE;
+  cullDistance = CULL_DISTANCE * Math.max(1, CAMERA_DISTANCE);
   private readonly frustum = new THREE.Frustum();
   private readonly viewProj = new THREE.Matrix4();
   private readonly probe = new THREE.Vector3();
