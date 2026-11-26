@@ -930,6 +930,11 @@ export class HomeBase {
     };
   }
 
+  /** Show the current salvage (after it changed outside the base, e.g. the dev panel). */
+  refreshSalvage(): void {
+    this.ui.setSalvage(this.save.salvage);
+  }
+
   private commit(): void {
     writeSave(this.save);
     this.ui.setSalvage(this.save.salvage);

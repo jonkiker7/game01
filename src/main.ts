@@ -381,6 +381,13 @@ function showDevPanel(on: boolean): void {
           }),
         ),
       setProps: (on) => world.setProps(on),
+      resetProgress: () => {
+        save.salvage = 0;
+        save.perks = {};
+        writeSave(save);
+        base.refreshSalvage();
+        hud.show('SALVAGE & UPGRADES RESET', 1.6);
+      },
     }),
   );
 }
