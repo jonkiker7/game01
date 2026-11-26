@@ -132,9 +132,20 @@ export class TrainingCoach {
     if (STEPS[this.step].done.includes(e)) this.next();
   }
 
+  /** Stretch the prompt across the top: from the armor bar to the radar (whatever the screen). */
+  private place(): void {
+    const armor = document.getElementById('armor')?.getBoundingClientRect();
+    const radar = document.getElementById('radar')?.getBoundingClientRect();
+    if (!armor || !radar || !radar.width) return;
+    const left = armor.right + 14;
+    const right = radar.left - 14;
+    Object.assign(this.panel.style, { left: `${left}px`, width: `${Math.max(200, right - left)}px` });
+  }
+
   /** Track how far the ship has flown (for the first step), and keep the demo in place. */
   update(x: number, z: number): void {
     if (!this.active) return;
+    this.place();
     if (!Number.isNaN(this.lastX)) this.moved += Math.hypot(x - this.lastX, z - this.lastZ);
     this.lastX = x;
     this.lastZ = z;
@@ -151,6 +162,7 @@ export class TrainingCoach {
     const text = this.panel.querySelector('.text') as HTMLElement;
     const skip = this.panel.querySelector('.skip') as HTMLElement;
     this.panel.classList.add('show');
+    this.place();
     this.panel.classList.remove('pop');
     void this.panel.offsetWidth;
     this.panel.classList.add('pop');
