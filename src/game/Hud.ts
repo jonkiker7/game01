@@ -27,6 +27,7 @@ export class Hud {
        <div id="score"></div>
        <div id="score-pop"></div>
        <div id="objective"></div>
+       <div id="ship-full">SHIP FULL!</div>
        <div id="message"></div>
        <div id="damage"></div>
        <div id="boss-bar"><div class="name"></div><div class="bar"><div class="fill"></div></div></div>`,
@@ -154,6 +155,17 @@ export class Hud {
       (el.querySelector('.name') as HTMLElement).textContent = name ?? '';
     }
     if (name) (el.querySelector('.fill') as HTMLElement).style.transform = `scaleX(${Math.max(0, fraction)})`;
+  }
+
+  private fullShown = false;
+
+  /** "SHIP FULL!" under the objective panel while you can't carry any more. */
+  setShipFull(full: boolean): void {
+    const el = document.getElementById('ship-full')!;
+    if (full) el.style.top = `${this.objective.offsetTop + this.objective.offsetHeight + 4}px`;
+    if (full === this.fullShown) return;
+    this.fullShown = full;
+    el.classList.toggle('show', full);
   }
 
   setObjective(text: string): void {

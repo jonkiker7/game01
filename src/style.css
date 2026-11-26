@@ -1663,7 +1663,7 @@ body:not(.mode-base) .speech {
   letter-spacing: 0.12em;
   pointer-events: auto;
 }
-body.mode-base #btn-tutorial {
+body.mode-base #btn-tutorial.show {
   display: block;
 }
 body.in-convo #btn-tutorial {
@@ -1741,4 +1741,42 @@ body.in-convo #btn-tutorial {
   border: none;
   text-decoration: underline;
   padding: 2px 6px;
+}
+
+/* Under the objective panel while the hold is full. */
+#ship-full {
+  display: none;
+  position: absolute;
+  right: calc(150px + env(safe-area-inset-right));
+  width: 150px;
+  box-sizing: border-box;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: rgba(40, 6, 12, 0.8);
+  border: 1px solid #ff6b6b;
+  color: #ff6b6b;
+  font-family: var(--display);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-align: center;
+  animation: full-pulse 0.9s ease-in-out infinite alternate;
+}
+#ship-full.show {
+  display: block;
+}
+body.mode-base #ship-full {
+  display: none;
+}
+@keyframes full-pulse {
+  from {
+    opacity: 0.65;
+  }
+  to {
+    opacity: 1;
+  }
+}
+#shop .preview-label {
+  white-space: normal;
+  line-height: 1.35;
 }

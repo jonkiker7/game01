@@ -13,6 +13,7 @@ import { WardrobePreview } from './WardrobePreview';
 import { SpeechBubbles } from './SpeechBubbles';
 import { ItemPreview } from './ItemPreview';
 import { contractModel, shipModel, upgradeModel } from './ShopModels';
+import { BRIEFINGS } from '../game/run/MissionModels';
 import { Pilot } from './Pilot';
 import { Robot } from './Robot';
 import { HELMETS, PERKS, type SaveData, SHIP_PRICES, SUITS, writeSave } from './Save';
@@ -497,6 +498,7 @@ export class HomeBase {
       this.convo.play(n.id, lines, [
         { label: 'CONTRACTS', action: () => this.openContracts() },
         { label: 'FLIGHT TRAINING', action: () => this.offerTutorial(false) },
+        { label: 'MISSION BRIEFINGS', action: () => this.openBriefings() },
         { label: 'DIRECTIONS', action: () => this.convo.play('bot', this.directions()) },
         { label: 'LEAVE' },
       ]);
@@ -506,6 +508,37 @@ export class HomeBase {
       this.convo.play(n.id, lines, [{ label: n.shopLabel!, action: () => n.shop?.() }, { label: 'LEAVE' }]);
     }
     this.updateMarkers();
+  }
+
+  /**
+   * BOLT's mission briefings: every mission type, with pictures. Tap a mission to see its first
+   * picture; tap it again for the next one.
+   */
+  private openBriefings(): void {
+    const pv = this.item;
+    const slideOf: Record<string, number> = {};
+    const show = (b: (typeof BRIEFINGS)[number], step: number) => {
+      const i = step % b.slides.length;
+      slideOf[b.id] = i;
+      const s = b.slides[i];
+      const more = b.slides.length > 1 ? ` (${i + 1}/${b.slides.length} · tap again for more)` : '';
+      pv.show(b.id, s.model(), s.caption + more);
+    };
+    this.openPreviewShop(
+      'MISSION BRIEFINGS · BOLT',
+      () =>
+        BRIEFINGS.map(
+          (b): ShopRow => ({
+            name: b.name,
+            text: b.summary,
+            status: b.slides.length > 1 ? `${b.slides.length} PICTURES` : '',
+            button: null,
+            selected: pv.current === b.id,
+            preview: () => show(b, pv.current === b.id ? (slideOf[b.id] ?? 0) + 1 : 0),
+          }),
+        ),
+      () => show(BRIEFINGS[0], 0),
+    );
   }
 
   /** BOLT's contract board: take one job at a time for your next sortie. */

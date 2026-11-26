@@ -421,7 +421,8 @@ const tutorial = new Tutorial($('hud'));
 let tutorialPending = false;
 // Always at the base, near the action (LAUNCH) button: offer the tutorial again.
 $('hud').insertAdjacentHTML('beforeend', '<button id="btn-tutorial">FLIGHT TUTORIAL</button>');
-$('btn-tutorial').addEventListener('pointerdown', (e) => {
+const tutorialBtn = $('btn-tutorial');
+tutorialBtn.addEventListener('pointerdown', (e) => {
   e.stopPropagation();
   base.offerTutorial(false);
 });
@@ -835,6 +836,7 @@ renderer.setAnimationLoop((now: number) => {
     const label = base.actionLabel;
     if (gunBtn.textContent !== (label ?? 'USE')) gunBtn.textContent = label ?? 'USE';
     gunBtn.classList.toggle('idle', label === null);
+    tutorialBtn.classList.toggle('show', label === 'LAUNCH'); // only beside the ship
     present(realDt);
     return;
   }
@@ -864,6 +866,7 @@ renderer.setAnimationLoop((now: number) => {
   specialBtn.style.setProperty('--charge', String(specialCharge));
   specialBtn.classList.toggle('ready', specialCharge >= 1);
   hud.setObjective(run.objective());
+  hud.setShipFull(run.phase === 'fight' && !!run.mission?.full);
   run.blips(blips);
   radar.draw(ship.root.position.x, ship.root.position.z, ship.heading, blips, elapsed, { outline: run.shape.outline });
   hud.update(dt);
