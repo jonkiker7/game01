@@ -723,6 +723,15 @@ let wasDucked = false;
 
 /** One step of the sortie's game logic (movement, enemies, shots, effects). */
 function simulate(dt: number): void {
+  // The mission title is up: only its countdown runs; the world holds still underneath it.
+  if (run.frozen && !paused && !menuPaused) {
+    run.update(dt);
+    dt = 0;
+    ship.update(0, input, world);
+    enemies.update(0, ship, enemyShots, mortars, rig.camera);
+    effects.update(0, rig.lookTarget);
+    return;
+  }
   if (paused || menuPaused) dt = 0; // upgrade screen or pause menu is open: the world holds still
 
   if (!paused && !menuPaused) {

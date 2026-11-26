@@ -64,7 +64,7 @@ const CLOCK: Partial<Record<EncounterKind, { limit: number; fail: boolean }>> = 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 /** How long the mission title stays up at the start of a round (enemies arrive 1 s before it goes). */
-const INTRO_TIME = 4.6;
+const INTRO_TIME = 4.1;
 
 const TITLES: Record<EncounterKind, string> = {
   outpost: 'DESTROY THE OUTPOST',
@@ -237,11 +237,19 @@ export class Run {
    */
   private enter(): void {
     const boss = this.kind === 'boss';
+    // Everything for the round is set up now, while the big title covers the screen (so any
+    // loading hitch is hidden), and the game stays frozen until the title goes away.
+    this.beginFight();
     this.phase = 'intro';
-    this.introTimer = INTRO_TIME - 1;
+    this.introTimer = INTRO_TIME;
     audio.song(boss ? 'boss' : 'sortie');
     audio.play(boss ? 'bossAppear' : 'sectorStart');
     this.d.hud.show(TITLES[this.kind], INTRO_TIME, true); // just the mission (which sector doesn't matter)
+  }
+
+  /** True while the mission title is up: the game holds still. */
+  get frozen(): boolean {
+    return this.phase === 'intro';
   }
 
   private introTimer = 0;
@@ -307,7 +315,7 @@ export class Run {
     this.phase = 'fight';
     this.elapsed = 0;
     this.missionDamage = 0;
-    if (this.boss) hud.show(this.boss.name, 2.2, true);
+    void hud;
   }
 
   /**
@@ -379,7 +387,7 @@ export class Run {
   update(dt: number): void {
     const { ship, enemies, arena } = this.d;
     if (this.phase !== 'over' && this.phase !== 'transition') this.confineShip();
-    if (this.phase !== 'transition') this.d.contracts.update(dt, ship);
+    if (this.phase !== 'transition' && this.phase !== 'intro') this.d.contracts.update(dt, ship);
     // Health bar across the top: the boss, or what a mission has you protecting.
     const guard = this.phase === 'fight' ? this.mission?.healthBar() : null;
     if (this.boss && this.boss.alive && this.phase === 'fight') this.d.hud.setBoss(this.boss.name, this.boss.healthFraction);
@@ -389,7 +397,10 @@ export class Run {
     switch (this.phase) {
       case 'intro':
         this.introTimer -= dt;
-        if (this.introTimer <= 0) this.beginFight();
+        if (this.introTimer <= 0) {
+          this.phase = 'fight';
+          if (this.boss) this.d.hud.show(this.boss.name, 2.2, true);
+        }
         break;
       case 'fight': {
         this.elapsed += dt;
