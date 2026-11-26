@@ -36,7 +36,7 @@ interface WallLook {
   lines: THREE.Object3D[];
   faded: boolean;
 }
-const SHIP_YAW = 0.45 + Math.PI / 2; // parked nose-west (turned 270° clockwise from nose-north)
+const SHIP_YAW = 0.45 + Math.PI / 2 + THREE.MathUtils.degToRad(25); // parked nose-west, turned a further 25° counter-clockwise
 
 export type Spawn = 'wake' | 'landed';
 
