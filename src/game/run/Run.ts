@@ -40,6 +40,8 @@ const ARENA_RADIUS: Record<EncounterKind, number> = { outpost: 180, survive: 110
 /** Escort runs left to right through a snaking corridor about one screen tall. */
 const CORRIDOR = { length: 330, halfWidth: 44 };
 const SURVIVE_TIME = 40;
+/** Flight training's practice arena. */
+const TRAINING_RADIUS = 90;
 
 type EncounterKind = 'outpost' | 'survive' | 'stronghold' | 'boss' | MissionKind;
 /** Encounters the rounds before the boss can be. */
@@ -151,9 +153,104 @@ export class Run {
     return this.radius;
   }
 
+  /**
+   * Flight training: a small practice arena with one drone that keeps coming back. No clock, no
+   * score or salvage to bank, and being shot down just puts you back in the air.
+   */
+  training = false;
+  private respawnTimer = 0;
+  private targetTimer = 0;
+
+  startTraining(): void {
+    const { ship, enemies, world } = this.d;
+    this.training = true;
+    this.stats = this.d.baseStats();
+    this.levels.clear();
+    this.takenNames.length = 0;
+    this.sector = 1;
+    this.kills = 0;
+    this.salvage = 0;
+    this.score = 0;
+    this.tally = { damage: 0, clear: 0, time: 0, protect: 0 };
+    this.missionFailed = false;
+    this.won = false;
+    this.boss = null;
+    this.pair = [];
+    this.seed = 1 + Math.floor(Math.random() * 99999);
+    this.d.resetRunState();
+    this.d.clearField();
+    enemies.reset();
+    this.d.contracts.begin(null);
+    this.endMission();
+    this.d.arena.hideGates();
+    this.d.arena.hideReward();
+    this.shape = blobArena(TRAINING_RADIUS, this.seed * 10 + 1);
+    world.generate(this.shape, this.seed * 10 + 1);
+    this.center.set(this.shape.center.x, this.shape.center.z);
+    this.radius = this.shape.radius;
+    const shape = this.shape;
+    enemies.configure({ x: this.center.x, z: this.center.y, r: this.radius, inside: (x, z, m) => shape.depth(x, z) > m }, 1, null);
+    ship.reset(world, this.shape.entry.x, this.shape.entry.z, this.stats);
+    this.d.snapCamera();
+    this.targetTimer = 1.5;
+    this.phase = 'intro';
+    this.introTimer = 2.5;
+    audio.song('sortie');
+    audio.play('sectorStart');
+    this.d.hud.show('FLIGHT TRAINING', 2.5, true);
+  }
+
+  /** Leave training (back to the station): clear the arena; nothing is banked. */
+  exitTraining(): void {
+    this.d.enemies.reset();
+    this.d.clearField();
+    this.d.releaseInput();
+    this.training = false;
+    this.phase = 'over';
+    this.overTimer = -10;
+  }
+
+  private updateTraining(dt: number): void {
+    const { ship, enemies, world, hud } = this.d;
+    if (this.phase === 'intro') {
+      this.introTimer -= dt;
+      if (this.introTimer <= 0) this.phase = 'fight';
+      return;
+    }
+    if (this.phase === 'over') {
+      // Shot down: back in the air in a moment, at full armor.
+      this.respawnTimer -= dt;
+      if (this.respawnTimer <= 0) {
+        ship.reset(world, this.center.x, this.center.y + 20, this.stats);
+        this.phase = 'fight';
+        hud.show('BACK IN THE AIR', 1.4);
+      }
+      return;
+    }
+    this.confineShip();
+    // The practice drone: a new one shortly after the last goes down.
+    if (!enemies.enemies.some((e) => e.alive)) {
+      this.targetTimer -= dt;
+      if (this.targetTimer <= 0) {
+        const p = ship.root.position;
+        const a = Math.random() * Math.PI * 2;
+        const r = 30;
+        let x = p.x + Math.cos(a) * r;
+        let z = p.z - Math.abs(Math.sin(a)) * r; // ahead (up the screen) of the ship
+        if (this.shape.depth(x, z) < 15) {
+          x = this.center.x;
+          z = this.center.y;
+        }
+        enemies.spawnDrone(x, z);
+        this.targetTimer = 2;
+      }
+    }
+  }
+
   /** Start a brand new sortie from the landing zone. */
   start(): void {
     const { ship, enemies, world } = this.d;
+    this.training = false;
     this.stats = this.d.baseStats();
     this.levels.clear();
     this.takenNames.length = 0;
@@ -379,12 +476,22 @@ export class Run {
   /** Called when the ship is destroyed: the run is over. */
   onDeath(): void {
     if (this.phase === 'over') return;
+    if (this.training) {
+      this.phase = 'over';
+      this.respawnTimer = 2;
+      return;
+    }
     this.phase = 'over';
     this.won = false;
     this.overTimer = 2.5;
   }
 
   update(dt: number): void {
+    if (this.training) {
+      this.d.hud.setBoss(null);
+      this.updateTraining(dt);
+      return;
+    }
     const { ship, enemies, arena } = this.d;
     if (this.phase !== 'over' && this.phase !== 'transition') this.confineShip();
     if (this.phase !== 'transition' && this.phase !== 'intro') this.d.contracts.update(dt, ship);
@@ -655,6 +762,7 @@ export class Run {
 
   /** What the HUD should say under the radar. */
   objective(): string {
+    if (this.training) return 'FLIGHT TRAINING\nPRACTICE ON THE DRONE';
     const line = this.d.contracts.objectiveLine(this.sector);
     let text = this.baseObjective();
     // The mission clock (a hard limit, or the time bonus counting down).
@@ -692,6 +800,10 @@ export class Run {
   /** What the radar should mark right now. */
   blips(out: Blip[]): void {
     out.length = 0;
+    if (this.training) {
+      for (const e of this.d.enemies.enemies) if (e.alive) out.push({ x: e.root.position.x, z: e.root.position.z, kind: 'target' });
+      return;
+    }
     if (this.phase === 'fight' && this.boss) {
       if (this.boss.alive) this.boss.blips(out);
     } else if (this.phase === 'fight' && this.mission) {

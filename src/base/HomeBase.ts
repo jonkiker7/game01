@@ -126,18 +126,19 @@ export class HomeBase {
   readonly camera = new THREE.PerspectiveCamera(40, 1, 2, 1400);
   /** Called when the launch cutscene is nearly done (start the fade into the sortie). */
   onLaunch?: () => void;
-  /** Set when you said yes to the flight tutorial: it plays at the start of the next sortie. */
+  /** Set when you said yes to the flight tutorial: the next launch is a training flight. */
   tutorialNext = false;
 
   /**
-   * BOLT asks whether you'd like the flight tutorial. Yes: launch, and it plays once the sortie
-   * starts. No: a reminder that BOLT can give it any time, then (if you were launching) carry on.
+   * BOLT asks whether you'd like the flight tutorial. Yes: the next launch is a training flight
+   * (a practice drone, step-by-step prompts, leave any time). No: a reminder that BOLT can give it
+   * any time, then (if you were launching) carry on to a sortie.
    */
   offerTutorial(launchAfterNo: boolean): void {
     if (this.launching >= 0) return;
     this.save.tutorialAsked = true;
     writeSave(this.save);
-    this.convo.play('bot', [{ who: 'bot', mood: 'happy', text: 'Would you like a quick flight tutorial before you head out?' }], [
+    this.convo.play('bot', [{ who: 'bot', mood: 'happy', text: 'Would you like a training flight first? You can practise on a target drone, and leave whenever you like.' }], [
       {
         label: 'YES',
         action: () => {
@@ -146,7 +147,7 @@ export class HomeBase {
           // Near the ship: off you go. Elsewhere: head to the hangar, and it plays on that launch.
           if (Math.hypot(p.x - PAD.x, p.z - PAD.z) < 20) this.startLaunch();
           else
-            this.convo.play('bot', [{ who: 'bot', mood: 'happy', text: "Great! Head to the Hangar Bay and launch your ship. I'll walk you through the controls once you're out there." }], [{ label: 'OK' }]);
+            this.convo.play('bot', [{ who: 'bot', mood: 'happy', text: "Great! Head to the Hangar Bay and launch your ship. I'll have a training flight ready for you." }], [{ label: 'OK' }]);
         },
       },
       {
