@@ -1,7 +1,7 @@
 import type { LeaderEntry } from './Save';
 
 /**
- * The shared leaderboard: every player's best scores, stored in Firebase (Firestore, the
+ * The shared leaderboard: the top 10 scores from everyone who plays, stored in Firebase (Firestore, the
  * `scores` collection). Each score is a new document {name, score, pid, at}; the database's
  * rules only allow adding valid scores (1–10 allowed characters, 1–200,000 points), never editing
  * or deleting. `pid` is a random id kept on this device, so your own rows stay highlighted (and
@@ -92,25 +92,19 @@ export async function flushPending(): Promise<void> {
 }
 
 /**
- * The top pilots (each player's best score once), with your rows marked. `myName` replaces the
+ * The top 10 scores (arcade style: a player can hold several places), with your rows marked. `myName` replaces the
  * name on your own rows. Resolves null if the board can't be reached.
  */
 export async function fetchTop(myName: string): Promise<LeaderEntry[] | null> {
   try {
     await flushPending();
     const { fs, db } = await firestore();
-    const snap = await fs.getDocs(fs.query(fs.collection(db, 'scores'), fs.orderBy('score', 'desc'), fs.limit(60)));
+    const snap = await fs.getDocs(fs.query(fs.collection(db, 'scores'), fs.orderBy('score', 'desc'), fs.limit(BOARD_SIZE)));
     const me = playerId();
-    const seen = new Set<string>();
-    const out: LeaderEntry[] = [];
-    for (const d of snap.docs) {
+    return snap.docs.map((d) => {
       const { name, score, pid } = d.data() as { name: string; score: number; pid: string };
-      if (seen.has(pid)) continue; // best score per player only
-      seen.add(pid);
-      out.push(pid === me ? { name: myName, score, you: true } : { name, score });
-      if (out.length >= BOARD_SIZE) break;
-    }
-    return out;
+      return pid === me ? { name: myName, score, you: true } : { name, score };
+    });
   } catch (err) {
     console.warn('Leaderboard: could not load the shared board', err);
     return null;
