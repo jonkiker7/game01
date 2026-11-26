@@ -1,3 +1,5 @@
+import { ThumbDemo } from './Training';
+
 /**
  * The flight tutorial: shown over the real game screen (paused) at the start of a sortie. Each
  * tip highlights the control it's about, with an arrow pointing at it, a NEXT button and a
@@ -10,12 +12,18 @@ interface Tip {
   targets: string[];
   /** No highlight: just the tip, in the middle of the screen. */
   center?: boolean;
+  /** Show the animated thumb (press and slide) over this button. */
+  demo?: 'btn-gun' | 'btn-missile';
 }
 
 const TIPS: Tip[] = [
   { text: 'Use your left thumb to move.', targets: [] },
-  { text: 'These buttons fire.', targets: ['btn-gun'] },
-  { text: 'Hold this to charge up and aim a missile shot.', targets: ['btn-missile'] },
+  {
+    text: 'To AIM and fire: hold GUN with your right thumb and slide it the way you want to shoot. Your ship turns and fires wherever your thumb points. Let go to stop.',
+    targets: ['btn-gun'],
+    demo: 'btn-gun',
+  },
+  { text: 'Missiles aim the same way: hold MSL, slide toward an enemy (it locks on), then let go to fire.', targets: ['btn-missile'], demo: 'btn-missile' },
   { text: 'Your Nova can be blasted periodically.', targets: ['btn-special'] },
   { text: 'Boost and roll can be used to get away. The curved buttons beside BOOST barrel-roll you left or right.', targets: ['btn-roll-l', 'btn-boost', 'btn-roll-r'] },
   { text: 'You are temporarily invulnerable during a boost or a roll.', targets: ['btn-roll-l', 'btn-boost', 'btn-roll-r'] },
@@ -34,6 +42,7 @@ export class Tutorial {
   private readonly box: HTMLElement;
   private readonly arrow: HTMLElement;
   private step = 0;
+  private readonly demo: ThumbDemo;
   private onDone: (() => void) | null = null;
   active = false;
 
@@ -55,6 +64,7 @@ export class Tutorial {
     this.hole = this.el.querySelector('.hole') as HTMLElement;
     this.box = this.el.querySelector('.tip') as HTMLElement;
     this.arrow = this.el.querySelector('.arrow') as HTMLElement;
+    this.demo = new ThumbDemo(root);
     const tap = (sel: string, fn: () => void) =>
       this.el.querySelector(sel)!.addEventListener('pointerup', (e) => {
         e.stopPropagation();
@@ -77,6 +87,7 @@ export class Tutorial {
   private finish(): void {
     this.active = false;
     this.el.classList.remove('visible');
+    this.demo.show(null);
     const cb = this.onDone;
     this.onDone = null;
     cb?.();
@@ -85,6 +96,7 @@ export class Tutorial {
   private show(i: number): void {
     this.step = i;
     const tip = TIPS[i];
+    this.demo.show(tip.demo ?? null);
     (this.el.querySelector('.count') as HTMLElement).textContent = `${i + 1} / ${TIPS.length}`;
     (this.el.querySelector('.text') as HTMLElement).textContent = tip.text;
     (this.el.querySelector('.next') as HTMLElement).textContent = i + 1 >= TIPS.length ? "LET'S FLY ▸" : 'NEXT ▸';

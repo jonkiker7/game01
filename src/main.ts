@@ -39,6 +39,7 @@ import { Ship } from './game/Ship';
 import { TUNING } from './game/Tuning';
 import { Halos } from './game/Halos';
 import { Tutorial } from './game/Tutorial';
+import { TrainingCoach } from './game/Training';
 import { applySavedControlLayout, openControlLayoutEditor } from './game/ControlLayout';
 import { readChoice, writeChoice } from './game/Choices';
 import { getPilotName, setPilotName } from './content/characters';
@@ -180,7 +181,7 @@ const radar = new Radar($('hud'));
 
 // ?debug in the URL exposes game objects for automated tests and console tinkering.
 if (new URLSearchParams(location.search).has('debug')) {
-  Object.assign(window, { __game: { audio, baker, get halos() { return halos; }, get perf() { return perf; }, get rig() { return rig; }, ship, enemies, enemyShots, missiles, pickups, combat, mortars, save, get base() { return base; }, get run() { return run; }, chargeNova: () => (specialCharge = 1) } });
+  Object.assign(window, { __game: { audio, baker, get halos() { return halos; }, get perf() { return perf; }, get rig() { return rig; }, ship, enemies, enemyShots, missiles, pickups, combat, mortars, save, get base() { return base; }, get run() { return run; }, chargeNova: () => (specialCharge = 1), get coach() { return coach; } } });
 }
 
 const rig = new CameraRig(window.innerWidth / window.innerHeight);
@@ -286,7 +287,11 @@ base.onLaunch = () =>
     setMode('run');
     tutorialPending = base.tutorialNext;
     base.tutorialNext = false;
-    run.start();
+    // Saying yes to the tutorial flies a training mission instead of a sortie.
+    if (tutorialPending) {
+      run.startTraining();
+      coach.begin();
+    } else run.start();
   });
 // Only colours brighter than 1.2 (glows; not even sunlit white hulls) bloom, so the ground and models stay crisp.
 const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.35, 0.4, 1.2);
@@ -434,6 +439,20 @@ let menuPaused = false;
 // ---------- Flight tutorial ----------
 const tutorial = new Tutorial($('hud'));
 let tutorialPending = false;
+// Flight training's step-by-step coach, and leaving training.
+const coach = new TrainingCoach($('hud'));
+coach.onStep = (_i, done) => {
+  if (done.includes('nova')) specialCharge = 1; // charged up, so you can try it
+};
+coach.onExit = () => {
+  if (!run.training) return;
+  input.releaseAll();
+  runUI.fade(() => {
+    coach.stop();
+    run.exitTraining();
+    goToBase('landed');
+  });
+};
 // Always at the base, near the action (LAUNCH) button: offer the tutorial again.
 $('hud').insertAdjacentHTML('beforeend', '<button id="btn-tutorial">FLIGHT TUTORIAL</button>');
 const tutorialBtn = $('btn-tutorial');
@@ -505,9 +524,11 @@ ship.onBoost = () => {
   input.vibrate(30);
   effects.boostBurst(ship.root.position);
   audio.play('boost');
+  coach.notify('boost');
 };
 ship.onRoll = (dir) => {
   audio.play('roll', { pan: dir * 0.5 });
+  coach.notify('roll');
   rig.kick(6, 0.4);
   input.vibrate(18);
 };
@@ -527,6 +548,7 @@ function missileLock(charge: number, heading: number) {
 }
 
 ship.onMissile = (charge, heading) => {
+  coach.notify('missile');
   const p = ship.root.position;
   if (ship.stats.secondary === 'swarm') {
     // Swarm Rockets: a volley of small homing rockets, one per nearby target (more with charge).
@@ -590,6 +612,7 @@ missiles.onExplode = (pos, power) => {
 };
 enemies.onKill = (kind, pos, enemy) => {
   run.onKill(kind, enemy);
+  coach.notify('kill');
   combat.onKill(enemy, pos, world.heightAt(pos.x, pos.z));
   // Sometimes a wreck drops a healing orb that floats up to flying height.
   if (Math.random() < enemy.dropChance + ship.stats.dropBonus) {
@@ -661,6 +684,7 @@ function fireNova(): void {
   const p = ship.root.position;
   const radius = NOVA_RADIUS * ship.stats.novaRadiusMul;
   specialCharge = 0;
+  coach.notify('nova');
   ship.invulnerable = Math.max(ship.invulnerable, 0.6);
   enemyShots.clear();
   mortars.clear();
@@ -761,6 +785,7 @@ function simulate(dt: number): void {
     tutorial.start(() => {
       menuPaused = false;
       input.releaseAll();
+      coach.startSteps(); // in training: now try each control
     });
   }
   // The mission title is up: only its countdown runs; the world holds still underneath it.
@@ -778,6 +803,7 @@ function simulate(dt: number): void {
     if (ship.alive) chargeNova(dt);
     ship.update(dt, input, world);
     run.update(dt);
+    if (coach.active && ship.alive) coach.update(ship.root.position.x, ship.root.position.z);
     updateGun(dt);
   }
   // Ramjet: damage enemies the ship boosts through.
@@ -948,6 +974,12 @@ function present(realDt: number): void {
 if (new URLSearchParams(location.search).has('sortie')) {
   setMode('run');
   run.start();
+} else if (new URLSearchParams(location.search).has('training')) {
+  setMode('run');
+  tutorialPending = !new URLSearchParams(location.search).has('notips');
+  run.startTraining();
+  coach.begin();
+  if (!tutorialPending) window.setTimeout(() => coach.startSteps(), 3000);
 } else {
   goToBase();
 }

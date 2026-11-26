@@ -350,6 +350,13 @@ export class EnemyManager {
     }
   }
 
+  /** One ordinary drone at (x, z): flight training's practice target. */
+  spawnDrone(x: number, z: number): Enemy {
+    const d = new Drone(this.hpMul);
+    this.register(d, x, z);
+    return d;
+  }
+
   /** Place `count` turret towers in a loose ring around (cx, cz). */
   spawnTurrets(cx: number, cz: number, count: number, minR: number, maxR: number): void {
     const start = this.rand() * Math.PI * 2;
