@@ -70,6 +70,27 @@ function ring(color: string, r: number, width = 0.6, opacity = 0.75): THREE.Mesh
   return m;
 }
 
+/** Pick-up radius for crew and cargo (fly inside this ring). */
+const PICKUP_R = 7;
+
+/**
+ * A gold ring at flying height, above a pickup, showing where to fly to grab it (like the green
+ * drop-off rings). Add it to the pickup's group, which sits on the ground.
+ */
+function pickupRing(): THREE.Object3D {
+  const g = new THREE.Group();
+  g.add(ring(GOLD, PICKUP_R, 1.2, 1));
+  // A faint fill inside, so the whole circle reads as "fly here".
+  const fill = new THREE.Mesh(
+    new THREE.CircleGeometry(PICKUP_R - 1.2, 40),
+    glow(GOLD, { transparent: true, opacity: 0.12, side: THREE.DoubleSide, depthWrite: false }, 1),
+  );
+  fill.rotation.x = -Math.PI / 2;
+  g.add(fill);
+  g.position.y = HOVER_HEIGHT - 1;
+  return g;
+}
+
 /** A progress arc at flying height (rebuilt as it changes). */
 class Arc {
   mesh: THREE.Mesh | null = null;
@@ -378,7 +399,7 @@ class Rescue extends Mission {
       const stripe = new THREE.Mesh(new THREE.CylinderGeometry(1.36, 1.36, 0.5, 12), toon('#e2733a'));
       stripe.rotation.z = 1.2;
       stripe.position.y = 1.2;
-      obj.add(pod, stripe, beam(GOLD, 0, 0, 0, 1.2));
+      obj.add(pod, stripe, beam(GOLD, 0, 0, 0, 1.2), pickupRing());
       // The flare beam is built at the origin: lift it to start at the ground.
       obj.children[2].position.set(0, (HOVER_HEIGHT + 14) / 2, 0);
       obj.position.set(x, ground, z);
@@ -392,7 +413,7 @@ class Rescue extends Mission {
     this.time += dt;
     for (const c of this.crew) {
       if (c.taken || this.carrying >= this.capacity) continue;
-      if (this.shipNear(c.x, c.z, 7)) {
+      if (this.shipNear(c.x, c.z, PICKUP_R)) {
         c.taken = true;
         c.obj.visible = false;
         this.carrying++;
@@ -895,7 +916,7 @@ class Cargo extends Mission {
       band.position.y = 1.1;
       const flare = beam(GOLD, 0, 0, 0, 1.1);
       flare.position.set(0, (HOVER_HEIGHT + 14) / 2, 0);
-      obj.add(box, band, flare);
+      obj.add(box, band, flare, pickupRing());
       obj.position.set(x, ground, z);
       obj.rotation.y = Math.random() * Math.PI;
       addOutlines(obj);
@@ -911,7 +932,7 @@ class Cargo extends Mission {
     const cap = this.capacity;
     for (const c of this.crates) {
       if (c.taken || this.carrying >= cap) continue;
-      if (this.shipNear(c.x, c.z, 7)) {
+      if (this.shipNear(c.x, c.z, PICKUP_R)) {
         c.taken = true;
         c.obj.visible = false;
         this.carrying++;
