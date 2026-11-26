@@ -77,6 +77,24 @@ function ownPivot(id: string): void {
   write(id, p);
 }
 
+const samePlace = (a: Placement, b: Placement) =>
+  Math.abs(a.right - b.right) < 0.5 && Math.abs(a.bottom - b.bottom) < 0.5 && Math.abs(a.tilt - b.tilt) < 0.01 && Math.abs(a.size - b.size) < 0.001;
+
+/** The game's built-in layout (read with this device's changes taken off for a moment). */
+function builtIn(): Layout {
+  const out: Layout = {};
+  for (const id of ALL_IDS) {
+    const e = el(id);
+    if (!e) continue;
+    const css = e.style.cssText;
+    clear(id);
+    const p = read(id);
+    e.style.cssText = css;
+    if (p) out[id] = p;
+  }
+  return out;
+}
+
 function snapshot(): Layout {
   const out: Layout = {};
   for (const id of ALL_IDS) {
@@ -91,8 +109,15 @@ export function applySavedControlLayout(): void {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return;
-    const layout = JSON.parse(raw) as Layout;
-    for (const [id, p] of Object.entries(layout)) if (ALL_IDS.includes(id)) write(id, p);
+    const saved = JSON.parse(raw) as { layout?: Layout; defaults?: Layout };
+    // Each button keeps its saved spot only while the game's default for it hasn't changed since
+    // (so a new default reaches everyone). Older saves didn't record defaults: skip them.
+    if (!saved.layout || !saved.defaults) return;
+    for (const [id, p] of Object.entries(saved.layout)) {
+      const was = saved.defaults[id];
+      const now = read(id);
+      if (ALL_IDS.includes(id) && was && now && samePlace(was, now)) write(id, p);
+    }
   } catch {
     /* private mode or a bad save: keep the built-in layout */
   }
@@ -198,7 +223,7 @@ export function openControlLayoutEditor(onClose: () => void): void {
     },
     save: () => {
       try {
-        localStorage.setItem(KEY, JSON.stringify(snapshot()));
+        localStorage.setItem(KEY, JSON.stringify({ layout: snapshot(), defaults: builtIn() }));
       } catch {
         /* private mode: it still applies until the page reloads */
       }
