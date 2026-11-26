@@ -1961,13 +1961,13 @@ body.layout-edit #tutorial {
 }
 
 /* ---------- Flight training: the coach's prompts, EXIT TRAINING, and the thumb demo ---------- */
+/* Across the top, between the armor bar and the radar (placed in Training.ts). */
 #coach {
   display: none;
   position: absolute;
-  top: calc(102px + env(safe-area-inset-top));
-  left: calc(14px + env(safe-area-inset-left));
-  width: min(400px, calc(100vw - 400px));
-  min-width: 220px;
+  top: calc(8px + env(safe-area-inset-top));
+  left: 260px;
+  width: 400px;
   box-sizing: border-box;
   padding: 9px 12px 8px;
   border-radius: 12px;
@@ -2036,7 +2036,12 @@ body.layout-edit #tutorial {
 body.training #btn-exit-training {
   display: block;
 }
-/* Nothing is banked in training: no score or salvage counters. */
+/* Nothing is banked in training: no score or salvage counters, and the coach replaces the
+   mission box. */
+body.training #objective,
+body.training #ship-full {
+  display: none;
+}
 body.training #score,
 body.training #score-pop,
 body.training #salvage {

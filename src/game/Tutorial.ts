@@ -42,6 +42,8 @@ export class Tutorial {
   private readonly box: HTMLElement;
   private readonly arrow: HTMLElement;
   private step = 0;
+  /** The tips for this showing (ones pointing at something hidden, like the mission box in training, are left out). */
+  private tips: Tip[] = TIPS;
   private readonly demo: ThumbDemo;
   private onDone: (() => void) | null = null;
   active = false;
@@ -70,7 +72,7 @@ export class Tutorial {
         e.stopPropagation();
         fn();
       });
-    tap('.next', () => (this.step + 1 >= TIPS.length ? this.finish() : this.show(this.step + 1)));
+    tap('.next', () => (this.step + 1 >= this.tips.length ? this.finish() : this.show(this.step + 1)));
     tap('.exit', () => this.finish());
     // Swallow touches so the game underneath doesn't get them.
     for (const ev of ['pointerdown', 'pointermove', 'touchstart']) this.el.addEventListener(ev, (e) => e.stopPropagation());
@@ -80,6 +82,11 @@ export class Tutorial {
   start(onDone: () => void): void {
     this.onDone = onDone;
     this.active = true;
+    const visible = (id: string) => {
+      const el = document.getElementById(id);
+      return !!el && el.getBoundingClientRect().width > 0;
+    };
+    this.tips = TIPS.filter((t) => t.targets.length === 0 || t.targets.some(visible));
     this.el.classList.add('visible');
     this.show(0);
   }
@@ -95,11 +102,11 @@ export class Tutorial {
 
   private show(i: number): void {
     this.step = i;
-    const tip = TIPS[i];
+    const tip = this.tips[i];
     this.demo.show(tip.demo ?? null);
-    (this.el.querySelector('.count') as HTMLElement).textContent = `${i + 1} / ${TIPS.length}`;
+    (this.el.querySelector('.count') as HTMLElement).textContent = `${i + 1} / ${this.tips.length}`;
     (this.el.querySelector('.text') as HTMLElement).textContent = tip.text;
-    (this.el.querySelector('.next') as HTMLElement).textContent = i + 1 >= TIPS.length ? "LET'S FLY ▸" : 'NEXT ▸';
+    (this.el.querySelector('.next') as HTMLElement).textContent = i + 1 >= this.tips.length ? "LET'S FLY ▸" : 'NEXT ▸';
 
     // The area to highlight.
     const W = window.innerWidth;
@@ -123,8 +130,11 @@ export class Tutorial {
     const cy = (r.y0 + r.y1) / 2;
     const bw = Math.min(320, W * 0.42);
     const bx = cx < W / 2 ? Math.min(W - bw - 16, r.x1 + 70) : Math.max(16, r.x0 - 70 - bw);
-    const by = Math.max(16, Math.min(H - 200, cy - 80));
-    Object.assign(this.box.style, { left: `${bx}px`, top: `${by}px`, width: `${bw}px` });
+    // Set the width first, then keep the whole box (however tall its text) on screen.
+    this.box.style.width = `${bw}px`;
+    const bh = this.box.offsetHeight || 200;
+    const by = Math.max(12, Math.min(H - bh - 12, cy - 80));
+    Object.assign(this.box.style, { left: `${bx}px`, top: `${by}px` });
     // Arrow: from the box edge toward the highlight's centre.
     const ax = cx < W / 2 ? bx - 46 : bx + bw + 8;
     const ay = by + 40;
