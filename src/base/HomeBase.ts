@@ -10,6 +10,8 @@ import type { ConversationUI } from './Conversation';
 import { CORRIDORS, DESTINATIONS, heightAt, HOLES, inRect, type Rect, ROOMS, roomAt, SPOTS, WALKABLE } from './Layout';
 import { LeaderboardSign } from './Leaderboard';
 import { WardrobePreview } from './WardrobePreview';
+import { ItemPreview } from './ItemPreview';
+import { contractModel, shipModel, upgradeModel } from './ShopModels';
 import { Pilot } from './Pilot';
 import { Robot } from './Robot';
 import { HELMETS, PERKS, type SaveData, SHIP_PRICES, SUITS, writeSave } from './Save';
@@ -194,6 +196,15 @@ export class HomeBase {
   private readonly board = new LeaderboardSign();
   /** The Outfitter's try-it-on preview. */
   private readonly wardrobe = new WardrobePreview();
+  /** The other shops' turntable preview of the selected item. */
+  private readonly item = new ItemPreview();
+
+  /** Open a shop with the turntable preview beside it, starting on `first`. */
+  private openPreviewShop(title: string, rows: () => ShopRow[], first: () => void): void {
+    first();
+    this.item.start();
+    this.ui.openShop(title, rows, () => this.item.stop(), this.item.el);
+  }
 
   enter(spawn: Spawn = 'wake'): void {
     this.launching = -1;
@@ -451,11 +462,17 @@ export class HomeBase {
   private openContracts(): void {
     const board = this.save.contracts;
     const who = (c: { client: string }) => c.client.toUpperCase();
-    this.ui.openShop('CONTRACT BOARD · ONE AT A TIME', () => {
+    const pv = this.item;
+    const showContract = (c: { id: string; type: string; reward: number; sector: number }) =>
+      pv.show(c.id, contractModel(c.type), `${KIND_LABEL[c.type as keyof typeof KIND_LABEL]} · SECTOR ${c.sector} · ⬢ ${c.reward}`);
+    const firstContract = board.active ?? board.offers[0];
+    this.openPreviewShop('CONTRACT BOARD · ONE AT A TIME', () => {
       const rows: ShopRow[] = [];
       const active = board.active;
       if (active) {
         rows.push({
+          selected: pv.current === active.id,
+          preview: () => showContract(active),
           name: `▶ ${active.title}`,
           text: `${active.text} <i>${KIND_LABEL[active.type]} · from ${who(active)}</i>`,
           status: `ACTIVE · SECTOR ${active.sector} · ⬢ ${active.reward}`,
@@ -468,6 +485,8 @@ export class HomeBase {
       }
       for (const c of board.offers) {
         rows.push({
+          selected: pv.current === c.id,
+          preview: () => showContract(c),
           name: c.title,
           text: `${c.text} <i>${KIND_LABEL[c.type]} · from ${who(c)}</i>`,
           status: `SECTOR ${c.sector} · ⬢ ${c.reward}`,
@@ -482,7 +501,7 @@ export class HomeBase {
       }
       if (rows.length === 0) rows.push({ name: 'No contracts posted', text: 'New jobs go up after every sortie.', status: '', button: null });
       return rows;
-    });
+    }, () => (firstContract ? showContract(firstContract) : pv.show('none', contractModel('retrieve'), 'NO CONTRACTS POSTED')));
   }
 
   /** BOLT's menu: where everyone is. Picking one lights a path there. */
@@ -772,13 +791,20 @@ export class HomeBase {
       ...crew('crimson', 'tactical'),
       pos: new THREE.Vector3(SPOTS.rook.x, heightAt(SPOTS.rook.x, SPOTS.rook.z), SPOTS.rook.z),
       shopLabel: 'UPGRADES',
-      shop: () =>
-        this.ui.openShop('QUARTERMASTER · PERMANENT UPGRADES', () =>
+      shop: () => {
+        const pv = this.item;
+        const showPerk = (p: (typeof PERKS)[number]) => {
+          const lv = save.perks[p.id] ?? 0;
+          pv.show(p.id, upgradeModel(p.id), `${p.name.toUpperCase()} · LV ${lv}/${p.costs.length}`);
+        };
+        this.openPreviewShop('QUARTERMASTER · PERMANENT UPGRADES', () =>
           PERKS.map((p): ShopRow => {
             const level = save.perks[p.id] ?? 0;
             const maxed = level >= p.costs.length;
             const cost = p.costs[level];
             return {
+              selected: pv.current === p.id,
+              preview: () => showPerk(p),
               name: p.name,
               text: p.text,
               status: `LV ${level}/${p.costs.length}`,
@@ -792,7 +818,8 @@ export class HomeBase {
               },
             };
           }),
-        ),
+        () => showPerk(PERKS[0]));
+      },
     };
     const juno: Npc = {
       id: 'juno',
@@ -824,13 +851,18 @@ export class HomeBase {
       ...crew('arctic', 'dome'),
       pos: new THREE.Vector3(SPOTS.pip.x, heightAt(SPOTS.pip.x, SPOTS.pip.z), SPOTS.pip.z),
       shopLabel: 'HANGAR',
-      shop: () =>
-        this.ui.openShop('MECHANIC · SHIPS', () =>
+      shop: () => {
+        const pv = this.item;
+        const showShip = (d: (typeof SHIP_DESIGNS)[number]) =>
+          pv.show(d.id, shipModel(d.id), `${d.name.toUpperCase()} · CARGO ${d.cargo}${save.ship === d.id ? ' · IN USE' : ''}`, 0.5);
+        this.openPreviewShop('MECHANIC · SHIPS', () =>
           SHIP_DESIGNS.map((d): ShopRow => {
             const owned = save.ships.includes(d.id);
             const selected = save.ship === d.id;
             const price = SHIP_PRICES[d.id];
             return {
+              selected: pv.current === d.id,
+              preview: () => showShip(d),
               name: d.name,
               text: `${d.blurb}. Carries ${d.cargo} cargo.`,
               status: selected ? 'IN USE' : owned ? 'OWNED' : '',
@@ -848,7 +880,8 @@ export class HomeBase {
               },
             };
           }),
-        ),
+        () => showShip(SHIP_DESIGNS.find((d) => d.id === save.ship) ?? SHIP_DESIGNS[0]));
+      },
     };
     for (const n of [bot, rook, juno, pip]) {
       n.model.root.position.copy(n.pos);
