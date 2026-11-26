@@ -291,6 +291,8 @@ export class EnemyManager {
   private readonly rand = mulberry32(99);
   private readonly tmp = new THREE.Vector3();
   private readonly tmp2 = new THREE.Vector3();
+  /** Enemies further than this from the ship are hidden (grows when the camera pulls back). */
+  cullDistance = CULL_DISTANCE;
   private readonly frustum = new THREE.Frustum();
   private readonly viewProj = new THREE.Matrix4();
   private readonly probe = new THREE.Vector3();
@@ -371,7 +373,7 @@ export class EnemyManager {
     const ctx: Ctx = { ship, shots, mortars, world: this.world, dt, onScreen, effects: this.effects, spawn, hud: this.hud };
     const sp = ship.root.position;
     for (const e of this.enemies) {
-      const far = Math.hypot(e.root.position.x - sp.x, e.root.position.z - sp.z) > CULL_DISTANCE;
+      const far = Math.hypot(e.root.position.x - sp.x, e.root.position.z - sp.z) > this.cullDistance;
       e.root.visible = !far;
       if (e.alive && (!far || e.kind !== 'turret')) e.update(ctx);
     }
