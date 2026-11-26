@@ -157,6 +157,7 @@ export class Run {
     this.takenNames.length = 0;
     this.sector = 1;
     this.lastRoundKind = null;
+    this.usedKinds.clear();
     this.kills = 0;
     this.salvage = 0;
     this.score = 0;
@@ -314,10 +315,15 @@ export class Run {
   }
 
   /** A random round type, never the same as the previous round's. */
+  /** Mission types already flown this sortie: no repeats within a run. */
+  private usedKinds = new Set<EncounterKind>();
+
   private randomRoundKind(): EncounterKind {
-    const options = ROUND_KINDS.filter((k) => k !== this.lastRoundKind);
+    let options = ROUND_KINDS.filter((k) => !this.usedKinds.has(k));
+    if (!options.length) options = ROUND_KINDS.filter((k) => k !== this.lastRoundKind); // (more missions than types)
     const kind = options[Math.floor(Math.random() * options.length)];
     this.lastRoundKind = kind;
+    this.usedKinds.add(kind);
     return kind;
   }
 
