@@ -228,7 +228,7 @@ export class Saboteur extends Enemy {
 }
 
 /** A power pylon feeding the fortress shield. */
-class Pylon extends Enemy {
+export class Pylon extends Enemy {
   readonly radius = 2.6;
   readonly kind = 'ground';
   readonly species = 'pylon';
@@ -262,7 +262,7 @@ class Pylon extends Enemy {
 }
 
 /** The fortress: shielded while any pylon stands; lobs bomb volleys at you. */
-class Fortress extends Enemy {
+export class Fortress extends Enemy {
   readonly radius = 9;
   readonly kind = 'ground';
   readonly species = 'fortress';
@@ -372,6 +372,11 @@ export abstract class Mission {
   abstract objective(): string;
   abstract blips(out: Blip[]): void;
 
+  /** True while your ship can't carry any more (crew or cargo). */
+  get full(): boolean {
+    return false;
+  }
+
   /** A health bar to show across the top (what you're protecting), or null. */
   healthBar(): { name: string; fraction: number } | null {
     return null;
@@ -467,6 +472,10 @@ class Rescue extends Mission {
       this.done = true;
       this.beacon?.retire();
     }
+  }
+
+  get full(): boolean {
+    return this.carrying >= this.capacity && this.saved + this.carrying < this.total;
   }
 
   objective(): string {
@@ -998,6 +1007,10 @@ class Cargo extends Mission {
       b.position.set((i - (this.carrying - 1) / 2) * 1.5, -2.2, 0.6);
       this.hold.add(b);
     }
+  }
+
+  get full(): boolean {
+    return this.carrying >= this.capacity && this.delivered + this.carrying < this.total;
   }
 
   objective(): string {
