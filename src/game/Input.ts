@@ -288,6 +288,8 @@ export class Input {
 
   private bindKeyboard(): void {
     window.addEventListener('keydown', (e) => {
+      // Typing in a text box (your name): leave the keys alone.
+      if ((e.target as HTMLElement | null)?.closest?.('input, textarea')) return;
       if (e.code in KEY_BUTTONS || e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
       if (!e.repeat && KEY_BUTTONS[e.code]) this.pressed.add(KEY_BUTTONS[e.code]);
       this.keys.add(e.code);

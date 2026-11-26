@@ -17,6 +17,7 @@ import { BRIEFINGS } from '../game/run/MissionModels';
 import { Pilot } from './Pilot';
 import { Robot } from './Robot';
 import { HELMETS, PERKS, type SaveData, SHIP_PRICES, SUITS, writeSave } from './Save';
+import { setPilotName } from '../content/characters';
 import { buildStation, type Collider, type SlidingDoor, STATION, type WallSegment } from './Station';
 
 const WALK_SPEED = 11;
@@ -483,6 +484,13 @@ export class HomeBase {
       return;
     }
     const n = t.npc;
+    // The first time you talk to BOLT, it asks your name (before its greeting, which uses it).
+    if (n.id === 'bot' && !this.save.nameAsked) {
+      const p0 = this.pilot.root.position;
+      n.model.root.rotation.y = Math.atan2(-(p0.x - n.pos.x), -(p0.z - n.pos.z));
+      this.askName(() => this.act(t));
+      return;
+    }
     // Face the player while talking.
     const p = this.pilot.root.position;
     n.model.root.rotation.y = Math.atan2(-(p.x - n.pos.x), -(p.z - n.pos.z));
@@ -500,6 +508,7 @@ export class HomeBase {
         { label: 'FLIGHT TRAINING', action: () => this.offerTutorial(false) },
         { label: 'MISSION BRIEFINGS', action: () => this.openBriefings() },
         { label: 'DIRECTIONS', action: () => this.convo.play('bot', this.directions()) },
+        { label: 'MY NAME', action: () => this.askName() },
         { label: 'LEAVE' },
       ]);
     } else {
@@ -508,6 +517,31 @@ export class HomeBase {
       this.convo.play(n.id, lines, [{ label: n.shopLabel!, action: () => n.shop?.() }, { label: 'LEAVE' }]);
     }
     this.updateMarkers();
+  }
+
+  /** BOLT asks your name; it's used for {callsign} in lines and on the leaderboard. */
+  private askName(then?: () => void): void {
+    this.bubbles.hideAll();
+    const first = !this.save.nameAsked;
+    this.convo.ask(
+      'bot',
+      first ? "WHAT'S YOUR NAME, PILOT?" : 'WHAT SHOULD I CALL YOU, PILOT?',
+      'YOUR NAME',
+      (name) => {
+        this.save.nameAsked = true;
+        if (name) {
+          this.save.pilotName = name;
+          setPilotName(name);
+          // Your scores on the board carry your new name.
+          for (const e of this.save.leaderboard) if (e.you) e.name = name;
+          this.board.draw(this.save.leaderboard);
+        }
+        writeSave(this.save);
+        const reply = name ? `NICE TO MEET YOU, ${name}!` : "NO PROBLEM. I'LL CALL YOU PLAYER 1. TELL ME ANY TIME: ASK FOR 'MY NAME'.";
+        this.convo.play('bot', [{ who: 'bot', mood: 'happy', text: reply }], then ? [{ label: 'OK', action: then }] : []);
+      },
+      this.save.pilotName,
+    );
   }
 
   /**

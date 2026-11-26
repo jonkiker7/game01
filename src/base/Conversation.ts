@@ -1,5 +1,5 @@
 import { audio } from '../audio/Audio';
-import { CALLSIGN, CHARACTERS, type CharacterId, type Mood } from '../content/characters';
+import { CHARACTERS, getPilotName, type CharacterId, type Mood } from '../content/characters';
 import type { Line } from '../content/dialogue';
 import { portraitUrl } from './Portraits';
 
@@ -133,7 +133,51 @@ export class ConversationUI {
     }
 
     this.speaker(line.who, line.mood ?? 'neutral');
-    this.type(line.text.replaceAll('{callsign}', CALLSIGN));
+    this.type(line.text.replaceAll('{callsign}', getPilotName()));
+  }
+
+  /**
+   * `partner` asks a question and the player types an answer (e.g. their name). `onDone` gets
+   * the text, or null if they skipped.
+   */
+  ask(partner: CharacterId, question: string, placeholder: string, onDone: (answer: string | null) => void, initial = ''): void {
+    this.queue = [];
+    this.endOptions = [];
+    this.lastSrc = { left: '', right: '' };
+    this.setPortrait('left', 'pilot', 'neutral');
+    this.setPortrait('right', partner, 'neutral');
+    this.el.classList.add('visible');
+    document.body.classList.add('in-convo');
+    this.choices.replaceChildren();
+    this.speaker(partner, 'happy');
+    this.type(question);
+    this.waitingChoice = true;
+    const form = document.createElement('form');
+    form.className = 'ask';
+    form.innerHTML = `<input maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="done" /><button type="submit">OK</button><button type="button" class="skip">SKIP</button>`;
+    const input = form.querySelector('input')!;
+    input.placeholder = placeholder;
+    input.value = initial;
+    const finish = (answer: string | null) => {
+      input.blur();
+      this.choices.replaceChildren();
+      this.close();
+      onDone(answer);
+    };
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const v = input.value.trim().toUpperCase();
+      if (v) finish(v);
+      else input.focus();
+    });
+    form.querySelector('.skip')!.addEventListener('pointerup', (e) => {
+      e.stopPropagation();
+      finish(null);
+    });
+    // Keep taps on the box from moving the conversation on.
+    for (const ev of ['pointerup', 'pointerdown']) form.addEventListener(ev, (e) => e.stopPropagation());
+    this.choices.appendChild(form);
+    window.setTimeout(() => input.focus(), 50);
   }
 
   private showChoices(options: { text: string; run: () => void }[]): void {

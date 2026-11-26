@@ -1927,3 +1927,35 @@ body.layout-edit #tutorial {
   animation: tap-pulse 0.7s ease-in-out infinite alternate;
   filter: drop-shadow(0 0 4px #ff6b6b);
 }
+
+/* ---------- BOLT asks your name: a text box in the conversation ---------- */
+#convo .ask {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+#convo .ask input {
+  flex: 1 1 160px;
+  min-width: 0;
+  padding: 9px 12px;
+  font-family: var(--display);
+  font-size: 18px; /* 16px+ so iPhones don't zoom in */
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #fff4dc;
+  background: rgba(0, 0, 0, 0.35);
+  border: 2px solid var(--gold-dim);
+  border-radius: 10px;
+  -webkit-user-select: text;
+  user-select: text;
+  pointer-events: auto;
+}
+#convo .ask input:focus {
+  outline: none;
+  border-color: var(--gold);
+}
+#convo .ask .skip {
+  opacity: 0.7;
+}
