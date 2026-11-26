@@ -3,8 +3,7 @@
  * to select it, drag it to move it, and turn or resize it with the toolbar. SAVE keeps the layout
  * on this device; COPY puts it on the clipboard so it can be made the game's default for everyone.
  *
- * Every button moves on its own. The roll crescents normally turn about BOOST's centre (so they
- * hug it); once edited they turn and resize about their own middle instead.
+ * Every button moves, turns and resizes on its own, about its own middle.
  */
 
 const KEY = 'star-rotor-controls';
