@@ -168,11 +168,8 @@ export const SEALED: SealedDoor[] = [
 ];
 
 /** Signs over doorways (position just inside the doorway, label). */
-export const SIGNS: { x: number; z: number; text: string }[] = [
-  { x: 20, z: -1.5, text: 'BOUTIQUE ▶' },
-  { x: 0, z: 19, text: '▼ QUARTERS · DECK 4' },
-  { x: -7, z: 21.5, text: '◀ PILOT QUARTERS' },
-];
+// (Empty for now: room names are getting a new treatment.)
+export const SIGNS: { x: number; z: number; text: string }[] = [];
 
 // Key spots.
 export const SPOTS = {
