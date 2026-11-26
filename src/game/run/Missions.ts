@@ -594,11 +594,15 @@ class Escort extends Mission {
       if (gap && start < 0) start = d;
       if (!gap && start >= 0) {
         // A straight span from a little before the gap to a little after it.
-        const p0 = this.along(Math.max(0, start - 4));
-        const p1 = this.along(Math.min(len, d + 3));
+        const d0 = Math.max(0, start - 4);
+        const d1 = Math.min(len, d + 3);
+        const p0 = this.along(d0);
+        const p1 = this.along(d1);
         const mx = (p0.x + p1.x) / 2;
         const mz = (p0.z + p1.z) / 2;
         const y = w.heightAt(mx, mz);
+        // The convoy drives straight across this span (the road may curve beneath it).
+        this.spans.push({ d0, d1, x0: p0.x, z0: p0.z, x1: p1.x, z1: p1.z, y });
         const span = Math.hypot(p1.x - p0.x, p1.z - p0.z);
         const bridge = new THREE.Group();
         const deck = new THREE.Mesh(new THREE.BoxGeometry(7.5, 0.8, span), deckMat);
@@ -627,8 +631,21 @@ class Escort extends Mission {
     }
   }
 
+  /** Bridge spans along the route: where they start and end, and the deck's height. */
+  private readonly spans: { d0: number; d1: number; x0: number; z0: number; x1: number; z1: number; y: number }[] = [];
+
   private place(): void {
-    const p = this.along(this.progress * this.routeLen);
+    const d = this.progress * this.routeLen;
+    const span = this.spans.find((s) => d >= s.d0 && d <= s.d1);
+    if (span) {
+      // On a bridge: follow the deck in a straight line, at the deck's height.
+      const k = (d - span.d0) / (span.d1 - span.d0 || 1);
+      this.pos.set(span.x0 + (span.x1 - span.x0) * k, span.y, span.z0 + (span.z1 - span.z0) * k);
+      this.convoy.position.copy(this.pos);
+      this.convoy.rotation.y = approachAngle(this.convoy.rotation.y, Math.atan2(-(span.x1 - span.x0), -(span.z1 - span.z0)), 0.15);
+      return;
+    }
+    const p = this.along(d);
     this.pos.set(p.x, this.d.world.heightAt(p.x, p.z), p.z);
     this.convoy.position.copy(this.pos);
     this.convoy.rotation.y = approachAngle(this.convoy.rotation.y, p.yaw, 0.15);
@@ -702,31 +719,48 @@ class Sabotage extends Mission {
 
   protected setup(): void {
     this.fortress = this.d.enemies.add(new Fortress(this.hpMul), this.cx, this.cz) as Fortress;
-    const ground = this.d.world.heightAt(this.cx, this.cz);
     for (let i = 0; i < 3; i++) {
       const a = (i / 3) * Math.PI * 2 + Math.random() * 0.6;
       const r = this.R * (0.45 + Math.random() * 0.3);
       const x = this.cx + Math.cos(a) * r;
       const z = this.cz + Math.sin(a) * r;
       this.pylons.push(this.d.enemies.add(new Pylon(this.hpMul), x, z) as Pylon);
-      // Power link from the pylon to the fortress.
-      const py = this.d.world.heightAt(x, z) + 14;
-      const fy = ground + 12;
-      const len = Math.hypot(this.cx - x, fy - py, this.cz - z);
+      // Power link from the pylon to the fortress (a unit-length beam, stretched every frame).
       const link = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.35, 0.35, len, 6, 1, true),
+        new THREE.CylinderGeometry(0.35, 0.35, 1, 6, 1, true),
         glow(CYAN, { transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.AdditiveBlending }, 1.4),
       );
-      link.position.set((x + this.cx) / 2, (py + fy) / 2, (z + this.cz) / 2);
-      link.lookAt(this.cx, fy, this.cz);
-      link.rotateX(Math.PI / 2);
       this.links.push(link);
       this.group.add(link);
+    }
+    this.placeLinks();
+  }
+
+  private readonly linkFrom = new THREE.Vector3();
+  private readonly linkTo = new THREE.Vector3();
+
+  /**
+   * Stretch each beam between where its pylon and the fortress actually are. (Spawning can
+   * nudge them onto solid rock, so the spot they were asked for isn't always where they stand.)
+   */
+  private placeLinks(): void {
+    const f = this.fortress.root.position;
+    this.linkTo.set(f.x, this.d.world.heightAt(f.x, f.z) + 12, f.z);
+    for (const [i, p] of this.pylons.entries()) {
+      const link = this.links[i];
+      const q = p.root.position;
+      this.linkFrom.set(q.x, this.d.world.heightAt(q.x, q.z) + 14, q.z);
+      const len = this.linkFrom.distanceTo(this.linkTo);
+      link.position.addVectors(this.linkFrom, this.linkTo).multiplyScalar(0.5);
+      link.scale.set(1, Math.max(0.01, len), 1);
+      link.lookAt(this.linkTo);
+      link.rotateX(Math.PI / 2);
     }
   }
 
   update(dt: number): void {
     this.time += dt;
+    this.placeLinks();
     for (const [i, p] of this.pylons.entries()) {
       this.links[i].visible = p.alive;
       (this.links[i].material as THREE.MeshBasicMaterial).opacity = 0.4 + Math.sin(this.time * 8 + i) * 0.2;
