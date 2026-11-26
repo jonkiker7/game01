@@ -4,6 +4,7 @@ import type { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPas
 import type { Halos } from '../game/Halos';
 import type { ShadowMode, SunShadows } from '../game/Shadows';
 import { TUNING } from '../game/Tuning';
+import { CAMERA_DISTANCE } from '../game/CameraRig';
 import { CANYON_FOG } from '../game/World';
 
 /**
@@ -68,7 +69,7 @@ const LOOK_DEFAULTS = {
   canyonFogDensity: CANYON_FOG.density,
   canyonFogHeight: CANYON_FOG.height,
   vignetteSize: 62,
-  cameraDistance: 1,
+  cameraDistance: CAMERA_DISTANCE,
 };
 
 type Look = typeof LOOK_DEFAULTS;
