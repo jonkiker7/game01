@@ -1598,3 +1598,49 @@ body.mode-base #btn-pause {
   font-size: 15px;
   color: var(--gold);
 }
+
+/* Speech bubbles over the crew in the base. */
+.speech {
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 6px 11px;
+  border-radius: 12px;
+  background: #fff8ea;
+  color: #2a1d33;
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  opacity: 0;
+  margin-top: -10px;
+  transition: opacity 0.18s;
+}
+.speech::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  margin-left: -7px;
+  border: 7px solid transparent;
+  border-bottom: 0;
+  border-top-color: #fff8ea;
+}
+.speech.show {
+  opacity: 1;
+  animation: speech-pop 0.25s ease-out;
+}
+@keyframes speech-pop {
+  from {
+    scale: 0.6;
+  }
+  to {
+    scale: 1;
+  }
+}
+body:not(.mode-base) .speech {
+  display: none;
+}

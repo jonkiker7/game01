@@ -10,6 +10,7 @@ import type { ConversationUI } from './Conversation';
 import { CORRIDORS, DESTINATIONS, heightAt, HOLES, inRect, type Rect, ROOMS, roomAt, SPOTS, WALKABLE } from './Layout';
 import { LeaderboardSign } from './Leaderboard';
 import { WardrobePreview } from './WardrobePreview';
+import { SpeechBubbles } from './SpeechBubbles';
 import { ItemPreview } from './ItemPreview';
 import { contractModel, shipModel, upgradeModel } from './ShopModels';
 import { Pilot } from './Pilot';
@@ -194,6 +195,13 @@ export class HomeBase {
 
   /** Arrive at the base: wake up in your quarters (first load) or step off the ship (after a sortie). */
   private readonly board = new LeaderboardSign();
+  /** "Hello!" bubbles over the crew as you walk up. */
+  private readonly bubbles = new SpeechBubbles(document.getElementById('hud')!);
+
+  /** Hide the bubbles (when leaving the base). */
+  leave(): void {
+    this.bubbles.hideAll();
+  }
   /** The Outfitter's try-it-on preview. */
   private readonly wardrobe = new WardrobePreview();
   /** The other shops' turntable preview of the selected item. */
@@ -292,6 +300,9 @@ export class HomeBase {
       this.room = room.id;
       this.ui.toast(room.name, room.subtitle);
     }
+
+    // Speech bubbles as you walk up to someone (quiet while a menu or conversation is open).
+    this.bubbles.update(dt, p, this.camera, this.busy);
 
     // What's in reach?
     this.target = null;
@@ -893,6 +904,7 @@ export class HomeBase {
       n.markerY += n.pos.y;
       n.marker.position.set(n.pos.x, n.markerY, n.pos.z);
       this.scene.add(n.model.root, n.marker);
+      this.bubbles.add(n.id, new THREE.Vector3(n.pos.x, n.markerY + (n.id === 'bot' ? 2.6 : 1.2), n.pos.z));
       if (n.id !== 'bot') this.colliders.push({ x: n.pos.x, z: n.pos.z, r: 1.1 });
       this.npcs.push(n);
     }
