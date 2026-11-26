@@ -125,6 +125,11 @@ export class MusicPlayer {
 
   constructor(private readonly bus: Bus) {}
 
+  /** The song playing now (null when silent). */
+  get playingId(): SongId | null {
+    return this.current?.id ?? null;
+  }
+
   /** Use a recording instead of the built-in song. */
   setFile(id: SongId, buf: AudioBuffer): void {
     this.files.set(id, buf);

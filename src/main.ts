@@ -39,6 +39,7 @@ import { Ship } from './game/Ship';
 import { TUNING } from './game/Tuning';
 import { Halos } from './game/Halos';
 import { Tutorial } from './game/Tutorial';
+import { applySavedControlLayout, openControlLayoutEditor } from './game/ControlLayout';
 import { ShadowBaker, type ShadowMode, SunShadows } from './game/Shadows';
 import { isShipDesign } from './game/ShipDesigns';
 import { World } from './game/World';
@@ -385,6 +386,15 @@ function showDevPanel(on: boolean): void {
           }),
         ),
       setProps: (on) => world.setProps(on),
+      editControls: () => {
+        const was = menuPaused;
+        menuPaused = true; // hold the world still while the buttons are moved
+        input.releaseAll();
+        openControlLayoutEditor(() => {
+          menuPaused = was;
+          input.releaseAll();
+        });
+      },
       resetProgress: () => {
         save.salvage = 0;
         save.perks = {};
@@ -405,12 +415,28 @@ const showSound = () => {
   soundBtn.classList.toggle('off', audio.volumes.muted);
 };
 showSound();
+// Browsers only allow sound after a tap, so the game opens on TAP TO START: that tap starts the
+// music straight away. The speaker pulses if sound still isn't running.
+if (!new URLSearchParams(location.search).has('debug')) {
+  document.body.insertAdjacentHTML('beforeend', '<div id="tap-start"><b>STAR ROTOR</b><span>TAP TO START</span></div>');
+  const tap = $('tap-start');
+  const go = (e: Event) => {
+    e.stopPropagation();
+    tap.classList.add('gone');
+    window.setTimeout(() => tap.remove(), 500);
+  };
+  tap.addEventListener('pointerup', go);
+  tap.addEventListener('pointerdown', (e) => e.stopPropagation());
+}
+window.setInterval(() => soundBtn.classList.toggle('waiting', !audio.volumes.muted && audio.status !== 'playing'), 1000);
 soundBtn.addEventListener('pointerdown', (e) => {
   e.stopPropagation();
   audio.setVolumes({ muted: !audio.volumes.muted });
   showSound();
   audio.play('uiTap');
 });
+
+applySavedControlLayout(); // a layout saved from the dev panel's editor
 
 // ---------- Pause menu ----------
 const pauseMenu = new PauseMenu($('hud'));

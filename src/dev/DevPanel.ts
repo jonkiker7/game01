@@ -39,6 +39,8 @@ export interface DevHooks {
   getGlow: () => 'auto' | 'full' | 'light' | 'halos' | 'off';
   halos: Halos;
   setProps: (on: boolean) => void;
+  /** Open the on-screen control layout editor. */
+  editControls: () => void;
   /** Wipe salvage and Rook's permanent upgrades (for testing). */
   resetProgress: () => void;
 }
@@ -214,6 +216,7 @@ export function openDevPanel(h: DevHooks): void {
   swarm.add(TUNING.swarmers, 'damage', 0, 30, 1).name('damage').onChange(changed);
   swarm.add(TUNING.swarmers, 'restMin', 0.2, 6, 0.1).name('rest between dives s').onChange(changed);
 
+  gui.add({ edit: () => h.editControls() }, 'edit').name('🎮 Edit control layout');
   gui
     .add(
       {

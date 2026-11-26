@@ -80,14 +80,20 @@ class AudioEngine {
     const events = ['pointerdown', 'pointerup', 'touchend', 'keydown'];
     const unlock = () => this.start();
     for (const e of events) window.addEventListener(e, unlock, true);
+    // iPhones mute web audio with the silent switch unless the page says it plays media.
+    const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession;
+    if (session) session.type = 'playback';
     document.addEventListener('visibilitychange', () => {
       if (!this.bus) return;
       if (document.hidden) void this.bus.ctx.suspend();
       else void this.bus.ctx.resume();
     });
     // And keep nudging it awake while the app is open (works without a touch on most browsers).
+    // It also checks the music is really playing the song it should (and restarts it if not).
     window.setInterval(() => {
-      if (this.bus && !document.hidden && this.bus.ctx.state !== 'running') void this.bus.ctx.resume();
+      if (!this.bus || document.hidden) return;
+      if (this.bus.ctx.state !== 'running') void this.bus.ctx.resume();
+      else if (this.wantSong && this.music && this.music.playingId !== this.wantSong) this.music.play(this.wantSong);
     }, 1000);
     void this.loadFiles();
   }
@@ -130,7 +136,10 @@ class AudioEngine {
   /** Create the audio graph (on the first touch). */
   private start(): void {
     if (this.bus) {
-      if (this.bus.ctx.state !== 'running' && !document.hidden) void this.bus.ctx.resume();
+      if (this.bus.ctx.state !== 'running' && !document.hidden) {
+        void this.bus.ctx.resume();
+        this.blip(this.bus.ctx);
+      }
       return;
     }
     const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -210,6 +219,20 @@ class AudioEngine {
     if (this.wantSong) this.music.play(this.wantSong);
     this.setDucked(this.ducked);
     void ctx.resume();
+    this.blip(ctx);
+  }
+
+  /** A silent sound played inside the tap: older iPhones only unlock audio once something plays. */
+  private blip(ctx: AudioContext): void {
+    const src = ctx.createBufferSource();
+    src.buffer = ctx.createBuffer(1, 1, 22050);
+    src.connect(ctx.destination);
+    src.start(0);
+  }
+
+  /** 'playing' once sound is running; 'waiting' until the browser allows it (needs a tap). */
+  get status(): 'playing' | 'waiting' {
+    return this.bus?.ctx.state === 'running' ? 'playing' : 'waiting';
   }
 
   /** Play a sound effect (your file if there is one, otherwise the synthesized one). */
