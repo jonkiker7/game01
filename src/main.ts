@@ -41,6 +41,7 @@ import { Halos } from './game/Halos';
 import { Tutorial } from './game/Tutorial';
 import { applySavedControlLayout, openControlLayoutEditor } from './game/ControlLayout';
 import { readChoice, writeChoice } from './game/Choices';
+import { setPilotName } from './content/characters';
 import { ShadowBaker, type ShadowMode, SunShadows } from './game/Shadows';
 import { isShipDesign } from './game/ShipDesigns';
 import { World } from './game/World';
@@ -128,6 +129,7 @@ const effects = new Effects(scene, (x, z) => world.heightAt(x, z));
 // Pick the ship design with ?ship=a|b|c|d (see designs.html); defaults to the Manta.
 const shipParam = new URLSearchParams(location.search).get('ship');
 const save = loadSave();
+setPilotName(save.pilotName); // the name you gave BOLT (PLAYER 1 until then)
 const ship = new Ship(scene, isShipDesign(shipParam) ? shipParam : save.ship);
 const missiles = new MissileSystem(scene, world, effects);
 const aim = new AimIndicator(scene);

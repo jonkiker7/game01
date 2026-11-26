@@ -1,3 +1,4 @@
+import { getPilotName } from '../content/characters';
 import type { ShipDesignId } from '../game/ShipDesigns';
 import type { Stats } from '../game/run/Upgrades';
 import { CONTRACT_TEMPLATES, type ContractClient, contractReward, type ContractType } from '../content/contracts';
@@ -33,6 +34,9 @@ export interface SaveData {
   best: number;
   /** Whether you've been offered the flight tutorial (asked once, on your first launch). */
   tutorialAsked: boolean;
+  /** The name you gave BOLT ('' = not given: you're PLAYER 1), and whether BOLT has asked. */
+  pilotName: string;
+  nameAsked: boolean;
   /** The station's leaderboard (top 10), you and other pilots. */
   leaderboard: LeaderEntry[];
   deaths: number;
@@ -57,8 +61,6 @@ export interface LeaderEntry {
   you?: boolean;
 }
 
-/** Your name on the leaderboard until callsigns can be entered. */
-export const PLAYER_NAME = 'PLAYER 1';
 const BOARD_SIZE = 10;
 
 /** Other pilots already on the board, so there's something to beat. */
@@ -78,7 +80,7 @@ const SEED_LEADERBOARD: LeaderEntry[] = [
 /** Add a sortie's score to the leaderboard; returns your rank (1-based) or 0 if it didn't place. */
 export function addToLeaderboard(save: SaveData, score: number): number {
   if (score <= 0) return 0;
-  const entry: LeaderEntry = { name: PLAYER_NAME, score, you: true };
+  const entry: LeaderEntry = { name: getPilotName(), score, you: true };
   const board = [...save.leaderboard, entry].sort((a, b) => b.score - a.score).slice(0, BOARD_SIZE);
   save.leaderboard = board;
   return board.indexOf(entry) + 1;
@@ -97,6 +99,8 @@ function fresh(): SaveData {
     lastRun: null,
     best: 0,
     tutorialAsked: false,
+    pilotName: '',
+    nameAsked: false,
     leaderboard: SEED_LEADERBOARD.map((e) => ({ ...e })),
     runs: 0,
     wins: 0,
