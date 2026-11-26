@@ -17,7 +17,7 @@ const TIPS: Tip[] = [
   { text: 'These buttons fire.', targets: ['btn-gun'] },
   { text: 'Hold this to charge up and aim a missile shot.', targets: ['btn-missile'] },
   { text: 'Your Nova can be blasted periodically.', targets: ['btn-special'] },
-  { text: 'Boost and roll can be used to get away.', targets: ['btn-roll-l', 'btn-boost', 'btn-roll-r'] },
+  { text: 'Boost and roll can be used to get away. The curved buttons beside BOOST barrel-roll you left or right.', targets: ['btn-roll-l', 'btn-boost', 'btn-roll-r'] },
   { text: 'You are temporarily invulnerable during a boost or a roll.', targets: ['btn-roll-l', 'btn-boost', 'btn-roll-r'] },
   { text: 'Use your radar to find objectives.', targets: ['radar'] },
   { text: 'Red targets need to be destroyed.', targets: ['radar'] },

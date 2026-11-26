@@ -112,10 +112,12 @@ body {
   box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.35), inset 0 0 12px rgba(0, 0, 0, 0.5);
   transition: transform 0.08s, filter 0.08s;
   overflow: hidden;
+  /* Each button is tilted a little to follow the thumb's arc. */
+  transform: rotate(var(--tilt, 0deg)) scale(var(--press, 1));
 }
 
 .btn.pressed {
-  transform: scale(0.9);
+  --press: 0.9;
   filter: brightness(1.5);
   border-color: var(--gold);
 }
@@ -127,45 +129,77 @@ body {
 }
 
 #btn-gun {
-  right: 24px;
-  bottom: 24px;
+  right: 15px;
+  bottom: 33px;
+  --tilt: -20deg;
 }
 #btn-missile {
-  right: 124px;
-  bottom: 30px;
+  right: 111px;
+  bottom: 9px;
+  --tilt: -15deg;
 }
-/* Boost in the middle, a barrel roll button on each side. */
+/* Boost in the middle, a crescent barrel-roll button hugging each side of it. The whole
+   group is tilted to follow the thumb's arc (the rolls turn about BOOST's centre). */
 #btn-boost {
-  right: 64px;
-  bottom: 124px;
+  right: 44px;
+  bottom: 132px;
+  --tilt: -22deg;
 }
 #btn-roll-l,
 #btn-roll-r {
-  bottom: 130px;
-  width: 46px;
-  height: 46px;
-  flex-direction: column;
-  font-size: 20px;
+  bottom: 128px;
+  width: 31px;
+  height: 66px;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background: none;
+  font-size: 18px;
   line-height: 1;
+  --tilt: -22deg;
+  overflow: visible;
 }
 #btn-roll-l {
-  right: 128px;
+  right: 99px;
+  transform-origin: 57px 33px;
+  clip-path: path('M8.9 8.5A54 54 0 0 0 8.9 57.5A10 10 0 0 0 26.7 48.4A34 34 0 0 1 26.7 17.6A10 10 0 0 0 8.9 8.5Z');
 }
 #btn-roll-r {
-  right: 12px;
+  right: 16px;
+  transform-origin: -26px 33px;
+  clip-path: path('M22.1 8.5A54 54 0 0 1 22.1 57.5A10 10 0 0 1 4.3 48.4A34 34 0 0 0 4.3 17.6A10 10 0 0 1 22.1 8.5Z');
 }
-.btn-roll small {
-  font-size: 8px;
-  letter-spacing: 0.08em;
-  margin-top: 1px;
+.btn-roll svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
 }
-/* Roll cooldown: the same sweeping wedge as boost. */
+.btn-roll path {
+  fill: rgba(110, 20, 40, 0.78);
+  stroke: var(--gold-dim);
+  stroke-width: 4; /* half of it is clipped away: a 2px rim like the round buttons */
+}
+.btn-roll.pressed path {
+  stroke: var(--gold);
+}
+.btn-roll span {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+#btn-roll-l span {
+  left: 13px;
+}
+#btn-roll-r span {
+  left: 18px;
+}
+/* Roll cooldown: a dark shade that drains away as the roll recharges. */
 .btn-roll::after {
   content: '';
   position: absolute;
   inset: 0;
-  border-radius: 50%;
-  background: conic-gradient(rgba(0, 0, 0, 0.65) calc(var(--cd, 0) * 360deg), transparent 0);
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.65) calc(var(--cd, 0) * 100%), transparent 0);
 }
 
 /* ---------- Aim sticks (appear around GUN / MSL while held) ---------- */
@@ -200,8 +234,9 @@ body {
 }
 
 #btn-special {
-  right: 186px;
-  bottom: 128px;
+  right: 154px;
+  bottom: 91px;
+  --tilt: -12deg;
   width: 52px;
   height: 52px;
   font-size: 10px;
@@ -508,8 +543,8 @@ body {
 /* ---------- Missile ammo pips around the MSL button ---------- */
 #msl-pips {
   position: absolute;
-  right: 124px;
-  bottom: 30px;
+  right: 111px;
+  bottom: 9px;
   width: 58px;
   height: 58px;
   pointer-events: none;
@@ -832,6 +867,7 @@ body:not(.mode-base) #base-salvage {
 }
 
 body.mode-base #btn-gun {
+  --tilt: 0deg;
   font-size: 13px;
   transition: opacity 0.2s, transform 0.08s;
 }
