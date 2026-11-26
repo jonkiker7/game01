@@ -172,18 +172,39 @@ export class Hud {
   }
 
   /**
-   * Size the big title so its text spans 85% of the screen's width (like the area titles in
-   * Control: huge, over everything).
+   * Make the big title fill 85% of the screen, both ways (like the area titles in Control):
+   * try every way of breaking it into lines, and keep whichever lets the text be biggest.
    */
   private fitWide(): void {
     const m = this.message;
-    const probe = document.createElement('span');
-    probe.textContent = m.textContent;
-    probe.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;font-size:100px;letter-spacing:0.08em;font-family:var(--display);font-weight:900';
-    m.appendChild(probe);
-    const w = probe.getBoundingClientRect().width;
-    probe.remove();
-    if (w > 0) m.style.fontSize = `${Math.min((100 * 0.85 * window.innerWidth) / w, window.innerHeight * 0.4)}px`;
+    const words = (m.textContent ?? '').split(' ').filter(Boolean);
+    if (!words.length) return;
+    const ctx = document.createElement('canvas').getContext('2d')!;
+    ctx.font = `900 100px ${getComputedStyle(m).fontFamily}`;
+    const SPACING = 0.08; // letter-spacing (em), as in the CSS
+    const LINE = 1.05; // line height (em)
+    const width = (line: string) => ctx.measureText(line).width + line.length * SPACING * 100;
+    const W = window.innerWidth * 0.85;
+    const H = window.innerHeight * 0.85;
+    let best = { size: 0, lines: [words.join(' ')] };
+    // Every split of the words into lines (titles are short, so this is quick).
+    const n = words.length;
+    for (let mask = 0; mask < 1 << (n - 1); mask++) {
+      const lines: string[] = [];
+      let cur = words[0];
+      for (let i = 1; i < n; i++) {
+        if (mask & (1 << (i - 1))) {
+          lines.push(cur);
+          cur = words[i];
+        } else cur += ' ' + words[i];
+      }
+      lines.push(cur);
+      const widest = Math.max(...lines.map(width));
+      const size = Math.min((W / widest) * 100, H / (lines.length * LINE));
+      if (size > best.size) best = { size, lines };
+    }
+    m.replaceChildren(...best.lines.flatMap((l, i) => (i ? [document.createElement('br'), l] : [l])));
+    m.style.fontSize = `${best.size}px`;
   }
 
   /** Brief green glow at the screen edges when armor is restored. */
