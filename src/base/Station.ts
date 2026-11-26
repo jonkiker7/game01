@@ -638,15 +638,27 @@ function concourse(g: THREE.Group, parts: StationParts, m: Mats): void {
   g.add(directory);
   parts.walls.push({ obj: directory, x: -18, z: 7, cut: 1 });
 
-  // Benches beside the light well, and plants.
-  for (const [x, z] of [[-11, 7], [11, 7]] as const) {
+  // The station logo inlaid in the floor, where you start.
+  const logo = new THREE.Mesh(new THREE.CircleGeometry(5, 64), new THREE.MeshBasicMaterial({ map: logoTexture(), transparent: true, toneMapped: false }));
+  logo.rotation.x = -Math.PI / 2;
+  logo.position.set(0, 0.03, 5.5);
+  logo.userData.noOutline = true;
+  logo.userData.noHalo = true;
+  const logoRing = new THREE.Mesh(new THREE.RingGeometry(5, 5.45, 64), glow(STATION.amber, { side: THREE.DoubleSide }, 1.3));
+  logoRing.rotation.x = -Math.PI / 2;
+  logoRing.position.set(0, 0.04, 5.5);
+  logoRing.userData.noOutline = true;
+  g.add(logo, logoRing);
+
+  // Benches facing the logo, and plants.
+  for (const [x, z] of [[-6.6, 14], [6.6, 14]] as const) {
     const bench = new THREE.Mesh(new THREE.CapsuleGeometry(0.7, 4, 4, 10), m.orange);
-    bench.rotation.x = Math.PI / 2;
+    bench.rotation.z = Math.PI / 2;
     bench.position.set(x, 0.7, z);
     g.add(bench);
-    parts.colliders.push({ x, z: z - 1.6, r: 1 }, { x, z: z + 1.6, r: 1 });
+    parts.colliders.push({ x: x - 1.6, z, r: 1 }, { x: x + 1.6, z, r: 1 });
   }
-  for (const [x, z] of [[-16, 14], [16, 14], [14, -11], [-14, -11]] as const) plant(g, parts, m, x, z);
+  for (const [x, z] of [[-3.2, 14.5], [3.2, 14.5], [14, -11], [-14, -11]] as const) plant(g, parts, m, x, z);
 
   // Holographic station map spinning over a plinth.
   const plinth = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.5, 1, 16), m.cream);
@@ -1144,4 +1156,58 @@ function planetTexture(colors: string[], banded = false): THREE.CanvasTexture {
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
+}
+
+/** The game's logo for the Concourse floor: a gold emblem with the name around it. */
+function logoTexture(): THREE.CanvasTexture {
+  const S = 1024;
+  const c = document.createElement('canvas');
+  c.width = c.height = S;
+  const g = c.getContext('2d')!;
+  const mid = S / 2;
+  // Dark inlay with rings.
+  g.fillStyle = '#1d1a33';
+  g.beginPath();
+  g.arc(mid, mid, mid, 0, Math.PI * 2);
+  g.fill();
+  g.strokeStyle = '#e2733a';
+  g.lineWidth = 18;
+  g.beginPath();
+  g.arc(mid, mid, mid - 30, 0, Math.PI * 2);
+  g.stroke();
+  g.strokeStyle = 'rgba(111, 247, 255, 0.7)';
+  g.lineWidth = 6;
+  g.beginPath();
+  g.arc(mid, mid, mid - 62, 0, Math.PI * 2);
+  g.stroke();
+  // A four-bladed rotor star in the middle.
+  g.save();
+  g.translate(mid, mid - 40);
+  g.fillStyle = '#f2c46d';
+  for (let i = 0; i < 4; i++) {
+    g.rotate(Math.PI / 2);
+    g.beginPath();
+    g.moveTo(0, -250);
+    g.quadraticCurveTo(60, -80, 0, 0);
+    g.quadraticCurveTo(-60, -80, 0, -250);
+    g.fill();
+  }
+  g.fillStyle = '#6ff7ff';
+  g.beginPath();
+  g.arc(0, 0, 46, 0, Math.PI * 2);
+  g.fill();
+  g.restore();
+  // The name.
+  g.fillStyle = '#f2c46d';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.font = '900 118px Georgia, serif';
+  g.fillText('STAR ROTOR', mid, mid + 300);
+  g.font = '700 44px Georgia, serif';
+  g.fillStyle = '#9ef3ff';
+  g.fillText('HALCYON STATION', mid, mid + 380);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
 }

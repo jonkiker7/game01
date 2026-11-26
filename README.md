@@ -185,8 +185,9 @@ depths of the station. Many doors to the rest of the station are sealed (for now
 You wake up in your **Pilot Quarters** (south-west). Walk with the left stick; the action button
 says **TALK** near someone and **LAUNCH** at your ship. The room's name shows as you walk in.
 
-- **Concourse:** the grand hub in the middle (twice the ceiling height, columns, a balcony and a
-  light well down to the reactor), with the **information desk** run by **BOLT**, a robot.
+- **Concourse:** the grand hub in the middle (twice the ceiling height, columns, a balcony, and two
+  wide openings on either side looking down into the station), with the **information desk** run by
+  **BOLT**, a robot. You start each session on the **STAR ROTOR** logo in the middle of its floor.
   Ask BOLT where anyone is: picking a destination lights a green arrow at your feet that leads you
   through the doorways, and a beacon over the destination.
 - **Armory** (west), **Boutique** (east), **Hangar Bay** (north, with your ship on the pad).

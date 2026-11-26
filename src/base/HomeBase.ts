@@ -213,7 +213,7 @@ export class HomeBase {
     this.pilot.root.scale.setScalar(1);
     const at = SPOTS[spawn];
     this.pilot.root.position.set(at.x, heightAt(at.x, at.z), at.z);
-    this.pilot.root.rotation.y = spawn === 'landed' ? Math.PI : -Math.PI / 2; // toward the door
+    this.pilot.root.rotation.y = spawn === 'landed' ? Math.PI : 0; // landed: toward the door; waking: facing BOLT's desk
     this.parkShip();
     this.focus.copy(this.pilot.root.position);
     this.focus.y += 1.6;
@@ -378,7 +378,7 @@ export class HomeBase {
   /** Each wall piece's bounds in the world (walls never move, so measured once). */
   private wallBoxes: THREE.Box3[] | null = null;
   private readonly ray = new THREE.Ray();
-  private readonly sightPoints = Array.from({ length: 6 }, () => new THREE.Vector3());
+  private readonly sightPoints = Array.from({ length: 8 }, () => new THREE.Vector3());
   private readonly hitPoint = new THREE.Vector3();
 
   /**
@@ -405,6 +405,10 @@ export class HomeBase {
     pts[3].set(at.x + rx, at.y + 1.3, at.z + rz);
     pts[4].set(at.x - rx, at.y + 1.3, at.z - rz);
     pts[5].set(at.x, at.y + 4, at.z);
+    // And the floor just in front of you (toward the camera), so a tall wall doesn't hide
+    // where you're about to walk.
+    pts[6].set(at.x + 2.8, at.y + 0.2, at.z + 2.8);
+    pts[7].set(at.x + 5, at.y + 0.2, at.z + 5);
 
     this.walls.forEach((w, i) => {
       const box = this.wallBoxes![i];
