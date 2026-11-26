@@ -263,6 +263,7 @@ let mode: Mode = 'base';
 const gunBtn = $('btn-gun');
 
 function setMode(m: Mode): void {
+  if (m !== 'base') base.leave();
   mode = m;
   document.body.classList.toggle('mode-base', m === 'base');
   renderPass.scene = m === 'base' ? base.scene : scene;
