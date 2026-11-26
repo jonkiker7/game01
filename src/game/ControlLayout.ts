@@ -3,7 +3,8 @@
  * to select it, drag it to move it, and turn or resize it with the toolbar. SAVE keeps the layout
  * on this device; COPY puts it on the clipboard so it can be made the game's default for everyone.
  *
- * BOOST and its two roll crescents move, turn and resize together (the rolls hug BOOST).
+ * Every button moves on its own. The roll crescents normally turn about BOOST's centre (so they
+ * hug it); once edited they turn and resize about their own middle instead.
  */
 
 const KEY = 'star-rotor-controls';
@@ -21,7 +22,9 @@ const GROUPS: { name: string; ids: string[] }[] = [
   { name: 'GUN', ids: ['btn-gun'] },
   { name: 'MSL', ids: ['btn-missile', 'msl-pips'] },
   { name: 'NOVA', ids: ['btn-special'] },
-  { name: 'BOOST + ROLLS', ids: ['btn-boost', 'btn-roll-l', 'btn-roll-r'] },
+  { name: 'BOOST', ids: ['btn-boost'] },
+  { name: 'ROLL LEFT', ids: ['btn-roll-l'] },
+  { name: 'ROLL RIGHT', ids: ['btn-roll-r'] },
 ];
 const ALL_IDS = GROUPS.flatMap((g) => g.ids);
 
@@ -44,6 +47,7 @@ function write(id: string, p: Placement): void {
   if (!e) return;
   e.style.right = `${Math.round(p.right)}px`;
   e.style.bottom = `${Math.round(p.bottom)}px`;
+  if (ROLLS.includes(id)) e.style.transformOrigin = '50% 50%';
   if (id === 'msl-pips') {
     e.style.transform = `scale(${p.size})`; // the pips stay upright
   } else {
@@ -55,7 +59,23 @@ function write(id: string, p: Placement): void {
 function clear(id: string): void {
   const e = el(id);
   if (!e) return;
-  for (const prop of ['right', 'bottom', 'transform', '--tilt', '--size']) e.style.removeProperty(prop);
+  for (const prop of ['right', 'bottom', 'transform', 'transform-origin', '--tilt', '--size']) e.style.removeProperty(prop);
+}
+
+const ROLLS = ['btn-roll-l', 'btn-roll-r'];
+
+/** Switch a roll to turning about its own middle, without it visibly moving. */
+function ownPivot(id: string): void {
+  const e = el(id);
+  if (!e || e.style.transformOrigin) return;
+  const a = e.getBoundingClientRect();
+  e.style.transformOrigin = '50% 50%';
+  const b = e.getBoundingClientRect();
+  const p = read(id);
+  if (!p) return;
+  p.right += b.left + b.width / 2 - (a.left + a.width / 2);
+  p.bottom += b.top + b.height / 2 - (a.top + a.height / 2);
+  write(id, p);
 }
 
 function snapshot(): Layout {
@@ -81,6 +101,7 @@ export function applySavedControlLayout(): void {
 
 /** Open the editor. `onClose` runs when it's closed (saved or not). */
 export function openControlLayoutEditor(onClose: () => void): void {
+  const hadPivot = ROLLS.filter((id) => el(id)?.style.transformOrigin);
   const before = snapshot();
   const hadInline = ALL_IDS.filter((id) => el(id)?.style.right);
   let selected = GROUPS[0];
@@ -103,6 +124,7 @@ export function openControlLayoutEditor(onClose: () => void): void {
   document.body.appendChild(bar);
   const selLabel = bar.querySelector('.sel') as HTMLElement;
 
+  ROLLS.forEach(ownPivot);
   const mark = () => {
     for (const id of ALL_IDS) el(id)?.classList.toggle('layout-selected', selected.ids.includes(id));
     selLabel.textContent = `Selected: ${selected.name}`;
@@ -167,8 +189,14 @@ export function openControlLayoutEditor(onClose: () => void): void {
     rotR: () => adjust((p) => (p.tilt += 5)),
     smaller: () => adjust((p) => (p.size = Math.max(0.6, +(p.size - 0.05).toFixed(2)))),
     bigger: () => adjust((p) => (p.size = Math.min(1.6, +(p.size + 0.05).toFixed(2)))),
-    reset: () => selected.ids.forEach(clear),
-    resetAll: () => ALL_IDS.forEach(clear),
+    reset: () => {
+      selected.ids.forEach(clear);
+      ROLLS.forEach(ownPivot);
+    },
+    resetAll: () => {
+      ALL_IDS.forEach(clear);
+      ROLLS.forEach(ownPivot);
+    },
     save: () => {
       try {
         localStorage.setItem(KEY, JSON.stringify(snapshot()));
@@ -188,6 +216,8 @@ export function openControlLayoutEditor(onClose: () => void): void {
         clear(id);
         if (hadInline.includes(id)) write(id, before[id]);
       }
+      // A roll that was never edited goes back to turning about BOOST.
+      for (const id of ROLLS) if (!hadPivot.includes(id) && !hadInline.includes(id)) clear(id);
       close();
     },
   };
