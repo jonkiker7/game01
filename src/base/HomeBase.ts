@@ -9,6 +9,7 @@ import type { BaseUI, ShopRow } from './BaseUI';
 import type { ConversationUI } from './Conversation';
 import { CORRIDORS, DESTINATIONS, heightAt, HOLES, inRect, type Rect, ROOMS, roomAt, SPOTS, WALKABLE } from './Layout';
 import { LeaderboardSign } from './Leaderboard';
+import { WardrobePreview } from './WardrobePreview';
 import { Pilot } from './Pilot';
 import { Robot } from './Robot';
 import { HELMETS, PERKS, type SaveData, SHIP_PRICES, SUITS, writeSave } from './Save';
@@ -191,6 +192,8 @@ export class HomeBase {
 
   /** Arrive at the base: wake up in your quarters (first load) or step off the ship (after a sortie). */
   private readonly board = new LeaderboardSign();
+  /** The Outfitter's try-it-on preview. */
+  private readonly wardrobe = new WardrobePreview();
 
   enter(spawn: Spawn = 'wake'): void {
     this.launching = -1;
@@ -798,11 +801,21 @@ export class HomeBase {
       ...crew('midnight', 'fishbowl'),
       pos: new THREE.Vector3(SPOTS.juno.x, heightAt(SPOTS.juno.x, SPOTS.juno.z), SPOTS.juno.z),
       shopLabel: 'WARDROBE',
-      shop: () =>
-        this.ui.openShop('OUTFITTER · SUITS & HELMETS', () => [
-          ...SUITS.map((suit): ShopRow => this.cosmeticRow(suit.name, 'Suit', suit.id, suit.price, 'suits', 'suit')),
-          ...HELMETS.map((h): ShopRow => this.cosmeticRow(h.name, 'Helmet', h.id, h.price, 'helmets', 'helmet')),
-        ]),
+      shop: () => {
+        // Start the preview in what you're wearing; tapping a row tries it on.
+        const pv = this.wardrobe;
+        pv.show(save.suit, save.helmet, 'WEARING');
+        pv.start();
+        this.ui.openShop(
+          'OUTFITTER · SUITS & HELMETS',
+          () => [
+            ...SUITS.map((suit): ShopRow => this.cosmeticRow(suit.name, 'Suit', suit.id, suit.price, 'suits', 'suit')),
+            ...HELMETS.map((h): ShopRow => this.cosmeticRow(h.name, 'Helmet', h.id, h.price, 'helmets', 'helmet')),
+          ],
+          () => pv.stop(),
+          pv.el,
+        );
+      },
     };
     const pip: Npc = {
       id: 'pip',
@@ -862,6 +875,15 @@ export class HomeBase {
       status: wearing ? 'WEARING' : has ? 'OWNED' : '',
       button: wearing ? null : has ? 'WEAR' : `⬢ ${price}`,
       disabled: !has && save.salvage < price,
+      selected: (worn === 'suit' ? this.wardrobe.suit : this.wardrobe.helmet) === id,
+      // Try it on in the preview (keeping the other half of the outfit as previewed).
+      preview: () => {
+        const pv = this.wardrobe;
+        const suit = worn === 'suit' ? id : pv.suit;
+        const helmet = worn === 'helmet' ? id : pv.helmet;
+        const wearingAll = suit === save.suit && helmet === save.helmet;
+        pv.show(suit, helmet, wearingAll ? 'WEARING' : `PREVIEW · ${name.toUpperCase()}`);
+      },
       onClick: () => {
         if (!has) {
           if (save.salvage < price) return;
