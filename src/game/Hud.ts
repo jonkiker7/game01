@@ -120,18 +120,18 @@ export class Hud {
   }
 
   /** A short breakdown of points earned (e.g. when a sector is cleared). */
-  showScore(lines: [string, number][], seconds = 4): void {
-    this.scorePop.replaceChildren(
-      ...lines.map(([label, pts]) => {
-        const row = document.createElement('div');
-        const l = document.createElement('span');
-        l.textContent = label;
-        const v = document.createElement('b');
-        v.textContent = `+${Math.round(pts).toLocaleString('en-US')}`;
-        row.append(l, v);
-        return row;
-      }),
-    );
+  showScore(lines: [string, number][], totals: [string, number][] = [], seconds = 5): void {
+    const row = (label: string, pts: number, total: boolean) => {
+      const r = document.createElement('div');
+      if (total) r.className = 'total';
+      const l = document.createElement('span');
+      l.textContent = label;
+      const v = document.createElement('b');
+      v.textContent = `${total ? '' : '+'}${Math.round(pts).toLocaleString('en-US')}`;
+      r.append(l, v);
+      return r;
+    };
+    this.scorePop.replaceChildren(...lines.map(([l, p]) => row(l, p, false)), ...totals.map(([l, p]) => row(l, p, true)));
     this.scorePop.classList.add('visible');
     this.popTimer = seconds;
   }

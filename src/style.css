@@ -382,6 +382,19 @@ body {
 #score-pop b {
   color: var(--gold);
 }
+#score-pop .total {
+  border-top: 1px solid rgba(242, 196, 109, 0.35);
+  margin-top: 3px;
+  padding-top: 4px;
+}
+#score-pop .total + .total {
+  border-top: none;
+  margin-top: 0;
+  padding-top: 2px;
+}
+#score-pop .total b {
+  color: #9ef3ff;
+}
 
 #objective {
   font-family: var(--display);
@@ -1560,4 +1573,28 @@ body.mode-base #btn-pause {
   font-weight: 800;
   letter-spacing: 0.16em;
   color: #9ef3ff;
+}
+
+/* Where the sortie's points came from. */
+.end-breakdown {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  margin: 0 0 10px;
+  font-family: var(--display);
+}
+.end-breakdown div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.end-breakdown span {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: #cfc4e0;
+}
+.end-breakdown b {
+  font-size: 15px;
+  color: var(--gold);
 }
