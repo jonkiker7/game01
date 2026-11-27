@@ -2036,11 +2036,13 @@ body.layout-edit #tutorial {
 body.training #btn-exit-training {
   display: block;
 }
-/* Nothing is banked in training: no score or salvage counters, and the coach replaces the
-   mission box. */
-body.training #objective,
+/* Nothing is banked in training: no score or salvage counters. The mission box is narrower,
+   leaving room for the coach beside it. */
 body.training #ship-full {
   display: none;
+}
+body.training #objective {
+  width: 118px;
 }
 body.training #score,
 body.training #score-pop,

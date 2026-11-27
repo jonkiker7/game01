@@ -132,13 +132,15 @@ export class TrainingCoach {
     if (STEPS[this.step].done.includes(e)) this.next();
   }
 
-  /** Stretch the prompt across the top: from the armor bar to the radar (whatever the screen). */
+  /** Stretch the prompt across the top: from the armor bar to the mission box (or the radar). */
   private place(): void {
     const armor = document.getElementById('armor')?.getBoundingClientRect();
+    const box = document.getElementById('objective')?.getBoundingClientRect();
     const radar = document.getElementById('radar')?.getBoundingClientRect();
-    if (!armor || !radar || !radar.width) return;
+    const end = box && box.width ? box : radar;
+    if (!armor || !end || !end.width) return;
     const left = armor.right + 14;
-    const right = radar.left - 14;
+    const right = end.left - 12;
     Object.assign(this.panel.style, { left: `${left}px`, width: `${Math.max(200, right - left)}px` });
   }
 
