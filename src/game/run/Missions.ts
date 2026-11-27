@@ -20,7 +20,7 @@ import type { World } from '../World';
  * Defend and Escort can be failed, which ends the sortie (like being shot down).
  */
 
-export type MissionKind = 'rescue' | 'defend' | 'escort' | 'sabotage' | 'hold' | 'cargo';
+export type MissionKind = 'rescue' | 'defend' | 'escort' | 'sabotage' | 'hold' | 'cargo' | 'threats' | 'sweep' | 'rescueLite';
 
 export const MISSION_TITLES: Record<MissionKind, string> = {
   rescue: 'RESCUE THE CREW',
@@ -29,9 +29,23 @@ export const MISSION_TITLES: Record<MissionKind, string> = {
   sabotage: 'SABOTAGE THE FORTRESS',
   hold: 'HOLD THE ZONES',
   cargo: 'DELIVER THE CARGO',
+  // Warm-ups (the first missions of a sortie).
+  threats: 'ELIMINATE THE THREATS',
+  sweep: 'SALVAGE SWEEP',
+  rescueLite: 'RESCUE THE PILOTS',
 };
 
-export const MISSION_RADIUS: Record<MissionKind, number> = { rescue: 150, defend: 110, escort: 150, sabotage: 150, hold: 125, cargo: 150 };
+export const MISSION_RADIUS: Record<MissionKind, number> = {
+  rescue: 150,
+  defend: 110,
+  escort: 150,
+  sabotage: 150,
+  hold: 125,
+  cargo: 150,
+  threats: 100,
+  sweep: 120,
+  rescueLite: 110,
+};
 
 /** Missions that play on the snaking left-to-right corridor map. */
 export const CORRIDOR_MISSIONS: MissionKind[] = ['escort', 'cargo'];
@@ -385,6 +399,9 @@ export abstract class Mission {
   /** The banner when it's failed. */
   failText = 'OBJECTIVE FAILED';
 
+  /** Salvage picked up during the mission (banked when it's cleared). */
+  bonusSalvage = 0;
+
   /** Called once when failed (blow up what you were protecting). */
   onFail(): void {}
 
@@ -414,13 +431,15 @@ export abstract class Mission {
 // ---- Rescue
 
 class Rescue extends Mission {
-  readonly kind = 'rescue';
+  readonly kind: MissionKind = 'rescue';
   private readonly crew: { x: number; z: number; obj: THREE.Group; taken: boolean }[] = [];
   private carrying = 0;
   private saved = 0;
   private readonly lz = new THREE.Vector3();
   private readonly capacity = 2;
-  private total = 4;
+  protected total = 4;
+  /** How far out the crew are (fractions of the arena radius). */
+  protected spread = [0.45, 0.85];
 
   protected setup(): void {
     // The landing zone near the arena's south edge (where you come in).
@@ -431,7 +450,7 @@ class Rescue extends Mission {
     // Stranded crew: escape pods with a flare, spread around the arena.
     for (let i = 0; i < this.total; i++) {
       const a = (i / this.total) * Math.PI * 2 + Math.random() * 0.8 - Math.PI / 2;
-      const r = this.R * (0.45 + Math.random() * 0.4);
+      const r = this.R * (this.spread[0] + Math.random() * (this.spread[1] - this.spread[0]));
       const { x, z } = this.d.world.nearestRock(this.cx + Math.cos(a) * r, this.cz + Math.sin(a) * r, 3);
       const ground = this.d.world.heightAt(x, z);
       const obj = new THREE.Group();
@@ -485,6 +504,102 @@ class Rescue extends Mission {
   blips(out: Blip[]): void {
     if (this.carrying < this.capacity) for (const c of this.crew) if (!c.taken) out.push({ x: c.x, z: c.z, kind: 'reward', color: GOLD });
     if (this.carrying > 0) out.push({ x: this.lz.x, z: this.lz.z, kind: 'reward', color: GREEN });
+  }
+}
+
+// ---- Warm-ups: short, simple missions that open every sortie
+
+/** Rescue, easy: two pilots close by (no reinforcements; see Run). */
+class RescueLite extends Rescue {
+  readonly kind: MissionKind = 'rescueLite';
+  protected total = 2;
+  protected spread = [0.3, 0.5];
+}
+
+/** Shoot down a small group of drones. */
+class Threats extends Mission {
+  readonly kind = 'threats';
+  private readonly targets: Enemy[] = [];
+
+  protected setup(): void {
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2 + Math.random() * 0.6;
+      const r = this.R * (0.3 + Math.random() * 0.3);
+      this.targets.push(this.d.enemies.spawnDrone(this.cx + Math.cos(a) * r, this.cz + Math.sin(a) * r - this.R * 0.15));
+    }
+  }
+
+  private get left(): number {
+    return this.targets.filter((e) => e.alive).length;
+  }
+
+  update(dt: number): void {
+    this.time += dt;
+    if (this.left === 0) this.done = true;
+  }
+
+  objective(): string {
+    return `${this.title}\n${this.left} DRONES LEFT`;
+  }
+
+  blips(out: Blip[]): void {
+    for (const e of this.targets) if (e.alive) out.push({ x: e.root.position.x, z: e.root.position.z, kind: 'target' });
+  }
+}
+
+/** Fly through the floating salvage canisters (a couple of drones keep you honest). */
+class Sweep extends Mission {
+  readonly kind = 'sweep';
+  private readonly cans: { x: number; z: number; obj: THREE.Object3D; taken: boolean }[] = [];
+  private got = 0;
+  private readonly total = 6;
+
+  protected setup(): void {
+    const mat = glow(GOLD, {}, 1.4);
+    for (let i = 0; i < this.total; i++) {
+      const a = (i / this.total) * Math.PI * 2 + Math.random() * 0.7;
+      const r = this.R * (0.3 + Math.random() * 0.45);
+      const x = this.cx + Math.cos(a) * r;
+      const z = this.cz + Math.sin(a) * r;
+      const obj = new THREE.Group();
+      const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(1.4, 0), mat);
+      crystal.scale.set(1, 1.5, 1);
+      obj.add(crystal, pickupRing());
+      obj.children[1].position.y = -1; // the gold ring just under the crystal, at flying height
+      obj.position.set(x, this.flyY(x, z), z);
+      this.group.add(obj);
+      this.cans.push({ x, z, obj, taken: false });
+    }
+    for (let i = 0; i < 2; i++) {
+      const [x, z] = this.spot(this.R * 0.3, this.R * 0.6);
+      this.d.enemies.spawnDrone(x, z);
+    }
+  }
+
+  update(dt: number): void {
+    this.time += dt;
+    for (const c of this.cans) {
+      if (c.taken) continue;
+      c.obj.children[0].rotation.y += dt * 2;
+      c.obj.children[0].position.y = Math.sin(this.time * 2 + c.x) * 0.4;
+      if (this.shipNear(c.x, c.z, PICKUP_R)) {
+        c.taken = true;
+        c.obj.visible = false;
+        this.got++;
+        this.bonusSalvage += 10;
+        this.d.hud.show(`SALVAGE +10 · ${this.got}/${this.total}`, 1.2);
+        this.d.hud.flashHeal();
+      }
+    }
+    if (this.got >= this.total) this.done = true;
+  }
+
+  objective(): string {
+    return `${this.title}\nCOLLECTED ${this.got}/${this.total}`;
+  }
+
+  blips(out: Blip[]): void {
+    for (const c of this.cans) if (!c.taken) out.push({ x: c.x, z: c.z, kind: 'reward', color: GOLD });
   }
 }
 
@@ -1035,6 +1150,12 @@ export function createMission(kind: MissionKind, d: MissionDeps): Mission {
       return new Cargo(d);
     case 'rescue':
       return new Rescue(d);
+    case 'rescueLite':
+      return new RescueLite(d);
+    case 'threats':
+      return new Threats(d);
+    case 'sweep':
+      return new Sweep(d);
     case 'defend':
       return new Defend(d);
     case 'escort':
