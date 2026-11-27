@@ -6,6 +6,7 @@ import type { ShadowMode, SunShadows } from '../game/Shadows';
 import { TUNING } from '../game/Tuning';
 import { sameValue } from '../game/Choices';
 import { CAMERA_DISTANCE } from '../game/CameraRig';
+import { DEFAULT_ENEMY_PALETTE, ENEMY_PALETTES, type EnemyPalette, setEnemyPalette } from '../game/EnemyBase';
 import { CANYON_FOG } from '../game/World';
 
 /**
@@ -71,6 +72,7 @@ const LOOK_DEFAULTS = {
   canyonFogHeight: CANYON_FOG.height,
   vignetteSize: 62,
   cameraDistance: CAMERA_DISTANCE,
+  enemyColors: DEFAULT_ENEMY_PALETTE as EnemyPalette,
 };
 
 type Look = typeof LOOK_DEFAULTS;
@@ -127,6 +129,7 @@ export function openDevPanel(h: DevHooks): void {
     h.halos.strength = look.haloStrength;
     h.setCanyonFog(look.canyonFogColor, look.canyonFogDensity, look.canyonFogHeight);
     h.setCameraDistance(look.cameraDistance);
+    setEnemyPalette(look.enemyColors);
     const root = document.documentElement.style;
     root.setProperty('--vig', String(look.vignette));
     root.setProperty('--vig-size', `${look.vignetteSize}%`);
@@ -156,6 +159,12 @@ export function openDevPanel(h: DevHooks): void {
   light.add(look, 'sunAngle', -180, 180, 1).name('sun direction °').onChange(changed);
   light.add(look, 'sunHeight', 15, 89, 1).name('sun height °').onChange(changed);
   light.add(look, 'rimLight', 0, 3, 0.05).name('blue rim light').onChange(changed);
+
+  const enemyF = gui.addFolder('Enemies');
+  enemyF
+    .add(look, 'enemyColors', Object.keys(ENEMY_PALETTES))
+    .name('colours (new enemies)')
+    .onChange(changed);
 
   const camF = gui.addFolder('Camera');
   camF.add(look, 'cameraDistance', 0.7, 3, 0.05).name('camera distance ×').onChange(changed);

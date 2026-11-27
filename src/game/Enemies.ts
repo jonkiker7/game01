@@ -5,12 +5,9 @@ import {
   ATTACK_RANGE,
   type Ctx,
   Enemy,
-  ENEMY_ARMOR,
-  ENEMY_BODY,
-  ENEMY_GLOW,
+  ENEMY_COLORS, ENEMY_GLOW,
   type Species,
   TOWER_RANGE,
-  TOWER_STONE,
 } from './EnemyBase';
 import { addOutlines, GLOW, glow } from './materials';
 import { approachAngle, mulberry32, wrapAngle } from './math';
@@ -50,8 +47,8 @@ export class Turret extends Enemy {
     this.weight = 0;
     this.dropChance = 0.35;
     const H = TOWER_HEIGHT;
-    const stone = this.mat(TOWER_STONE, false);
-    const armor = this.mat(ENEMY_ARMOR, false);
+    const stone = this.mat(ENEMY_COLORS.stone, false);
+    const armor = this.mat(ENEMY_COLORS.armor, false);
 
     // Flared foot, tapering pillar, and buttress fins up the sides.
     const foot = new THREE.Mesh(new THREE.CylinderGeometry(3.0, 3.8, 2.2, 6), stone);
@@ -73,17 +70,17 @@ export class Turret extends Enemy {
       parts.push(band);
     }
     // Platform the gun sits on.
-    const platform = new THREE.Mesh(new THREE.CylinderGeometry(2.8, 1.8, 1.3, 6), this.mat(ENEMY_ARMOR));
+    const platform = new THREE.Mesh(new THREE.CylinderGeometry(2.8, 1.8, 1.3, 6), this.mat(ENEMY_COLORS.armor));
     platform.position.y = H + 0.1;
-    const base = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 2.3, 0.8, 6), this.mat(ENEMY_BODY));
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 2.3, 0.8, 6), this.mat(ENEMY_COLORS.body));
     base.position.y = H + 1.1;
-    const collar = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.9, 0.6, 6), this.mat(ENEMY_ARMOR));
+    const collar = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.9, 0.6, 6), this.mat(ENEMY_COLORS.armor));
     collar.position.y = H + 1.75;
     parts.push(platform, base, collar);
 
     this.head.position.y = H + 2.2;
-    const dome = new THREE.Mesh(new THREE.SphereGeometry(1.35, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), this.mat(ENEMY_ARMOR));
-    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.32, 2.2, 8), this.mat(ENEMY_BODY));
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(1.35, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), this.mat(ENEMY_COLORS.armor));
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.32, 2.2, 8), this.mat(ENEMY_COLORS.body));
     barrel.rotation.x = Math.PI / 2;
     barrel.position.set(0, 0.5, -1.5);
     this.eye = glow(ENEMY_GLOW);
@@ -141,10 +138,10 @@ export class Drone extends Enemy {
     this.radius = 1.9 * size;
     this.hitBottom = -2.5 * size;
     this.hitTop = 3 * size;
-    const core = new THREE.Mesh(new THREE.IcosahedronGeometry(1.1, 0), this.mat(ENEMY_ARMOR));
+    const core = new THREE.Mesh(new THREE.IcosahedronGeometry(1.1, 0), this.mat(ENEMY_COLORS.armor));
     const eye = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 8), glow(ENEMY_GLOW));
     eye.position.z = -0.75;
-    const spikeMat = this.mat(ENEMY_BODY);
+    const spikeMat = this.mat(ENEMY_COLORS.body);
     for (let i = 0; i < 4; i++) {
       const spike = new THREE.Mesh(new THREE.ConeGeometry(0.28, 1.3, 5), spikeMat);
       const a = (i / 4) * Math.PI * 2 + Math.PI / 4;

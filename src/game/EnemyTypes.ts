@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { type Ctx, Enemy, ENEMY_ARMOR, ENEMY_BODY, ENEMY_GLOW } from './EnemyBase';
+import { type Ctx, Enemy, ENEMY_COLORS, ENEMY_GLOW } from './EnemyBase';
 import { TUNING } from './Tuning';
 import { addOutlines, GLOW, glow } from './materials';
 import { approachAngle } from './math';
@@ -59,7 +59,7 @@ export class Swarmer extends Enemy {
     this.salvage = 1;
     this.weight = 0.25;
     this.dropChance = 0.06;
-    const body = new THREE.Mesh(new THREE.IcosahedronGeometry(0.7, 0), this.mat(ENEMY_ARMOR));
+    const body = new THREE.Mesh(new THREE.IcosahedronGeometry(0.7, 0), this.mat(ENEMY_COLORS.armor));
     const tail = new THREE.Mesh(new THREE.SphereGeometry(0.55, 8, 6), this.glowMat);
     tail.position.z = 0.75;
     tail.scale.set(1, 0.8, 1.4);
@@ -146,14 +146,14 @@ export class Lancer extends Enemy {
     super(45 * hpMul);
     this.salvage = 4;
     // A spear: long nose cone, swept fins, glowing tail.
-    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.8, 4.4, 6), this.mat(ENEMY_ARMOR));
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.8, 4.4, 6), this.mat(ENEMY_COLORS.armor));
     nose.rotation.x = -Math.PI / 2;
     nose.position.z = -1.2;
-    const hull = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.6, 1.8, 6), this.mat(ENEMY_BODY));
+    const hull = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.6, 1.8, 6), this.mat(ENEMY_COLORS.body));
     hull.rotation.x = Math.PI / 2;
     hull.position.z = 1.4;
     for (const s of [-1, 1]) {
-      const fin = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.2, 1.2), this.mat(ENEMY_BODY));
+      const fin = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.2, 1.2), this.mat(ENEMY_COLORS.body));
       fin.position.set(s * 1.3, 0, 1.4);
       fin.rotation.y = s * -0.5;
       this.body.add(fin);
@@ -247,11 +247,11 @@ export class Crawler extends Enemy {
     this.salvage = 6;
     this.weight = 1.5;
     this.dropChance = 0.35;
-    const hull = new THREE.Mesh(new THREE.BoxGeometry(4.6, 2, 5.6), this.mat(ENEMY_ARMOR));
+    const hull = new THREE.Mesh(new THREE.BoxGeometry(4.6, 2, 5.6), this.mat(ENEMY_COLORS.armor));
     hull.position.y = 2;
-    const deck = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.9, 3.6), this.mat(ENEMY_BODY));
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.9, 3.6), this.mat(ENEMY_COLORS.body));
     deck.position.y = 3.4;
-    const gun = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.45, 2.6, 8), this.mat(ENEMY_BODY));
+    const gun = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.45, 2.6, 8), this.mat(ENEMY_COLORS.body));
     gun.rotation.x = Math.PI / 2.4;
     gun.position.set(0, 4, -1.6);
     this.muzzle.position.set(0, 4.6, -2.8);
@@ -260,7 +260,7 @@ export class Crawler extends Enemy {
     this.root.add(hull, deck, gun, eye, this.muzzle);
     for (let i = 0; i < 6; i++) {
       const side = i < 3 ? -1 : 1;
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.4, 0.5), this.mat(ENEMY_BODY));
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.4, 0.5), this.mat(ENEMY_COLORS.body));
       leg.position.set(side * 3, 1, -1.8 + (i % 3) * 1.8);
       leg.rotation.z = side * -0.5;
       this.legs.push(leg);
@@ -344,9 +344,9 @@ export class Sniper extends Enemy {
   constructor(hpMul = 1) {
     super(32 * hpMul);
     this.salvage = 4;
-    const body = new THREE.Mesh(new THREE.OctahedronGeometry(1.2, 0), this.mat(ENEMY_ARMOR));
+    const body = new THREE.Mesh(new THREE.OctahedronGeometry(1.2, 0), this.mat(ENEMY_COLORS.armor));
     body.scale.set(0.8, 0.8, 1.4);
-    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.22, 3.6, 6), this.mat(ENEMY_BODY));
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.22, 3.6, 6), this.mat(ENEMY_COLORS.body));
     barrel.rotation.x = Math.PI / 2;
     barrel.position.z = -2;
     const scope = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 8), this.lens);
@@ -430,7 +430,7 @@ export class Mine extends Enemy {
     this.salvage = 0;
     this.weight = 0;
     this.dropChance = 0;
-    const core = new THREE.Mesh(new THREE.IcosahedronGeometry(1.1, 0), this.mat(ENEMY_ARMOR));
+    const core = new THREE.Mesh(new THREE.IcosahedronGeometry(1.1, 0), this.mat(ENEMY_COLORS.armor));
     const dot = new THREE.Mesh(new THREE.SphereGeometry(0.75, 10, 8), this.light);
     // A faint red danger halo showing roughly where it goes off.
     this.halo = new THREE.Mesh(
@@ -441,7 +441,7 @@ export class Mine extends Enemy {
     this.halo.userData.noOutline = true;
     this.root.add(core, dot, this.halo);
     for (let i = 0; i < 6; i++) {
-      const spike = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.8, 5), this.mat(ENEMY_ARMOR));
+      const spike = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.8, 5), this.mat(ENEMY_COLORS.armor));
       const dirs = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]][i];
       spike.position.set(dirs[0] * 1.15, dirs[1] * 1.15, dirs[2] * 1.15);
       spike.lookAt(dirs[0] * 2, dirs[1] * 2, dirs[2] * 2);
@@ -490,8 +490,8 @@ export class MineLayer extends Enemy {
   constructor(hpMul = 1) {
     super(45 * hpMul);
     this.salvage = 4;
-    const saucer = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 1.4, 0.9, 12), this.mat(ENEMY_ARMOR));
-    const dome = new THREE.Mesh(new THREE.SphereGeometry(1.1, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), this.mat(ENEMY_BODY));
+    const saucer = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 1.4, 0.9, 12), this.mat(ENEMY_COLORS.armor));
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(1.1, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), this.mat(ENEMY_COLORS.body));
     dome.position.y = 0.4;
     this.ring = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.15, 6, 20), glow('#ffb03a', {}, 1.6));
     this.ring.rotation.x = Math.PI / 2;
@@ -554,13 +554,13 @@ export class Pulsar extends Enemy {
     this.salvage = 6;
     this.weight = 1.5;
     this.dropChance = 0.35;
-    const base = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 3.2, 1.6, 8), this.mat(ENEMY_ARMOR, false));
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 3.2, 1.6, 8), this.mat(ENEMY_COLORS.armor, false));
     base.position.y = 0.8;
-    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1.2, PULSAR_HEIGHT - 1.6, 8), this.mat(ENEMY_BODY, false));
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1.2, PULSAR_HEIGHT - 1.6, 8), this.mat(ENEMY_COLORS.body, false));
     mast.position.y = 1.6 + (PULSAR_HEIGHT - 1.6) / 2;
     const orb = new THREE.Mesh(new THREE.SphereGeometry(1.4, 16, 12), this.orb);
     orb.position.y = PULSAR_HEIGHT + 0.6;
-    const cradle = new THREE.Mesh(new THREE.TorusGeometry(1.7, 0.3, 6, 16), this.mat(ENEMY_ARMOR));
+    const cradle = new THREE.Mesh(new THREE.TorusGeometry(1.7, 0.3, 6, 16), this.mat(ENEMY_COLORS.armor));
     cradle.rotation.x = Math.PI / 2;
     cradle.position.y = PULSAR_HEIGHT;
     this.root.add(base, mast, orb, cradle);
