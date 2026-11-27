@@ -5,6 +5,9 @@
  * EXIT TRAINING button is always there.
  */
 
+/** After you complete a step, how long until the next one opens (so you see what you did). */
+const STEP_DELAY_MS = 2500;
+
 export type CoachEvent = 'move' | 'gunHit' | 'kill' | 'missile' | 'boost' | 'roll' | 'nova';
 
 interface Step {
@@ -159,9 +162,25 @@ export class TrainingCoach {
 
   /** Something happened in the game (a missile fired, a boost…). */
   notify(e: CoachEvent): void {
-    if (!this.active || this.step < 0 || this.step >= STEPS.length) return;
-    if (STEPS[this.step].done.includes(e)) this.next();
+    if (!this.active || this.step < 0 || this.step >= STEPS.length || this.advancing) return;
+    if (!STEPS[this.step].done.includes(e)) return;
+    // Done! Let the move play out for a moment before the next step opens (and pauses).
+    this.advancing = true;
+    const step = this.step;
+    const count = this.panel.querySelector('.count') as HTMLElement;
+    count.textContent = '✓ NICE!';
+    this.panel.classList.add('done');
+    this.setGlow([]);
+    this.demo.show(null);
+    window.setTimeout(() => {
+      this.advancing = false;
+      this.panel.classList.remove('done');
+      if (this.active && this.step === step) this.next();
+    }, STEP_DELAY_MS);
   }
+
+  /** A step was just completed and the next one is coming up. */
+  private advancing = false;
 
   /** Stretch the prompt across the top: from the armor bar to the mission box (or the radar). */
   private place(): void {
@@ -190,6 +209,8 @@ export class TrainingCoach {
   }
 
   private next(): void {
+    this.advancing = false;
+    this.panel.classList.remove('done');
     this.step++;
     const count = this.panel.querySelector('.count') as HTMLElement;
     const text = this.panel.querySelector('.text') as HTMLElement;
