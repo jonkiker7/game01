@@ -15,7 +15,7 @@ import type { World } from './World';
  */
 export const ENEMY_PALETTES = {
   /** Bright orange: easy to spot against the jungle's greens, blues and purples. */
-  orange: { armor: '#fe8200', body: '#3b1d4a', stone: '#fe8200' },
+  orange: { armor: '#fe8200', body: '#fe002f', stone: '#fe8200' },
   /** The original dark purple. */
   purple: { armor: '#6a2f63', body: '#3b1d4a', stone: '#4a2f5e' },
 };
