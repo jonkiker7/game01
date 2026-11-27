@@ -196,6 +196,11 @@ export abstract class Enemy implements Hittable {
    * Draw this enemy `f` times bigger: every part of its model (and its hit size, so shots that
    * look like hits are hits), but not attack warnings (parts marked `userData.keepSize`).
    */
+  /** Health left, 0–1 (for health bars). */
+  get healthLeft(): number {
+    return Math.max(0, this.hp / this.maxHp);
+  }
+
   /** How much bigger than built this enemy is drawn (see growModel). */
   modelScale = 1;
 

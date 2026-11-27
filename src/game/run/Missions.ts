@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { cargoCapacity } from '../ShipDesigns';
 import type { EnemyManager } from '../Enemies';
 import { type Ctx, Enemy, ENEMY_COLORS, ENEMY_GLOW } from '../EnemyBase';
+import { Swarmer } from '../EnemyTypes';
 import type { Hud } from '../Hud';
 import { addOutlines, GLOW, glow, toon } from '../materials';
 import { castShadows } from '../Shadows';
@@ -20,7 +21,7 @@ import type { World } from '../World';
  * Defend and Escort can be failed, which ends the sortie (like being shot down).
  */
 
-export type MissionKind = 'rescue' | 'defend' | 'escort' | 'sabotage' | 'hold' | 'cargo' | 'threats' | 'sweep' | 'rescueLite';
+export type MissionKind = 'rescue' | 'defend' | 'escort' | 'sabotage' | 'hold' | 'cargo' | 'threats' | 'sweep' | 'rescueLite' | 'hive';
 
 export const MISSION_TITLES: Record<MissionKind, string> = {
   rescue: 'RESCUE THE CREW',
@@ -33,6 +34,7 @@ export const MISSION_TITLES: Record<MissionKind, string> = {
   threats: 'ELIMINATE THE THREATS',
   sweep: 'SALVAGE SWEEP',
   rescueLite: 'RESCUE THE PILOTS',
+  hive: 'SWARM HIVE',
 };
 
 export const MISSION_RADIUS: Record<MissionKind, number> = {
@@ -44,7 +46,8 @@ export const MISSION_RADIUS: Record<MissionKind, number> = {
   cargo: 150,
   threats: 100,
   sweep: 120,
-  rescueLite: 110,
+  rescueLite: 130,
+  hive: 110,
 };
 
 /** Missions that play on the snaking left-to-right corridor map. */
@@ -284,6 +287,8 @@ export class Fortress extends Enemy {
   readonly hitTop = 16;
   readonly aimHeight = 12;
   shielded = true;
+  /** Seconds between bomb volleys once the shield is down. */
+  volleyEvery = 3.2;
   private cooldown = 3;
   private readonly shieldMesh: THREE.Mesh;
   private readonly shieldMat = glow(CYAN, { transparent: true, opacity: 0.18, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }, 1.1);
@@ -335,7 +340,7 @@ export class Fortress extends Enemy {
     this.cooldown -= dt;
     const d = this.distanceTo(ship).dist;
     if (this.cooldown <= 0) {
-      this.cooldown = this.shielded ? 4.5 : 3.2;
+      this.cooldown = this.shielded ? 4.5 : this.volleyEvery;
       if (!ship.alive || d > 90) return;
       // A volley of bombs from each gun, landing around the ship.
       const s = ship.root.position;
@@ -513,37 +518,142 @@ class Rescue extends Mission {
 class RescueLite extends Rescue {
   readonly kind: MissionKind = 'rescueLite';
   protected total = 2;
-  protected spread = [0.3, 0.5];
+  protected spread = [0.6, 0.9];
 }
 
-/** Shoot down a small group of drones. */
-class Threats extends Mission {
-  readonly kind = 'threats';
-  private readonly targets: Enemy[] = [];
+/**
+ * A few drones at a time for the warm-ups: a wave arrives (away from the ship, so nothing pops up
+ * on top of you), and the next one only once that wave is shot down. `sizes` are the waves in
+ * order; with `repeat`, the last size keeps coming back.
+ */
+export class DroneSquad {
+  private readonly members: Enemy[] = [];
+  private wave = 0;
+  private timer = 0;
 
-  protected setup(): void {
-    for (let i = 0; i < 5; i++) {
-      const a = (i / 5) * Math.PI * 2 + Math.random() * 0.6;
-      const r = this.R * (0.3 + Math.random() * 0.3);
-      this.targets.push(this.d.enemies.spawnDrone(this.cx + Math.cos(a) * r, this.cz + Math.sin(a) * r - this.R * 0.15));
-    }
+  constructor(
+    private readonly enemies: EnemyManager,
+    private readonly ship: Ship,
+    private readonly cx: number,
+    private readonly cz: number,
+    private readonly R: number,
+    private readonly sizes: number[],
+    private readonly repeat: boolean,
+  ) {}
+
+  get alive(): number {
+    return this.members.filter((e) => e.alive).length;
   }
 
-  private get left(): number {
-    return this.targets.filter((e) => e.alive).length;
+  /** Every wave has arrived and been shot down (never, when repeating). */
+  get done(): boolean {
+    return !this.repeat && this.wave >= this.sizes.length && this.alive === 0;
+  }
+
+  /** Drones still to come after this wave (for "N DRONES LEFT"). */
+  get still(): number {
+    return this.alive + this.sizes.slice(this.wave).reduce((a, b) => a + b, 0);
+  }
+
+  update(dt: number): void {
+    if (this.alive > 0) return;
+    if (this.wave >= this.sizes.length && !this.repeat) return;
+    this.timer -= dt;
+    if (this.timer > 0) return;
+    const n = this.sizes[Math.min(this.wave, this.sizes.length - 1)];
+    this.wave++;
+    this.members.length = 0;
+    for (let i = 0; i < n; i++) this.members.push(this.enemies.spawnDrone(...this.spawnPoint()));
+    this.timer = 2.5; // the next wave comes a moment after this one is cleared
+  }
+
+  /** Somewhere in the arena, well away from the ship. */
+  private spawnPoint(): [number, number] {
+    const s = this.ship.root.position;
+    let best: [number, number] = [this.cx, this.cz];
+    let bestD = -1;
+    for (let i = 0; i < 24; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = this.R * (0.2 + Math.random() * 0.5);
+      const x = this.cx + Math.cos(a) * r;
+      const z = this.cz + Math.sin(a) * r;
+      const d = Math.hypot(x - s.x, z - s.z);
+      if (d >= 55) return [x, z];
+      if (d > bestD) [best, bestD] = [[x, z], d];
+    }
+    return best;
+  }
+
+  blips(out: Blip[]): void {
+    for (const e of this.members) if (e.alive) out.push({ x: e.root.position.x, z: e.root.position.z, kind: 'target' });
+  }
+}
+
+/** Shoot down two drones, then three more (always the first mission of a sortie). */
+class Threats extends Mission {
+  readonly kind = 'threats';
+  private squad!: DroneSquad;
+
+  protected setup(): void {
+    this.squad = new DroneSquad(this.d.enemies, this.d.ship, this.cx, this.cz, this.R, [2, 3], false);
+    this.squad.update(0);
   }
 
   update(dt: number): void {
     this.time += dt;
-    if (this.left === 0) this.done = true;
+    this.squad.update(dt);
+    if (this.squad.done) this.done = true;
   }
 
   objective(): string {
-    return `${this.title}\n${this.left} DRONES LEFT`;
+    return `${this.title}\n${this.squad.still} DRONES LEFT`;
   }
 
   blips(out: Blip[]): void {
-    for (const e of this.targets) if (e.alive) out.push({ x: e.root.position.x, z: e.root.position.z, kind: 'target' });
+    this.squad.blips(out);
+  }
+}
+
+/** Destroy the hive tower in the middle while swarmers pour out of it. */
+class Hive extends Mission {
+  readonly kind = 'hive';
+  private hive!: Fortress;
+  private readonly swarm: Enemy[] = [];
+  private spawnTimer = 1.5;
+
+  protected setup(): void {
+    this.hive = this.d.enemies.add(new Fortress(this.hpMul * 0.5), this.cx, this.cz) as Fortress;
+    this.hive.shielded = false;
+    this.hive.volleyEvery = 5.5; // fewer bombs than the real fortress
+  }
+
+  update(dt: number): void {
+    this.time += dt;
+    if (!this.hive.alive) {
+      this.done = true;
+      return;
+    }
+    // Up to four swarmers at a time, out of the hive.
+    for (let i = this.swarm.length - 1; i >= 0; i--) if (!this.swarm[i].alive) this.swarm.splice(i, 1);
+    this.spawnTimer -= dt;
+    if (this.spawnTimer <= 0 && this.swarm.length < 4) {
+      this.spawnTimer = 2.6;
+      const a = Math.random() * Math.PI * 2;
+      const p = this.hive.root.position;
+      this.swarm.push(this.d.enemies.add(new Swarmer(this.hpMul), p.x + Math.cos(a) * 11, p.z + Math.sin(a) * 11));
+    }
+  }
+
+  healthBar(): { name: string; fraction: number } | null {
+    return { name: 'SWARM HIVE', fraction: this.hive.healthLeft };
+  }
+
+  objective(): string {
+    return `${this.title}\nDESTROY THE HIVE · ${Math.ceil(this.hive.healthLeft * 100)}%`;
+  }
+
+  blips(out: Blip[]): void {
+    if (this.hive.alive) out.push({ x: this.hive.root.position.x, z: this.hive.root.position.z, kind: 'target' });
   }
 }
 
@@ -569,10 +679,6 @@ class Sweep extends Mission {
       obj.position.set(x, this.flyY(x, z), z);
       this.group.add(obj);
       this.cans.push({ x, z, obj, taken: false });
-    }
-    for (let i = 0; i < 2; i++) {
-      const [x, z] = this.spot(this.R * 0.3, this.R * 0.6);
-      this.d.enemies.spawnDrone(x, z);
     }
   }
 
@@ -1156,6 +1262,8 @@ export function createMission(kind: MissionKind, d: MissionDeps): Mission {
       return new Threats(d);
     case 'sweep':
       return new Sweep(d);
+    case 'hive':
+      return new Hive(d);
     case 'defend':
       return new Defend(d);
     case 'escort':
