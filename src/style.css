@@ -2196,3 +2196,57 @@ body.mode-base #coach {
     opacity: 0.2;
   }
 }
+
+/* The coach prompt: full size (game paused) with TAP TO MINIMIZE, or one line to tap open. */
+#coach .row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 7px;
+}
+#coach .min {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1.5px solid #6ff7ff;
+  background: rgba(111, 247, 255, 0.12);
+  color: #bffcff;
+  font-family: var(--display);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+#coach .skip {
+  float: none;
+  margin: 0;
+}
+#coach .expand {
+  display: none;
+}
+#coach.minimized {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+#coach.minimized .count {
+  flex: none;
+  margin: 0;
+}
+#coach.minimized .text {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#coach.minimized .row {
+  display: none;
+}
+#coach.minimized .expand {
+  display: inline;
+  flex: none;
+  color: #6ff7ff;
+  font-size: 11px;
+  white-space: nowrap;
+}

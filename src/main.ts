@@ -444,6 +444,11 @@ const coach = new TrainingCoach($('hud'));
 coach.onStep = (_i, done) => {
   if (done.includes('nova')) specialCharge = 1; // charged up, so you can try it
 };
+// A new training step pauses the game while it's open; minimizing it carries on.
+coach.onHold = (on) => {
+  menuPaused = on;
+  input.releaseAll();
+};
 coach.onExit = () => {
   if (!run.training) return;
   input.releaseAll();

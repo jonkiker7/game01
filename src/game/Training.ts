@@ -86,7 +86,9 @@ export class TrainingCoach {
   constructor(root: HTMLElement) {
     root.insertAdjacentHTML(
       'beforeend',
-      `<div id="coach"><div class="count"></div><div class="text"></div><button class="skip">skip ›</button></div>
+      `<div id="coach"><div class="count"></div><div class="text"></div>
+         <div class="row"><button class="min">▾ TAP TO MINIMIZE</button><button class="skip">skip step ›</button></div>
+         <span class="expand">▸ tap to expand</span></div>
        <button id="btn-exit-training">✕ EXIT TRAINING</button>`,
     );
     this.panel = root.querySelector('#coach') as HTMLElement;
@@ -99,6 +101,34 @@ export class TrainingCoach {
       });
     tap(this.exitBtn, () => this.onExit?.());
     tap(this.panel.querySelector('.skip')!, () => this.next());
+    tap(this.panel.querySelector('.min')!, () => this.minimize());
+    // Tapping the one-line (minimized) prompt opens it again.
+    this.panel.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      if (this.panel.classList.contains('minimized')) this.expand();
+    });
+  }
+
+  /** True while the prompt is open: the game waits for you to read it. */
+  holding = false;
+  /** The game should pause (true) or carry on (false). */
+  onHold?: (on: boolean) => void;
+
+  private expand(): void {
+    this.panel.classList.remove('minimized');
+    this.place();
+    this.setHold(true);
+  }
+
+  private minimize(): void {
+    this.panel.classList.add('minimized');
+    this.setHold(false);
+  }
+
+  private setHold(on: boolean): void {
+    if (this.holding === on) return;
+    this.holding = on;
+    this.onHold?.(on);
   }
 
   /** Show the EXIT button (from the moment training starts). */
@@ -122,7 +152,8 @@ export class TrainingCoach {
     this.step = -1;
     this.setGlow([]);
     this.demo.show(null);
-    this.panel.classList.remove('show', 'finished');
+    this.panel.classList.remove('show', 'finished', 'minimized');
+    this.setHold(false);
     document.body.classList.remove('training');
   }
 
@@ -163,8 +194,11 @@ export class TrainingCoach {
     const count = this.panel.querySelector('.count') as HTMLElement;
     const text = this.panel.querySelector('.text') as HTMLElement;
     const skip = this.panel.querySelector('.skip') as HTMLElement;
+    // Each new step opens full size and pauses the game until you minimize it.
     this.panel.classList.add('show');
+    this.panel.classList.remove('minimized');
     this.place();
+    this.setHold(true);
     this.panel.classList.remove('pop');
     void this.panel.offsetWidth;
     this.panel.classList.add('pop');
