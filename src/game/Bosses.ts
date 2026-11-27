@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { type Ctx, Enemy, ENEMY_ARMOR, ENEMY_BODY, ENEMY_GLOW } from './EnemyBase';
+import { type Ctx, Enemy, ENEMY_COLORS, ENEMY_GLOW } from './EnemyBase';
 import { Crawler, Pulsar, Swarmer } from './EnemyTypes';
 import { addOutlines, GLOW, glow, rimToon, toon } from './materials';
 import { approachAngle } from './math';
@@ -187,20 +187,20 @@ export class Skyreaver extends Boss {
     this.salvage = 150;
     this.weight = 0;
     this.dropChance = 0;
-    const armor = rimToon(ENEMY_ARMOR, ENEMY_GLOW, 0.75);
-    const hull = new THREE.Mesh(new THREE.SphereGeometry(4.5, 20, 12), this.mat(ENEMY_ARMOR));
+    const armor = rimToon(ENEMY_COLORS.armor, ENEMY_GLOW, 0.75);
+    const hull = new THREE.Mesh(new THREE.SphereGeometry(4.5, 20, 12), this.mat(ENEMY_COLORS.armor));
     hull.scale.set(1.2, 0.55, 2);
-    const spine = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.4, 12), this.mat(ENEMY_BODY));
+    const spine = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.4, 12), this.mat(ENEMY_COLORS.body));
     spine.position.y = 1.6;
     const parts: THREE.Object3D[] = [hull, spine];
     for (const s of [-1, 1]) {
-      const wing = new THREE.Mesh(new THREE.BoxGeometry(11, 0.6, 5), this.mat(ENEMY_BODY));
+      const wing = new THREE.Mesh(new THREE.BoxGeometry(11, 0.6, 5), this.mat(ENEMY_COLORS.body));
       wing.position.set(s * 8, 0, 1);
       wing.rotation.y = s * 0.35;
       const tip = new THREE.Mesh(new THREE.ConeGeometry(1.2, 4, 6), armor);
       tip.rotation.x = Math.PI / 2;
       tip.position.set(s * 13.5, 0, 3);
-      const engine = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.5, 3.6, 10), this.mat(ENEMY_ARMOR));
+      const engine = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.5, 3.6, 10), this.mat(ENEMY_COLORS.armor));
       engine.rotation.x = Math.PI / 2;
       engine.position.set(s * 4.5, -0.4, 7.5);
       const flame = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), this.engines);
@@ -208,7 +208,7 @@ export class Skyreaver extends Boss {
       flame.scale.set(0.9, 0.9, 1.6);
       // Missile pods under the wings.
       for (const k of [0, 1]) {
-        const pod = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 2.2, 8), this.mat(ENEMY_ARMOR));
+        const pod = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 2.2, 8), this.mat(ENEMY_COLORS.armor));
         pod.rotation.x = Math.PI / 2;
         pod.position.set(s * (6 + k * 2.4), -0.8, 0);
         parts.push(pod);
@@ -406,14 +406,14 @@ export class Juggernaut extends Boss {
     this.salvage = 150;
     this.weight = 0;
     this.dropChance = 0;
-    const hull = new THREE.Mesh(new THREE.BoxGeometry(13, 4.2, 18), this.mat(ENEMY_ARMOR));
+    const hull = new THREE.Mesh(new THREE.BoxGeometry(13, 4.2, 18), this.mat(ENEMY_COLORS.armor));
     hull.position.y = TANK_H - 2.4;
-    const skirt = new THREE.Mesh(new THREE.BoxGeometry(15, 1.6, 20), this.mat(ENEMY_BODY));
+    const skirt = new THREE.Mesh(new THREE.BoxGeometry(15, 1.6, 20), this.mat(ENEMY_COLORS.body));
     skirt.position.y = 2.6;
     this.root.add(hull, skirt);
     // Treads.
     for (const s of [-1, 1]) {
-      const tread = new THREE.Mesh(new THREE.BoxGeometry(3, 3.2, 21), this.mat(ENEMY_BODY));
+      const tread = new THREE.Mesh(new THREE.BoxGeometry(3, 3.2, 21), this.mat(ENEMY_COLORS.body));
       tread.position.set(s * 8.2, 1.6, 0);
       this.legs.push(tread);
       this.root.add(tread);
@@ -426,9 +426,9 @@ export class Juggernaut extends Boss {
     this.shield.userData.noOutline = true;
     this.root.add(core, this.shield);
     // Main turret with a long gun.
-    const dome = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 4, 2.4, 10), this.mat(ENEMY_BODY));
+    const dome = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 4, 2.4, 10), this.mat(ENEMY_COLORS.body));
     dome.position.y = 1.2;
-    const gun = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, 10, 10), this.mat(ENEMY_ARMOR));
+    const gun = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, 10, 10), this.mat(ENEMY_COLORS.armor));
     gun.rotation.x = Math.PI / 2;
     gun.position.set(0, 1.4, -6.5);
     const muzzle = new THREE.Mesh(new THREE.SphereGeometry(0.9, 10, 8), glow(ENEMY_GLOW, {}, 1.8));
@@ -460,8 +460,8 @@ export class Juggernaut extends Boss {
   protected setupParts(ctx: Ctx): void {
     for (const s of [-1, 1]) {
       const c = new BossPart(320 * (this.maxHp / 1500), 3.4, -2, 4, true);
-      const base = new THREE.Mesh(new THREE.CylinderGeometry(2, 2.4, 1.6, 8), c.material(ENEMY_BODY));
-      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 4.2, 8), c.material(ENEMY_ARMOR));
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(2, 2.4, 1.6, 8), c.material(ENEMY_COLORS.body));
+      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 4.2, 8), c.material(ENEMY_COLORS.armor));
       barrel.rotation.x = Math.PI / 2.6;
       barrel.position.set(0, 1.4, -1.6);
       const eye = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6), glow('#ffb03a', {}, 1.8));

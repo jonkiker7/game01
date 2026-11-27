@@ -6,10 +6,28 @@ import type { EnemyShots, Hittable } from './Projectiles';
 import type { Ship } from './Ship';
 import type { World } from './World';
 
-export const ENEMY_BODY = '#3b1d4a';
-export const ENEMY_ARMOR = '#6a2f63';
+/**
+ * Enemy colour schemes. `armor` is each enemy's main body colour (hulls, domes, cores), `body`
+ * the darker detail parts (fins, barrels, treads), `stone` the towers' columns.
+ * To change every enemy's colour, change DEFAULT_ENEMY_PALETTE (or add a new scheme here); a
+ * level can also switch with setEnemyPalette() before its enemies are built (e.g. a desert level
+ * going back to 'purple', where orange wouldn't stand out).
+ */
+export const ENEMY_PALETTES = {
+  /** Bright orange: easy to spot against the jungle's greens, blues and purples. */
+  orange: { armor: '#fe8200', body: '#3b1d4a', stone: '#fe8200' },
+  /** The original dark purple. */
+  purple: { armor: '#6a2f63', body: '#3b1d4a', stone: '#4a2f5e' },
+};
+export type EnemyPalette = keyof typeof ENEMY_PALETTES;
+export const DEFAULT_ENEMY_PALETTE: EnemyPalette = 'orange';
+
+/** The colours new enemies are built with (setEnemyPalette changes them). */
+export const ENEMY_COLORS = { ...ENEMY_PALETTES[DEFAULT_ENEMY_PALETTE] };
+export function setEnemyPalette(p: EnemyPalette): void {
+  Object.assign(ENEMY_COLORS, ENEMY_PALETTES[p] ?? ENEMY_PALETTES[DEFAULT_ENEMY_PALETTE]);
+}
 export const ENEMY_GLOW = '#ff2e63';
-export const TOWER_STONE = '#4a2f5e';
 /** Enemies only attack inside this distance, which roughly matches what's visible on screen. */
 export const ATTACK_RANGE = 36;
 /** Towers lob mortars from much farther away (the landing ring warns you where they'll hit). */

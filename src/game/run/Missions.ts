@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { cargoCapacity } from '../ShipDesigns';
 import type { EnemyManager } from '../Enemies';
-import { type Ctx, Enemy, ENEMY_ARMOR, ENEMY_BODY, ENEMY_GLOW } from '../EnemyBase';
+import { type Ctx, Enemy, ENEMY_COLORS, ENEMY_GLOW } from '../EnemyBase';
 import type { Hud } from '../Hud';
 import { addOutlines, GLOW, glow, toon } from '../materials';
 import { castShadows } from '../Shadows';
@@ -183,9 +183,9 @@ export class Saboteur extends Enemy {
     super(28 * hpMul);
     this.salvage = 3;
     this.dropChance = 0.15;
-    const shell = new THREE.Mesh(new THREE.SphereGeometry(1.2, 12, 8), this.mat(ENEMY_ARMOR));
+    const shell = new THREE.Mesh(new THREE.SphereGeometry(1.2, 12, 8), this.mat(ENEMY_COLORS.armor));
     shell.scale.set(1, 0.7, 1.4);
-    this.drill = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.8, 8), this.mat(ENEMY_BODY));
+    this.drill = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.8, 8), this.mat(ENEMY_COLORS.body));
     this.drill.rotation.x = -Math.PI / 2;
     this.drill.position.z = -1.9;
     const glowBack = new THREE.Mesh(new THREE.SphereGeometry(0.6, 8, 6), glow('#b6ff5a', {}, 1.8));
@@ -242,11 +242,11 @@ export class Pylon extends Enemy {
     this.salvage = 6;
     this.weight = 0;
     this.dropChance = 0.35;
-    const base = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 3.4, 2, 6), this.mat(ENEMY_BODY, false));
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 3.4, 2, 6), this.mat(ENEMY_COLORS.body, false));
     base.position.y = 1;
-    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.4, 12, 6), this.mat(ENEMY_ARMOR, false));
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.4, 12, 6), this.mat(ENEMY_COLORS.armor, false));
     mast.position.y = 8;
-    const cage = new THREE.Mesh(new THREE.TorusGeometry(2, 0.35, 6, 12), this.mat(ENEMY_ARMOR));
+    const cage = new THREE.Mesh(new THREE.TorusGeometry(2, 0.35, 6, 12), this.mat(ENEMY_COLORS.armor));
     cage.rotation.x = Math.PI / 2;
     cage.position.y = 14;
     const orb = new THREE.Mesh(new THREE.SphereGeometry(1.6, 14, 10), this.core);
@@ -282,16 +282,16 @@ export class Fortress extends Enemy {
     this.salvage = 40;
     this.weight = 0;
     this.dropChance = 1;
-    const keep = new THREE.Mesh(new THREE.CylinderGeometry(7, 9, 10, 8), this.mat(ENEMY_BODY, false));
+    const keep = new THREE.Mesh(new THREE.CylinderGeometry(7, 9, 10, 8), this.mat(ENEMY_COLORS.body, false));
     keep.position.y = 5;
-    const crown = new THREE.Mesh(new THREE.CylinderGeometry(8, 7, 2.4, 8), this.mat(ENEMY_ARMOR));
+    const crown = new THREE.Mesh(new THREE.CylinderGeometry(8, 7, 2.4, 8), this.mat(ENEMY_COLORS.armor));
     crown.position.y = 11.2;
     const eye = new THREE.Mesh(new THREE.SphereGeometry(2.2, 14, 10), glow(ENEMY_GLOW, {}, 1.8));
     eye.position.y = 13.6;
     this.root.add(keep, crown, eye);
     for (let i = 0; i < 4; i++) {
       const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
-      const gun = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.8, 3.4, 8), this.mat(ENEMY_ARMOR));
+      const gun = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.8, 3.4, 8), this.mat(ENEMY_COLORS.armor));
       gun.position.set(Math.cos(a) * 6.5, 13.2, Math.sin(a) * 6.5);
       gun.rotation.z = Math.PI / 5;
       this.guns.push(gun);
