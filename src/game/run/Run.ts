@@ -762,7 +762,7 @@ export class Run {
 
   /** What the HUD should say under the radar. */
   objective(): string {
-    if (this.training) return 'FLIGHT TRAINING\nPRACTICE ON THE DRONE';
+    if (this.training) return 'TRAINING\nPRACTICE';
     const line = this.d.contracts.objectiveLine(this.sector);
     let text = this.baseObjective();
     // The mission clock (a hard limit, or the time bonus counting down).
