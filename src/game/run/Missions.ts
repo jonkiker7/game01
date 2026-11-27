@@ -289,6 +289,8 @@ export class Fortress extends Enemy {
   shielded = true;
   /** Seconds between bomb volleys once the shield is down. */
   volleyEvery = 3.2;
+  /** Damage per bomb. */
+  bombDamage = 14;
   private cooldown = 3;
   private readonly shieldMesh: THREE.Mesh;
   private readonly shieldMat = glow(CYAN, { transparent: true, opacity: 0.18, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }, 1.1);
@@ -348,7 +350,7 @@ export class Fortress extends Enemy {
         gun.getWorldPosition(this.tmp);
         const a = (i / 4) * Math.PI * 2 + Math.random();
         const r = i === 0 ? 0 : 10 + Math.random() * 10;
-        mortars.fireAt(this.tmp, s.x + ship.velocity.x * 0.5 + Math.cos(a) * r, s.y, s.z + ship.velocity.y * 0.5 + Math.sin(a) * r, 10, 14);
+        mortars.fireAt(this.tmp, s.x + ship.velocity.x * 0.5 + Math.cos(a) * r, s.y, s.z + ship.velocity.y * 0.5 + Math.sin(a) * r, 10, this.bombDamage);
       }
     }
   }
@@ -622,9 +624,10 @@ class Hive extends Mission {
   private spawnTimer = 1.5;
 
   protected setup(): void {
-    this.hive = this.d.enemies.add(new Fortress(this.hpMul * 0.5), this.cx, this.cz) as Fortress;
+    this.hive = this.d.enemies.add(new Fortress(this.hpMul), this.cx, this.cz) as Fortress;
     this.hive.shielded = false;
     this.hive.volleyEvery = 5.5; // fewer bombs than the real fortress
+    this.hive.bombDamage = 8; // and weaker ones (14 there)
   }
 
   update(dt: number): void {
