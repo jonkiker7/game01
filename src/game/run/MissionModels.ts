@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Skyreaver } from '../Bosses';
-import { Turret } from '../Enemies';
+import { Drone, Turret } from '../Enemies';
 import { Swarmer } from '../EnemyTypes';
 import { addOutlines, glow, toon } from '../materials';
 import { Fortress, Pylon, Saboteur } from './Missions';
@@ -101,7 +101,26 @@ export interface Briefing {
   slides: BriefingSlide[];
 }
 
+/** A salvage crystal (Salvage Sweep). */
+const crystal = () => {
+  const c = m(new THREE.OctahedronGeometry(1.4, 0), glow(GOLD, {}, 1.4));
+  c.scale.set(1, 1.5, 1);
+  return group(c);
+};
+
 export const BRIEFINGS: Briefing[] = [
+  {
+    id: 'warmups',
+    name: 'Warm-ups',
+    summary: 'The first three missions of every sortie: short and easy, to get you going.',
+    slides: [
+      { caption: 'ELIMINATE THE THREATS: shoot down a handful of drones.', model: () => new Drone(1).root },
+      { caption: 'KNOCK OUT THE RELAYS: destroy three towers. Nothing else attacks.', model: () => new Turret(1).root },
+      { caption: 'SALVAGE SWEEP: fly through the gold crystals. Each one is salvage!', model: crystal },
+      { caption: 'RESCUE THE PILOTS: pick up two pilots and fly them to the green beam.', model: pod },
+      { caption: 'SWARM PRACTICE: stay alive for 25 seconds while swarmers dive at you.', model: () => new Swarmer(1).root },
+    ],
+  },
   {
     id: 'outpost',
     name: 'Destroy the Outpost',
@@ -170,7 +189,7 @@ export const BRIEFINGS: Briefing[] = [
   {
     id: 'boss',
     name: 'Boss',
-    summary: 'The fifth fight of every sortie.',
+    summary: 'The final fight of every sortie.',
     slides: [{ caption: 'Every sortie ends with a boss. Watch for red warnings and dodge!', model: () => new Skyreaver(1).root }],
   },
 ];
