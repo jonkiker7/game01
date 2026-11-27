@@ -2250,3 +2250,11 @@ body.mode-base #coach {
   font-size: 11px;
   white-space: nowrap;
 }
+
+/* A step just completed: a green tick for a moment before the next step. */
+#coach.done {
+  border-color: #7dff9a;
+}
+#coach.done .count {
+  color: #7dff9a;
+}

@@ -6,6 +6,7 @@ import {
   type Ctx,
   Enemy,
   ENEMY_COLORS, ENEMY_GLOW,
+  FLYER_SCALE,
   type Species,
   TOWER_RANGE,
 } from './EnemyBase';
@@ -492,6 +493,8 @@ export class EnemyManager {
   }
 
   private register(e: Enemy, x: number, z: number): void {
+    // Flyers (not mines, which sit on the ground, nor boss parts) are drawn bigger to stand out.
+    if (e.kind === 'drone' && e.species !== 'mine' && e.species !== 'bosspart' && e.species !== 'boss') e.growModel(FLYER_SCALE);
     // Anything standing on the ground goes on a rock top, never over a canyon.
     if (e.kind !== 'drone' && e.species !== 'bosspart') ({ x, z } = this.world.nearestRock(x, z, e.radius + 1));
     e.root.position.set(x, this.world.heightAt(x, z), z);

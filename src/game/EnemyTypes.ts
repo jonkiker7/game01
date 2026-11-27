@@ -166,6 +166,7 @@ export class Lancer extends Enemy {
     this.lane = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.1, 1), this.laneMat);
     this.lane.visible = false;
     this.lane.userData.noOutline = true;
+    this.lane.userData.keepSize = true; // the dash warning stays its real size
     this.root.add(this.lane);
     addOutlines(this.body);
   }
@@ -357,6 +358,7 @@ export class Sniper extends Enemy {
     this.beam = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 1), this.beamMat);
     this.beam.visible = false;
     this.beam.userData.noOutline = true;
+    this.beam.userData.keepSize = true; // the targeting laser stays its real size
     this.root.add(this.beam);
   }
 
@@ -512,7 +514,7 @@ export class MineLayer extends Enemy {
     p.z += (tz - p.z) * k;
     p.y = flyY(world, p.x, p.z) + Math.sin(this.time * 2) * 0.4;
     this.root.rotation.y += dt * 2;
-    this.ring.scale.setScalar(1 + Math.max(0, 0.3 - this.dropTimer) * 2);
+    this.ring.scale.setScalar((1 + Math.max(0, 0.3 - this.dropTimer) * 2) * this.modelScale);
 
     for (let i = this.mines.length - 1; i >= 0; i--) if (!this.mines[i].alive) this.mines.splice(i, 1);
     this.dropTimer -= dt;

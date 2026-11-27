@@ -28,6 +28,8 @@ export function setEnemyPalette(p: EnemyPalette): void {
   Object.assign(ENEMY_COLORS, ENEMY_PALETTES[p] ?? ENEMY_PALETTES[DEFAULT_ENEMY_PALETTE]);
 }
 export const ENEMY_GLOW = '#ff2e63';
+/** Flying enemies are drawn this much bigger, so they're easier to see (their shots aren't). */
+export const FLYER_SCALE = 1.5;
 /** Enemies only attack inside this distance, which roughly matches what's visible on screen. */
 export const ATTACK_RANGE = 36;
 /** Towers lob mortars from much farther away (the landing ring warns you where they'll hit). */
@@ -189,6 +191,26 @@ export abstract class Enemy implements Hittable {
   }
 
   protected abstract think(ctx: Ctx): void;
+
+  /**
+   * Draw this enemy `f` times bigger: every part of its model (and its hit size, so shots that
+   * look like hits are hits), but not attack warnings (parts marked `userData.keepSize`).
+   */
+  /** How much bigger than built this enemy is drawn (see growModel). */
+  modelScale = 1;
+
+  growModel(f: number): void {
+    this.modelScale *= f;
+    for (const c of this.root.children) {
+      if (c.userData.keepSize) continue;
+      c.scale.multiplyScalar(f);
+      c.position.multiplyScalar(f);
+    }
+    const size = this as unknown as { radius: number; hitTop: number; hitBottom: number };
+    size.radius *= f;
+    size.hitTop *= f;
+    size.hitBottom *= f;
+  }
 
   /** @param flashes whether this part flashes white when hit (towers only flash their gun). */
   protected mat(color: string, flashes = true): THREE.MeshToonMaterial {
