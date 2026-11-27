@@ -8,7 +8,7 @@ import type { Ship } from '../Ship';
 import type { World } from '../World';
 import { type ArenaShape, blobArena, corridorArena } from '../ArenaShape';
 import type { ContractTracker } from './Contracts';
-import { CORRIDOR_MISSIONS, createMission, type Mission, type MissionDeps, MISSION_RADIUS, MISSION_TITLES, type MissionKind } from './Missions';
+import { CORRIDOR_MISSIONS, createMission, DroneSquad, type Mission, type MissionDeps, MISSION_RADIUS, MISSION_TITLES, type MissionKind } from './Missions';
 import { type ArenaVisual, type Gate, REWARD_STYLE, type Reward } from './Arena';
 import type { RunUI } from './RunUI';
 import { audio } from '../../audio/Audio';
@@ -42,18 +42,18 @@ export interface RunResult {
   contract: { title: string; reward: number; done: boolean } | null;
 }
 /** Arena size per encounter: tower hunts are big (fly around and find them), swarms are tight. */
-const ARENA_RADIUS: Record<EncounterKind, number> = { outpost: 180, survive: 110, stronghold: 110, boss: 130, relays: 110, swarmLite: 95, ...MISSION_RADIUS };
+const ARENA_RADIUS: Record<EncounterKind, number> = { outpost: 180, survive: 110, stronghold: 110, boss: 130, relays: 110, ...MISSION_RADIUS };
 /** Escort runs left to right through a snaking corridor about one screen tall. */
 const CORRIDOR = { length: 330, halfWidth: 44 };
 const SURVIVE_TIME = 40;
 /** Flight training's practice arena. */
 const TRAINING_RADIUS = 90;
 
-type EncounterKind = 'outpost' | 'survive' | 'stronghold' | 'boss' | 'relays' | 'swarmLite' | MissionKind;
+type EncounterKind = 'outpost' | 'survive' | 'stronghold' | 'boss' | 'relays' | MissionKind;
 /** The warm-ups (the first WARMUPS missions are picked from these, no repeats). */
-const WARMUP_KINDS: EncounterKind[] = ['threats', 'relays', 'sweep', 'rescueLite', 'swarmLite'];
-/** Swarm Practice: survive this long. */
-const SWARM_PRACTICE_TIME = 25;
+const WARMUP_KINDS: EncounterKind[] = ['threats', 'relays', 'sweep', 'rescueLite', 'hive'];
+/** Warm-ups with a few drones about (3 at a time; the next 3 once they're shot down). */
+const SQUAD_WARMUPS: EncounterKind[] = ['relays', 'sweep', 'rescueLite'];
 /** Encounters the rounds before the boss can be. */
 const ROUND_KINDS: EncounterKind[] = ['outpost', 'survive', 'rescue', 'defend', 'escort', 'sabotage', 'hold', 'cargo'];
 type Phase = 'intro' | 'fight' | 'failed' | 'reward' | 'choosing' | 'gates' | 'transition' | 'over';
@@ -84,7 +84,6 @@ const TITLES: Record<EncounterKind, string> = {
   stronghold: 'FINAL ASSAULT',
   boss: 'BOSS',
   relays: 'KNOCK OUT THE RELAYS',
-  swarmLite: 'SWARM PRACTICE',
   ...MISSION_TITLES,
 };
 
@@ -138,6 +137,8 @@ export class Run {
   pair: Species[] = [];
   /** The boss, during the final round. */
   boss: Boss | null = null;
+  /** Warm-up drones (see SQUAD_WARMUPS). */
+  private squad: DroneSquad | null = null;
   /** The current round's mission (rescue, defend, …), if it's one of those. */
   mission: Mission | null = null;
   private radius = ARENA_RADIUS.outpost;
@@ -404,10 +405,6 @@ export class Run {
       // Warm-up: a few towers, nothing else.
       enemies.configure(bounds, hpMul, null);
       enemies.spawnTurrets(cx, cz, 3, 22, 45);
-    } else if (this.kind === 'swarmLite') {
-      // Warm-up: a few swarmers at a time, until the timer runs out.
-      enemies.configure(bounds, hpMul, { types: ['swarmer'], max: 4, interval: 3 });
-      this.timer = SWARM_PRACTICE_TIME;
     } else if (this.kind === 'boss') {
       // No waves: the boss calls in its own helpers.
       enemies.configure(bounds, hpMul, null);
@@ -432,6 +429,9 @@ export class Run {
       enemies.spawnTurrets(cx, cz, 6, 8, 20);
       enemies.spawnTurrets(cx, cz, 8, 32, 50);
     }
+    // A few drones about in some warm-ups: 3 at a time, the next 3 once those are down.
+    this.squad = SQUAD_WARMUPS.includes(this.kind) ? new DroneSquad(enemies, this.d.ship, cx, cz, R, [3], true) : null;
+    this.squad?.update(0);
     this.d.contracts.enterSector(s, cx, cz, R);
     this.phase = 'fight';
     this.elapsed = 0;
@@ -477,6 +477,13 @@ export class Run {
     return ids[Math.floor(Math.random() * ids.length)];
   }
 
+  /** Every sortie opens with Eliminate the Threats. */
+  private firstKind(): EncounterKind {
+    this.usedKinds.add('threats');
+    this.lastRoundKind = 'threats';
+    return 'threats';
+  }
+
   /** What the next encounter will be (sets the arena size too). */
   private pickKind(): EncounterKind {
     const s = this.sector;
@@ -486,7 +493,9 @@ export class Run {
         ? 'boss'
         : forced && (ROUND_KINDS.includes(forced) || WARMUP_KINDS.includes(forced))
           ? forced
-          : this.randomRoundKind();
+          : s === 1
+            ? this.firstKind()
+            : this.randomRoundKind();
     this.radius = ARENA_RADIUS[kind];
     return kind;
   }
@@ -541,6 +550,7 @@ export class Run {
           this.failEncounter('OUT OF TIME · MISSION FAILED');
           break;
         }
+        this.squad?.update(dt);
         if (this.mission) {
           this.mission.update(dt);
           if (this.mission.failed) {
@@ -552,7 +562,7 @@ export class Run {
           ? !this.boss.alive
           : this.mission
             ? this.mission.done
-            : this.kind === 'survive' || this.kind === 'swarmLite'
+            : this.kind === 'survive'
             ? (this.timer -= dt) <= 0
             : enemies.turretsLeft === 0;
         if (done && !this.d.contracts.blocking) this.clearEncounter();
@@ -625,6 +635,7 @@ export class Run {
   private clearEncounter(): void {
     const { enemies, hud } = this.d;
     if (this.mission) this.salvage += Math.round(this.mission.bonusSalvage * this.stats.salvageMul);
+    this.squad = null; // no more drones once it's won
     this.awardBonus();
     enemies.stopDrones();
     enemies.destroyAll();
@@ -804,7 +815,7 @@ export class Run {
       case 'fight':
         if (this.boss) return `${head}\n${this.boss.objectiveLine()}`;
         if (this.mission) return this.mission.objective();
-        if (this.kind === 'survive' || this.kind === 'swarmLite') {
+        if (this.kind === 'survive') {
           if (this.timer <= 0 && this.d.contracts.blocking) return `${head}\nDESTROY THE ALPHA`;
           return `${head}\n${Math.ceil(Math.max(0, this.timer))}s LEFT`;
         }
@@ -837,7 +848,7 @@ export class Run {
     } else if (this.phase === 'fight') {
       for (const e of this.d.enemies.enemies) {
         if (!e.alive) continue;
-        if (!e.elite && e.species !== 'mine' && (e.kind === 'turret' || this.kind === 'survive' || this.kind === 'swarmLite')) out.push({ x: e.root.position.x, z: e.root.position.z, kind: 'target' });
+        if (!e.elite && e.species !== 'mine' && (e.kind === 'turret' || this.kind === 'survive')) out.push({ x: e.root.position.x, z: e.root.position.z, kind: 'target' });
       }
     } else if (this.phase === 'reward') {
       const r = this.d.arena.rewardPosition;

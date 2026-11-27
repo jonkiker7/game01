@@ -114,11 +114,11 @@ export const BRIEFINGS: Briefing[] = [
     name: 'Warm-ups',
     summary: 'The first three missions of every sortie: short and easy, to get you going.',
     slides: [
-      { caption: 'ELIMINATE THE THREATS: shoot down a handful of drones.', model: () => new Drone(1).root },
-      { caption: 'KNOCK OUT THE RELAYS: destroy three towers. Nothing else attacks.', model: () => new Turret(1).root },
-      { caption: 'SALVAGE SWEEP: fly through the gold crystals. Each one is salvage!', model: crystal },
-      { caption: 'RESCUE THE PILOTS: pick up two pilots and fly them to the green beam.', model: pod },
-      { caption: 'SWARM PRACTICE: stay alive for 25 seconds while swarmers dive at you.', model: () => new Swarmer(1).root },
+      { caption: 'ELIMINATE THE THREATS (always first): shoot down two drones, then three more.', model: () => new Drone(1).root },
+      { caption: 'KNOCK OUT THE RELAYS: destroy three towers while a few drones buzz around.', model: () => new Turret(1).root },
+      { caption: 'SALVAGE SWEEP: fly through the gold crystals (each one is salvage!) and dodge the drones.', model: crystal },
+      { caption: 'RESCUE THE PILOTS: two pilots at the far edges. Fly them back to the green beam.', model: pod },
+      { caption: 'SWARM HIVE: destroy the hive tower in the middle. Swarmers keep pouring out of it!', model: () => new Fortress(1).root },
     ],
   },
   {
