@@ -7,7 +7,7 @@ import { TUNING } from '../game/Tuning';
 import { sameValue } from '../game/Choices';
 import { CAMERA_DISTANCE } from '../game/CameraRig';
 import { DEFAULT_ENEMY_PALETTE, ENEMY_PALETTES, type EnemyPalette, setEnemyPalette } from '../game/EnemyBase';
-import { BIOME_FOG, type Biome, CANYON_FOG } from '../game/World';
+import { BIOME_FOG, BIOME_FOG_DENSITY, type Biome, CANYON_FOG } from '../game/World';
 
 /**
  * Developer panel (open the game with `?dev`): sliders for lighting, shadows, fog, glow, the
@@ -23,7 +23,7 @@ export interface DevHooks {
   bloom: UnrealBloomPass;
   shadows: SunShadows;
   /** Canyon fog (each planet's colour, density 0..1, height 0..1 of the canyon depth). */
-  setCanyonFog: (colors: Record<Biome, string>, density: number, height: number) => void;
+  setCanyonFog: (colors: Record<Biome, string>, densities: Record<Biome, number>, height: number) => void;
   /** Which planet you're on (the fog colour shown is that planet's). */
   getBiome: () => Biome;
   /** Whether HIGH quality is on (real shadows only exist on HIGH). */
@@ -74,7 +74,9 @@ const LOOK_DEFAULTS = {
   canyonFogColor: BIOME_FOG.jungle, // the jungle's
   desertFogColor: BIOME_FOG.desert,
   iceFogColor: BIOME_FOG.ice,
-  canyonFogDensity: CANYON_FOG.density,
+  jungleFogDensity: BIOME_FOG_DENSITY.jungle,
+  desertFogDensity: BIOME_FOG_DENSITY.desert,
+  iceFogDensity: BIOME_FOG_DENSITY.ice,
   canyonFogHeight: CANYON_FOG.height,
   vignetteSize: 62,
   cameraDistance: CAMERA_DISTANCE,
@@ -133,7 +135,11 @@ export function openDevPanel(h: DevHooks): void {
     h.bloom.radius = look.glowSpread;
     h.bloom.threshold = look.glowThreshold;
     h.halos.strength = look.haloStrength;
-    h.setCanyonFog({ jungle: look.canyonFogColor, desert: look.desertFogColor, ice: look.iceFogColor }, look.canyonFogDensity, look.canyonFogHeight);
+    h.setCanyonFog(
+      { jungle: look.canyonFogColor, desert: look.desertFogColor, ice: look.iceFogColor },
+      { jungle: look.jungleFogDensity, desert: look.desertFogDensity, ice: look.iceFogDensity },
+      look.canyonFogHeight,
+    );
     h.setCameraDistance(look.cameraDistance);
     setEnemyPalette(look.enemyColors);
     const root = document.documentElement.style;
@@ -211,7 +217,7 @@ export function openDevPanel(h: DevHooks): void {
   }, 1000);
 
   const canyon = gui.addFolder('Canyon fog');
-  // One colour per planet: only the one for the planet you're on shows.
+  // One colour and density per planet: only the ones for the planet you're on show.
   const fogColor: Record<Biome, ReturnType<typeof canyon.addColor>> = {
     jungle: canyon.addColor(look, 'canyonFogColor').name('colour (jungle)').onChange(changed),
     desert: canyon.addColor(look, 'desertFogColor').name('colour (desert)').onChange(changed),
@@ -222,13 +228,20 @@ export function openDevPanel(h: DevHooks): void {
     const b = h.getBiome();
     if (b === shownBiome) return;
     shownBiome = b;
-    for (const k of Object.keys(fogColor) as Biome[]) fogColor[k].show(k === b);
+    for (const k of Object.keys(fogColor) as Biome[]) {
+      fogColor[k].show(k === b);
+      fogDensity[k].show(k === b);
+    }
     canyon.title(`Canyon fog: ${b} planet`);
   };
+  const fogDensity: Record<Biome, ReturnType<typeof canyon.add>> = {
+    jungle: canyon.add(look, 'jungleFogDensity', 0, 0.6, 0.01).name('density (jungle)').onChange(changed),
+    desert: canyon.add(look, 'desertFogDensity', 0, 0.6, 0.01).name('density (desert)').onChange(changed),
+    ice: canyon.add(look, 'iceFogDensity', 0, 0.6, 0.01).name('density (ice)').onChange(changed),
+  };
+  canyon.add(look, 'canyonFogHeight', 0, 1, 0.01).name('height (0 = floor, 1 = rim)').onChange(changed);
   showFog();
   setInterval(showFog, 500);
-  canyon.add(look, 'canyonFogDensity', 0, 0.6, 0.01).name('density').onChange(changed);
-  canyon.add(look, 'canyonFogHeight', 0, 1, 0.01).name('height (0 = floor, 1 = rim)').onChange(changed);
 
   const post = gui.addFolder('Glow and vignette');
   post.add(look, 'glowStrength', 0, 3, 0.05).name('glow strength').onChange(changed);
