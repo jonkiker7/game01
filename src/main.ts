@@ -182,7 +182,7 @@ const radar = new Radar($('hud'));
 
 // ?debug in the URL exposes game objects for automated tests and console tinkering.
 if (new URLSearchParams(location.search).has('debug')) {
-  Object.assign(window, { __game: { audio, baker, get halos() { return halos; }, get perf() { return perf; }, get rig() { return rig; }, ship, enemies, enemyShots, missiles, pickups, combat, mortars, save, get base() { return base; }, get run() { return run; }, chargeNova: () => (specialCharge = 1), get coach() { return coach; } } });
+  Object.assign(window, { __game: { audio, baker, get bloom() { return bloom; }, get halos() { return halos; }, get perf() { return perf; }, get rig() { return rig; }, ship, enemies, enemyShots, missiles, pickups, combat, mortars, save, get base() { return base; }, get run() { return run; }, chargeNova: () => (specialCharge = 1), get coach() { return coach; } } });
 }
 
 const rig = new CameraRig(window.innerWidth / window.innerHeight);
@@ -297,6 +297,21 @@ base.onLaunch = () =>
 // Only colours brighter than 1.2 (glows; not even sunlit white hulls) bloom, so the ground and models stay crisp.
 const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.35, 0.4, 1.2);
 composer.addPass(bloom);
+/**
+ * The glow threshold (the dev panel's "glow threshold" sets it). The ice planet's sunlit snow
+ * is bright enough to glow at the normal 1.2 and washes the screen out, so there it's raised.
+ */
+const glow = { threshold: 1.2 };
+const ICE_GLOW_THRESHOLD = 2;
+/** What the dev panel changes: strength and spread directly, the threshold through `glow`. */
+const bloomControls = {
+  get strength() { return bloom.strength; },
+  set strength(v: number) { bloom.strength = v; },
+  get radius() { return bloom.radius; },
+  set radius(v: number) { bloom.radius = v; },
+  get threshold() { return glow.threshold; },
+  set threshold(v: number) { glow.threshold = v; },
+} as unknown as UnrealBloomPass;
 
 /**
  * Glow, from most to least expensive:
@@ -350,7 +365,7 @@ function showDevPanel(on: boolean): void {
       sun,
       rim,
       scene,
-      bloom,
+      bloom: bloomControls,
       shadows: sunShadows,
       setCanyonFog: (c, d, h) => world.setFogColors(c, d, h),
       getBiome: () => world.biome,
@@ -1004,6 +1019,7 @@ function present(realDt: number): void {
   // Bloom needs the post-processing chain; halos and no glow draw straight to the screen.
   const g = glowMode();
   halos.update(realDt);
+  bloom.threshold = mode === 'run' && world.biome === 'ice' ? Math.max(glow.threshold, ICE_GLOW_THRESHOLD) : glow.threshold;
   if (g === 'full' || g === 'light') composer.render(realDt);
   else if (mode === 'base') renderer.render(base.scene, base.camera);
   else renderer.render(scene, rig.camera);
