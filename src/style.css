@@ -2258,3 +2258,19 @@ body.mode-base #coach {
 #coach.done .count {
   color: #7dff9a;
 }
+
+/* Pause menu: return to base (turns red to confirm). */
+#pause .buttons .leave {
+  background: rgba(30, 30, 50, 0.9);
+  color: #ffd9a8;
+  font-size: 11px;
+}
+#pause .buttons .leave.confirm {
+  background: rgba(120, 14, 24, 0.95);
+  border-color: #ff6b6b;
+  color: #fff;
+}
+#run-end h1.returned,
+h1.returned {
+  color: #ffd36b;
+}
