@@ -216,9 +216,13 @@ export class HomeBase {
     this.scene.add(this.shipHolder);
     // The leaderboard, high on the concourse's north wall above the hangar doorway.
     // Hung upright on the wall between the two halves of the balcony, facing the room.
-    // Tilted out at the top (toward the camera) so it's easier to read from the floor.
-    this.board.root.position.set(0, 9, -12);
-    this.board.root.rotation.x = -0.44; // about 25°
+    // The top edge stays where it hung on the wall; the bottom edge swings out toward the room,
+    // so the board faces down toward the camera and is easier to read from the floor.
+    const tilt = 0.44; // about 25°
+    const half = 2.5; // half the board's height
+    const top = { y: 11.5, z: -13.15 }; // the top edge, against the wall
+    this.board.root.rotation.x = -tilt;
+    this.board.root.position.set(0, top.y - half * Math.cos(tilt), top.z + half * Math.sin(tilt));
     this.scene.add(this.board.root);
     this.refreshBoard();
     this.parkShip();
