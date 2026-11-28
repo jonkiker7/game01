@@ -1,3 +1,5 @@
+import { uiScale } from './UiScale';
+
 /**
  * The on-screen action buttons' layout, and an editor for it (from the dev panel): tap a button
  * to select it, drag it to move it, and turn or resize it with the toolbar. SAVE keeps the layout
@@ -182,9 +184,10 @@ export function openControlLayoutEditor(onClose: () => void): void {
     const dy = e.clientY - drag.y;
     drag.x = e.clientX;
     drag.y = e.clientY;
+    const s = uiScale(); // the buttons are drawn at the HUD's scale
     adjust((p) => {
-      p.right -= dx;
-      p.bottom -= dy;
+      p.right -= dx / s;
+      p.bottom -= dy / s;
     });
   };
   const up = (e: PointerEvent) => {

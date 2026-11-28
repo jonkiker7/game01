@@ -40,6 +40,7 @@ import { TUNING } from './game/Tuning';
 import { Halos } from './game/Halos';
 import { Tutorial } from './game/Tutorial';
 import { TrainingCoach } from './game/Training';
+import { setupUiScale } from './game/UiScale';
 import { applySavedControlLayout, openControlLayoutEditor } from './game/ControlLayout';
 import { readChoice, writeChoice } from './game/Choices';
 import { getPilotName, setPilotName } from './content/characters';
@@ -981,6 +982,10 @@ function present(realDt: number): void {
     }
   }
 }
+
+// Controls and HUD keep the same size relative to the screen on every device (and the player's
+// UI SIZE setting). Everything in the HUD exists by now.
+setupUiScale($('hud'));
 
 // Go! Start at the station (or straight into a sortie with ?sortie, handy for testing).
 if (new URLSearchParams(location.search).has('sortie')) {
