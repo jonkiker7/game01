@@ -841,6 +841,7 @@ export class Run {
   private weaponOptions(): Upgrade[] {
     const options = rollWeapons(this.stats, this.levels).map((w) => {
       if (w.id.endsWith('-plus')) return w; // an enhancement for a weapon you have
+      if (w.id.startsWith('b-')) return { ...w, text: `${w.text} Your boost charge for the rest of the sortie.` };
       const primary = ['w-scatter', 'w-rail'].includes(w.id);
       const current = primary ? PRIMARY_NAMES[this.stats.primary] : SECONDARY_NAMES[this.stats.secondary];
       return { ...w, text: `${w.text} Replaces your ${current} for good.` };

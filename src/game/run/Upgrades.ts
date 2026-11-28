@@ -4,6 +4,8 @@
  */
 export type PrimaryWeapon = 'machinegun' | 'scatter' | 'rail';
 export type SecondaryWeapon = 'missile' | 'cluster' | 'swarm';
+/** What every boost and barrel roll sends out (Armory). */
+export type BoostCharge = 'none' | 'frost' | 'flame' | 'arc';
 
 export interface Stats {
   primary: PrimaryWeapon;
@@ -13,6 +15,8 @@ export interface Stats {
   railDamageMul: number; // Rail Lance bolt damage (× gun damage)
   clusterBomblets: number; // bomblets per Cluster Bomb
   swarmBonus: number; // extra rockets per Swarm volley
+  boostCharge: BoostCharge; // a burst around the ship on every boost and roll
+  boostChargeLevel: number; // its strength (1 when fitted, + each enhancement)
   gunRate: number; // bullets per second
   gunDamage: number; // per bullet
   gunSideShots: number; // extra bullets fanned out either side
@@ -55,6 +59,8 @@ export function defaultStats(): Stats {
     railDamageMul: 4.5,
     clusterBomblets: 5,
     swarmBonus: 0,
+    boostCharge: 'none',
+    boostChargeLevel: 0,
     gunRate: 11,
     gunDamage: 7,
     gunSideShots: 0,
@@ -232,6 +238,61 @@ const WEAPONS: Upgrade[] = [
       s.missileRadiusMul *= 1.2;
     },
     requires: (s) => s.secondary === 'cluster',
+  },
+  // Boost charges: fitted once (for good), then enhanced.
+  {
+    id: 'b-frost',
+    name: 'Frost Burst',
+    category: 'weapon',
+    text: 'Every boost and barrel roll sends out a ring of frost that freezes the enemies around you.',
+    max: 1,
+    apply: (s) => ((s.boostCharge = 'frost'), (s.boostChargeLevel = 1)),
+    requires: (s) => s.boostCharge === 'none',
+  },
+  {
+    id: 'b-flame',
+    name: 'Flame Burst',
+    category: 'weapon',
+    text: 'Every boost and barrel roll sends out a ring of fire that sets the enemies around you burning.',
+    max: 1,
+    apply: (s) => ((s.boostCharge = 'flame'), (s.boostChargeLevel = 1)),
+    requires: (s) => s.boostCharge === 'none',
+  },
+  {
+    id: 'b-arc',
+    name: 'Arc Burst',
+    category: 'weapon',
+    text: 'Every boost and barrel roll throws lightning at up to 4 enemies around you.',
+    max: 1,
+    apply: (s) => ((s.boostCharge = 'arc'), (s.boostChargeLevel = 1)),
+    requires: (s) => s.boostCharge === 'none',
+  },
+  {
+    id: 'b-frost-plus',
+    name: 'Frost Burst+',
+    category: 'weapon',
+    text: 'The frost ring is 30% wider and freezes for longer.',
+    max: 3,
+    apply: (s) => s.boostChargeLevel++,
+    requires: (s) => s.boostCharge === 'frost',
+  },
+  {
+    id: 'b-flame-plus',
+    name: 'Flame Burst+',
+    category: 'weapon',
+    text: 'The fire ring is 30% wider and burns hotter.',
+    max: 3,
+    apply: (s) => s.boostChargeLevel++,
+    requires: (s) => s.boostCharge === 'flame',
+  },
+  {
+    id: 'b-arc-plus',
+    name: 'Arc Burst+',
+    category: 'weapon',
+    text: 'Lightning reaches 30% farther, hits one more enemy, and strikes harder.',
+    max: 3,
+    apply: (s) => s.boostChargeLevel++,
+    requires: (s) => s.boostCharge === 'arc',
   },
   {
     id: 'w-swarm-plus',

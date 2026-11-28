@@ -284,6 +284,13 @@ export class Effects {
   }
 
   /** Nova shockwave: a wide violet ring, a flash, and sparks. */
+  /** A boost charge going off: a coloured ring out to `radius`. */
+  burst(pos: THREE.Vector3, radius: number, color: string): void {
+    this.rings.spawn(pos, color, 0.45, 2, radius * 1.05, 0.9);
+    this.rings.spawn(pos, '#ffffff', 0.25, 1, radius * 0.6, 0.6);
+    this.embersBurst(pos, 14, 16, 0.12);
+  }
+
   nova(pos: THREE.Vector3, radius: number): void {
     this.rings.spawn(pos, '#c9a8ff', 0.55, 2, radius * 1.05, 1);
     this.rings.spawn(pos, '#ffffff', 0.3, 1, radius * 0.7, 0.8);

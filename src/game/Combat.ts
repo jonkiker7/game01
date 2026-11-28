@@ -4,7 +4,7 @@ import type { Enemy, EnemyManager } from './Enemies';
 import type { Hittable } from './Projectiles';
 import type { Stats } from './run/Upgrades';
 
-export type HitSource = 'gun' | 'missile' | 'bomblet' | 'ram' | 'nova' | 'arc' | 'meltdown';
+export type HitSource = 'gun' | 'missile' | 'bomblet' | 'ram' | 'nova' | 'arc' | 'meltdown' | 'burst';
 
 const ARC_RANGE = 24; // how far lightning can jump (on-screen distance at flying height)
 const ARC_COLOR = '#a9c8ff';
