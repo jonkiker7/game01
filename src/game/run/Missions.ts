@@ -1087,7 +1087,7 @@ const ZONE_R = 12;
 
 class Hold extends Mission {
   readonly kind = 'hold';
-  private readonly zones: { x: number; z: number; y: number; k: number; done: boolean; arc: Arc; edge: THREE.Mesh }[] = [];
+  private readonly zones: { x: number; z: number; y: number; k: number; done: boolean; arc: Arc; edge: THREE.Mesh; marker: THREE.Object3D }[] = [];
 
   protected setup(): void {
     for (let i = 0; i < 3; i++) {
@@ -1098,8 +1098,9 @@ class Hold extends Mission {
       const edge = ring(GOLD, ZONE_R, 0.7, 0.8);
       edge.position.set(x, y, z);
       const ground = this.d.world.heightAt(x, z);
-      this.group.add(edge, beam(GOLD, x, ground, z, 1.4));
-      this.zones.push({ x, z, y, k: 0, done: false, arc: new Arc(this.group, '#fff1c0', ZONE_R), edge });
+      const marker = beam(GOLD, x, ground, z, 1.4);
+      this.group.add(edge, marker);
+      this.zones.push({ x, z, y, k: 0, done: false, arc: new Arc(this.group, '#fff1c0', ZONE_R), edge, marker });
     }
   }
 
@@ -1112,7 +1113,10 @@ class Hold extends Mission {
       zn.arc.set(zn.x, zn.y, zn.z, zn.k);
       if (zn.k >= 1) {
         zn.done = true;
-        ((zn.edge.material as THREE.MeshBasicMaterial).color as THREE.Color).set(GREEN).multiplyScalar(1.3);
+        // A captured zone disappears (ring, beam and progress arc), like a collected crate.
+        zn.edge.visible = false;
+        zn.marker.visible = false;
+        zn.arc.set(zn.x, zn.y, zn.z, 0);
         this.d.hud.show(`ZONE CAPTURED · ${this.zones.filter((q) => q.done).length}/3`, 1.6);
       }
     }
