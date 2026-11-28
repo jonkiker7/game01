@@ -44,6 +44,8 @@ export interface DevHooks {
   setProps: (on: boolean) => void;
   /** Camera distance multiplier (1 = normal). */
   setCameraDistance: (d: number) => void;
+  /** Jump to the start of a planet (starting a sortie first if at the station). */
+  skipTo: (planet: 'desert' | 'ice') => void;
   /** Open the on-screen control layout editor. */
   editControls: () => void;
   /** Wipe salvage and Rook's permanent upgrades (for testing). */
@@ -250,6 +252,9 @@ export function openDevPanel(h: DevHooks): void {
   swarm.add(TUNING.swarmers, 'damage', 0, 30, 1).name('damage').onChange(changed);
   swarm.add(TUNING.swarmers, 'restMin', 0.2, 6, 0.1).name('rest between dives s').onChange(changed);
 
+  const skip = gui.addFolder('Skip to');
+  skip.add({ desert: () => h.skipTo('desert') }, 'desert').name('🏜 Start of the desert');
+  skip.add({ ice: () => h.skipTo('ice') }, 'ice').name('❄ Start of the ice planet');
   gui.add({ edit: () => h.editControls() }, 'edit').name('🎮 Edit control layout');
   gui
     .add(

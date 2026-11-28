@@ -381,6 +381,21 @@ function showDevPanel(on: boolean): void {
         rig.setDistance(d);
         enemies.cullDistance = 130 * Math.max(1, d); // so enemies don't pop in at the edges
       },
+      skipTo: (planet) => {
+        const go = () => run.skipToPlanet(planet);
+        if (mode === 'run' && !run.training) {
+          if (menuPaused) closePause();
+          go();
+          return;
+        }
+        // At the station (or in training): start a sortie, then jump.
+        coach.stop();
+        ship.setDesign(save.ship);
+        setMode('run');
+        tutorialPending = false;
+        run.start();
+        go();
+      },
       editControls: () => {
         const was = menuPaused;
         menuPaused = true; // hold the world still while the buttons are moved

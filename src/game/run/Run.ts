@@ -926,6 +926,15 @@ export class Run {
     }
   }
 
+  /** Dev panel: jump to the start of a planet (its first mission). */
+  skipToPlanet(id: Planet): void {
+    const first = SCHEDULE.findIndex((st) => PLANETS[st.planet].id === id);
+    if (first < 0 || this.training) return;
+    this.d.ship.reset(this.d.world, this.shape.entry.x, this.shape.entry.z, this.stats); // full armor
+    this.sector = first; // startNextPlanet moves on to the stage after this one
+    this.startNextPlanet();
+  }
+
   /** Off to the next planet: its first mission, in a fresh arena. */
   private startNextPlanet(): void {
     this.phase = 'transition';
