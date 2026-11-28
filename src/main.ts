@@ -565,7 +565,7 @@ ship.onMissile = (charge, heading) => {
   const p = ship.root.position;
   if (ship.stats.secondary === 'swarm') {
     // Swarm Rockets: a volley of small homing rockets, one per nearby target (more with charge).
-    const count = 3 + Math.round(charge * 3);
+    const count = 3 + Math.round(charge * 3) + ship.stats.swarmBonus;
     const range = missileRange(charge) + 12;
     const targets = enemies.nearest(p.x, p.z, range, count);
     for (let i = 0; i < count; i++) {
@@ -613,8 +613,9 @@ missiles.onExplode = (pos, power) => {
   // Cluster Bomb: the blast throws out 5 bomblets that go off a moment later.
   if (st.secondary === 'cluster') {
     const spreadR = missileBlastRadius(power) * st.missileRadiusMul * 1.7;
-    for (let i = 0; i < 5; i++) {
-      const a = (i / 5) * Math.PI * 2 + Math.random() * 0.8;
+    const n = st.clusterBomblets;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + Math.random() * 0.8;
       const r = spreadR * (0.55 + Math.random() * 0.45);
       bomblets.push({ x: pos.x + Math.cos(a) * r, y: pos.y, z: pos.z + Math.sin(a) * r, t: 0.12 + Math.random() * 0.25 });
     }
@@ -677,7 +678,7 @@ function updateGun(dt: number): void {
 
   if (weapon === 'scatter') {
     // A cone of pellets; Split Shot adds two more per level.
-    const pellets = 6 + st.gunSideShots * 2;
+    const pellets = st.scatterPellets + st.gunSideShots * 2;
     for (let i = 0; i < pellets; i++) {
       const k = pellets === 1 ? 0 : i / (pellets - 1) - 0.5;
       fire(angle + k * 0.56 + (Math.random() - 0.5) * 0.05, st.gunDamage * 0.85);
@@ -685,7 +686,7 @@ function updateGun(dt: number): void {
     rig.kick(0, 0.12);
     return;
   }
-  const damage = weapon === 'rail' ? st.gunDamage * 4.5 : st.gunDamage;
+  const damage = weapon === 'rail' ? st.gunDamage * st.railDamageMul : st.gunDamage;
   angle += weapon === 'rail' ? 0 : (Math.random() - 0.5) * GUN_SPREAD * 2;
   // Split Shot adds bullets fanned out to each side.
   for (let i = -st.gunSideShots; i <= st.gunSideShots; i++) fire(angle + i * SIDE_SHOT_ANGLE, damage);

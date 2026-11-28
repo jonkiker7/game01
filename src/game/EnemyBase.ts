@@ -16,8 +16,10 @@ import type { World } from './World';
 export const ENEMY_PALETTES = {
   /** Bright orange: easy to spot against the jungle's greens, blues and purples. */
   orange: { armor: '#fe8200', body: '#fe002f', stone: '#fe8200' },
-  /** The original dark purple. */
+  /** The original dark purple (the desert planet). */
   purple: { armor: '#6a2f63', body: '#3b1d4a', stone: '#4a2f5e' },
+  /** Crimson and near-black: stands out against the ice planet's whites and blues. */
+  crimson: { armor: '#e0213f', body: '#2a0f22', stone: '#c41a36' },
 };
 export type EnemyPalette = keyof typeof ENEMY_PALETTES;
 export const DEFAULT_ENEMY_PALETTE: EnemyPalette = 'orange';

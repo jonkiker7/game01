@@ -136,8 +136,12 @@ export class Ship {
     this.armor = Math.min(this.stats.maxArmor, this.armor + amount);
   }
 
+  /** Multiplies all damage taken (tougher planets' enemies hit harder). */
+  incomingMul = 1;
+
   damage(amount: number): void {
     if (!this.alive || this.invulnerable > 0) return;
+    amount *= this.incomingMul;
     this.armor = Math.max(0, this.armor - amount);
     this.hitFlash = 0.18;
     this.onHit?.(amount);
