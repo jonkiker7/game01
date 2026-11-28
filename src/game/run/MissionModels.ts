@@ -189,7 +189,13 @@ export const BRIEFINGS: Briefing[] = [
   {
     id: 'boss',
     name: 'Boss',
-    summary: 'The final fight of every sortie.',
-    slides: [{ caption: 'Every sortie ends with a boss. Watch for red warnings and dodge!', model: () => new Skyreaver(1).root }],
+    summary: 'The big fight at the end of every sortie.',
+    slides: [{ caption: 'Every sortie builds up to a boss. Watch for red warnings and dodge!', model: () => new Skyreaver(1).root }],
+  },
+  {
+    id: 'bonus',
+    name: 'Bonus Round',
+    summary: 'After the boss: 90 seconds, and every kill is extra salvage.',
+    slides: [{ caption: 'Beat the boss, then shoot down as many drones and swarmers as you can in 90 seconds. Every kill is +5 salvage!', model: () => new Swarmer(1).root }],
   },
 ];
