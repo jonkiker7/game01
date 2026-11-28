@@ -97,7 +97,7 @@ const DESERT_CANYON: CanyonColors = {
   sandstoneDark: '#8e4426',
   deep: '#3a1f2e',
   floor: '#5a2e2e',
-  fog: '#ff9a5a',
+  fog: '#d8abff', // a lilac haze
   redGlow: '#ff5a4a',
 };
 /** Ice canyons: pale ice walls dropping to deep blue, with a cold blue mist. */
@@ -117,6 +117,8 @@ const BIOMES: Record<Biome, { palette: Palette; canyon: CanyonColors }> = {
 
 /** Each planet's canyon fog colour (the ?dev panel can change them). */
 export const BIOME_FOG: Record<Biome, string> = { jungle: CANYON.fog, desert: DESERT_CANYON.fog, ice: ICE_CANYON.fog };
+/** Each planet's canyon fog density (the opacity of each fog layer). */
+export const BIOME_FOG_DENSITY: Record<Biome, number> = { jungle: 0.23, desert: 0.28, ice: 0.23 };
 
 /** How far the canyons drop below the rock tops. */
 export const CANYON_DEPTH = 48;
@@ -153,7 +155,7 @@ export class World {
     this.biome = b;
     this.palette = BIOMES[b].palette;
     this.canyon = BIOMES[b].canyon;
-    this.setCanyonFog(BIOME_FOG[b], this.fog.density, this.fog.height);
+    this.setCanyonFog(BIOME_FOG[b], BIOME_FOG_DENSITY[b], this.fog.height);
   }
   readonly group = new THREE.Group();
   private readonly bulbMat: THREE.MeshBasicMaterial;
@@ -305,10 +307,11 @@ export class World {
    * Canyon fog: `density` is each layer's opacity (they stack, so it's thickest at the
    * bottom), `height` how far up the canyon it reaches (0..1 of the depth).
    */
-  /** Set every planet's fog colour, and the fog's density and height (for the ?dev panel). */
-  setFogColors(colors: Record<Biome, string>, density: number, height: number): void {
+  /** Set every planet's fog colour and density, and the fog's height (for the ?dev panel). */
+  setFogColors(colors: Record<Biome, string>, densities: Record<Biome, number>, height: number): void {
     Object.assign(BIOME_FOG, colors);
-    this.setCanyonFog(BIOME_FOG[this.biome], density, height);
+    Object.assign(BIOME_FOG_DENSITY, densities);
+    this.setCanyonFog(BIOME_FOG[this.biome], BIOME_FOG_DENSITY[this.biome], height);
   }
 
   setCanyonFog(color: string, density: number, height: number): void {
