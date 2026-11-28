@@ -17,10 +17,13 @@ import { HOVER_HEIGHT, type Ship } from './Ship';
  *                  bomb barrages; a charged main-cannon beam; ground shockwaves; brings crawlers
  *   Jungle Titan   rooted plant colossus: only its open pod can be hurt (the weak spot moves);
  *                  tentacle slams, lingering spore clouds, seed spirals, calls in swarmers
+ *   Sandworm       the desert boss: tunnels under the sand (a dust cloud shows where it is and
+ *                  where it'll surface), bursts up under you, spits sand, then slowly sinks.
+ *                  It can only be hurt while it's above ground.
  */
 
-export type BossId = 'flyer' | 'tank' | 'titan';
-export const BOSS_NAMES: Record<BossId, string> = { flyer: 'SKYREAVER', tank: 'JUGGERNAUT', titan: 'JUNGLE TITAN' };
+export type BossId = 'flyer' | 'tank' | 'titan' | 'worm';
+export const BOSS_NAMES: Record<BossId, string> = { flyer: 'SKYREAVER', tank: 'JUGGERNAUT', titan: 'JUNGLE TITAN', worm: 'SANDWORM' };
 
 const RED = '#ff3d3d';
 const warnMat = () => glow(RED, { transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }, 1.4);
@@ -982,8 +985,208 @@ export class JungleTitan extends Boss {
   }
 }
 
+// ---------------------------------------------------------------- Sandworm (desert)
+
+const WORM_HEIGHT = 20; // how far the head rises above the sand
+
+export class Sandworm extends Boss {
+  readonly id = 'worm';
+  readonly kind = 'ground';
+  readonly radius = 5;
+  readonly aimHeight = 12;
+  /** 0 = under the sand, 1 = fully up. */
+  private rise = 0;
+  private state: 'burrow' | 'tell' | 'emerge' | 'up' | 'sink' = 'burrow';
+  private t = 0;
+  private fireTimer = 0;
+  private spin = 0;
+  private readonly target = new THREE.Vector2();
+  private readonly body = new THREE.Group();
+  private readonly head = new THREE.Group();
+  private readonly dust = new THREE.Group();
+  private readonly puffs: THREE.Mesh[] = [];
+  private readonly warn: THREE.Mesh;
+  private readonly warnMaterial = warnMat();
+  private readonly maw = glow(ENEMY_GLOW, {}, 1.8);
+  private readonly tmp = new THREE.Vector3();
+
+  get aimable(): boolean {
+    return this.exposed;
+  }
+  /** Only hittable while it's up out of the sand. */
+  get exposed(): boolean {
+    return this.rise > 0.35;
+  }
+  get hitBottom(): number {
+    return this.exposed ? 0 : -999;
+  }
+  get hitTop(): number {
+    return this.exposed ? WORM_HEIGHT * this.rise + 3 : -998;
+  }
+
+  constructor(hpMul = 1) {
+    super(900 * hpMul);
+    this.salvage = 150;
+    this.weight = 0;
+    this.dropChance = 0;
+    // A segmented body curving up out of the ground, ending in a round, toothed maw.
+    const n = 8;
+    for (let i = 0; i < n; i++) {
+      const k = i / (n - 1);
+      const r = 3.4 - k * 0.6;
+      const seg = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10), this.mat(i % 2 ? ENEMY_COLORS.body : ENEMY_COLORS.armor));
+      seg.position.set(Math.sin(k * 1.4) * 2.5, k * WORM_HEIGHT, 0);
+      seg.scale.y = 0.85;
+      this.body.add(seg);
+    }
+    const skull = new THREE.Mesh(new THREE.SphereGeometry(3.8, 16, 12), this.mat(ENEMY_COLORS.armor));
+    const mouth = new THREE.Mesh(new THREE.CircleGeometry(2.6, 20), this.maw);
+    mouth.rotation.x = -Math.PI / 2;
+    mouth.position.y = 3.3;
+    this.head.add(skull, mouth);
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2;
+      const tooth = new THREE.Mesh(new THREE.ConeGeometry(0.45, 1.8, 5), this.mat('#f1e3c2'));
+      tooth.position.set(Math.cos(a) * 2.9, 3.6, Math.sin(a) * 2.9);
+      tooth.rotation.set(Math.sin(a) * 0.5, 0, -Math.cos(a) * 0.5);
+      this.head.add(tooth);
+    }
+    this.head.position.set(Math.sin(1.4) * 2.5, WORM_HEIGHT + 1, 0);
+    this.body.add(this.head);
+    this.body.visible = false;
+    this.root.add(this.body);
+    // The dust cloud that travels with it under the sand.
+    const dustMat = new THREE.MeshBasicMaterial({ color: '#d9b07a', transparent: true, opacity: 0.55, depthWrite: false });
+    for (let i = 0; i < 6; i++) {
+      const puff = new THREE.Mesh(new THREE.SphereGeometry(2.2 + (i % 3) * 0.6, 10, 8), dustMat);
+      puff.userData.noOutline = true;
+      this.puffs.push(puff);
+      this.dust.add(puff);
+    }
+    this.root.add(this.dust);
+    // Where it's about to surface.
+    this.warn = new THREE.Mesh(new THREE.RingGeometry(7.2, 8, 40), this.warnMaterial);
+    this.warn.rotation.x = -Math.PI / 2;
+    this.warn.position.y = 0.4;
+    this.warn.visible = false;
+    this.warn.userData.noOutline = true;
+    this.root.add(this.warn);
+    addOutlines(this.body);
+  }
+
+  damage(amount: number, blast = false): void {
+    if (!this.exposed) return; // safe under the sand
+    super.damage(amount, blast);
+  }
+
+  objectiveLine(): string {
+    return this.exposed ? `SHOOT ${this.name} NOW!` : 'WATCH THE DUST: IT SURFACES THERE';
+  }
+
+  protected think({ ship, shots, world, dt, effects }: Ctx): void {
+    const p = this.root.position;
+    const s = ship.root.position;
+    p.y = world.heightAt(p.x, p.z);
+    this.t += dt;
+    const fast = this.phase2 ? 1.35 : 1;
+    // The dust: churning puffs over the spot, bigger just before it surfaces.
+    const churn = this.state === 'tell' ? 1.5 + this.t : this.state === 'burrow' ? 1 : 0.5;
+    this.dust.visible = this.state !== 'up';
+    this.puffs.forEach((puff, i) => {
+      const a = this.time * (1.5 + i * 0.3) + i;
+      puff.position.set(Math.cos(a) * 2.6 * churn, 1 + Math.abs(Math.sin(a * 1.3)) * 1.6 * churn, Math.sin(a) * 2.6 * churn);
+      puff.scale.setScalar(0.7 + 0.35 * churn);
+    });
+
+    switch (this.state) {
+      case 'burrow': {
+        // Tunnel toward where the ship is heading.
+        if (this.t <= dt) {
+          const a = Math.random() * Math.PI * 2;
+          this.target.set(s.x + ship.velocity.x * 0.8 + Math.cos(a) * 4, s.z + ship.velocity.y * 0.8 + Math.sin(a) * 4);
+        }
+        const dx = this.target.x - p.x;
+        const dz = this.target.y - p.z;
+        const d = Math.hypot(dx, dz);
+        const step = 16 * fast * dt;
+        if (d > step) {
+          p.x += (dx / d) * step;
+          p.z += (dz / d) * step;
+        }
+        if ((d <= step && this.t > 1) || this.t > 4.5) this.go('tell');
+        break;
+      }
+      case 'tell': {
+        this.warn.visible = true;
+        this.warnMaterial.opacity = 0.25 + 0.5 * Math.abs(Math.sin(this.t * 9));
+        if (this.t > 1.2 / fast) {
+          this.warn.visible = false;
+          this.go('emerge');
+          // Bursting out of the sand: anything on top of it gets hit.
+          effects.explosion(this.tmp.set(p.x, p.y + 2, p.z), 7, p.y);
+          const d = Math.hypot(s.x - p.x, s.z - p.z);
+          if (ship.alive && ship.invulnerable <= 0 && d < 8 + ship.radius) ship.damage(22);
+        }
+        break;
+      }
+      case 'emerge':
+        this.rise = Math.min(1, this.t / 0.45);
+        if (this.rise >= 1) {
+          this.go('up');
+          this.fireTimer = 0.4;
+          // Phase 2: a ring of sand bursts out as it surfaces.
+          if (this.phase2) this.ring(shots, s.y, 14);
+        }
+        break;
+      case 'up': {
+        // Turn to face the ship and spit fans of sand at it.
+        this.body.rotation.y = Math.atan2(s.x - p.x, s.z - p.z) - Math.PI / 2;
+        this.fireTimer -= dt;
+        if (this.fireTimer <= 0 && ship.alive) {
+          this.fireTimer = this.phase2 ? 0.7 : 1;
+          const base = Math.atan2(s.z - p.z, s.x - p.x);
+          const n = this.phase2 ? 7 : 5;
+          this.headPos();
+          for (let i = 0; i < n; i++) {
+            const a = base + (i - (n - 1) / 2) * 0.16;
+            shots.fire(this.tmp, Math.cos(a), Math.sin(a), 20, s.y, Math.hypot(s.x - p.x, s.z - p.z), 7, 4);
+          }
+        }
+        if (this.t > (this.phase2 ? 4.5 : 3.5)) this.go('sink');
+        break;
+      }
+      case 'sink':
+        // Slowly digs back down (still hittable until it's mostly under).
+        this.rise = Math.max(0, 1 - this.t / 2.6);
+        if (this.rise <= 0) this.go('burrow');
+        break;
+    }
+    this.body.visible = this.rise > 0;
+    this.body.position.y = -WORM_HEIGHT * (1 - this.rise) - 1;
+  }
+
+  private go(state: Sandworm['state']): void {
+    this.state = state;
+    this.t = 0;
+  }
+
+  private headPos(): void {
+    this.head.getWorldPosition(this.tmp);
+  }
+
+  private ring(shots: Ctx['shots'], y: number, n: number): void {
+    this.headPos();
+    this.spin += 0.4;
+    for (let i = 0; i < n; i++) {
+      const a = this.spin + (i / n) * Math.PI * 2;
+      shots.fire(this.tmp, Math.cos(a), Math.sin(a), 15, y, 30, 6, 4);
+    }
+  }
+}
+
 export function createBoss(id: BossId, hpMul: number): Boss {
   if (id === 'tank') return new Juggernaut(hpMul);
   if (id === 'titan') return new JungleTitan(hpMul);
+  if (id === 'worm') return new Sandworm(hpMul);
   return new Skyreaver(hpMul);
 }

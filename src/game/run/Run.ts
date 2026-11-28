@@ -33,12 +33,14 @@ interface PlanetSpec {
   power: number;
   /** Enemy colours, picked to stand out against the planet. */
   palette: EnemyPalette;
+  /** The boss waiting at the end of this planet. */
+  boss: BossId;
 }
 /** The planets of a sortie, in order: each ends with its own boss and a bonus round. */
 export const PLANETS: PlanetSpec[] = [
-  { id: 'jungle', name: 'JUNGLE PLANET', warmups: 3, missions: 4, power: 1, palette: 'orange' },
-  { id: 'desert', name: 'DESERT PLANET', warmups: 0, missions: 5, power: 1.5, palette: 'purple' },
-  { id: 'ice', name: 'ICE PLANET', warmups: 0, missions: 5, power: 2, palette: 'crimson' },
+  { id: 'jungle', name: 'JUNGLE PLANET', warmups: 3, missions: 4, power: 1, palette: 'orange', boss: 'titan' },
+  { id: 'desert', name: 'DESERT PLANET', warmups: 0, missions: 5, power: 1.5, palette: 'purple', boss: 'worm' },
+  { id: 'ice', name: 'ICE PLANET', warmups: 0, missions: 5, power: 2, palette: 'crimson', boss: 'flyer' },
 ];
 type StageKind = 'warmup' | 'mission' | 'boss' | 'bonus';
 interface Stage {
@@ -208,7 +210,6 @@ export class Run {
     return PLANETS[this.stage.planet];
   }
   /** Bosses already fought this sortie (each planet has a different one). */
-  private readonly usedBosses = new Set<BossId>();
 
   get arenaCenter(): THREE.Vector2 {
     return this.center;
@@ -347,7 +348,6 @@ export class Run {
     const planet = PLANETS.findIndex((p) => p.id === params.get('planet'));
     if (planet > 0) this.sector = SCHEDULE.findIndex((st) => st.planet === planet) + 1;
     if (params.has('boss')) this.sector = SCHEDULE.findIndex((st) => st.kind === 'boss' && st.planet === Math.max(0, planet)) + 1;
-    this.usedBosses.clear();
     this.kind = this.pickKind();
     this.buildArena();
     ship.reset(world, this.shape.entry.x, this.shape.entry.z, this.stats);
@@ -358,7 +358,10 @@ export class Run {
   /** Generate this round's level: an organic arena shaped for the mission, fresh terrain. */
   private buildArena(): void {
     this.d.world.setBiome(this.planet.id);
-    const seed = this.seed * 10 + this.sector;
+    // The Sandworm's arena is always the same one, with a wide canyon-free middle to tunnel in.
+    const worm = this.kind === 'boss' && this.bossId() === 'worm';
+    const seed = worm ? 4242 : this.seed * 10 + this.sector;
+    this.d.world.centerClear = worm ? 80 : 26;
     this.shape =
       CORRIDOR_MISSIONS.includes(this.kind as MissionKind)
         ? corridorArena(CORRIDOR.length, CORRIDOR.halfWidth, seed)
@@ -541,17 +544,15 @@ export class Run {
     return kind;
   }
 
-  /** Which boss: `?boss=flyer|tank|titan` for testing, otherwise one at random. */
+  /** Which boss: `?boss=flyer|tank|titan|worm` for testing, otherwise the planet's own. */
   private pickBoss(): BossId {
+    return this.bossId();
+  }
+
+  private bossId(): BossId {
     const forced = new URLSearchParams(location.search).get('boss') as BossId | null;
     if (forced && forced in BOSS_NAMES) return forced;
-    // A boss not fought yet this sortie (each planet gets a different one).
-    const all = Object.keys(BOSS_NAMES) as BossId[];
-    const fresh = all.filter((id) => !this.usedBosses.has(id));
-    const pool = fresh.length ? fresh : all;
-    const id = forced && forced in BOSS_NAMES ? forced : pool[Math.floor(Math.random() * pool.length)];
-    this.usedBosses.add(id);
-    return id;
+    return this.planet.boss;
   }
 
   /** Every sortie opens with Eliminate the Threats. */
