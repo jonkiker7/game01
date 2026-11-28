@@ -538,10 +538,12 @@ ship.onBoost = () => {
   effects.boostBurst(ship.root.position);
   audio.play('boost');
   coach.notify('boost');
+  fireBoostCharge();
 };
 ship.onRoll = (dir) => {
   audio.play('roll', { pan: dir * 0.5 });
   coach.notify('roll');
+  fireBoostCharge();
   rig.kick(6, 0.4);
   input.vibrate(18);
 };
@@ -694,6 +696,44 @@ function updateGun(dt: number): void {
 }
 
 /** Nova: a shockwave around the ship that damages everything nearby and wipes out enemy shots. */
+/**
+ * Boost charges (Armory): every boost and barrel roll sends out a ring that freezes, burns or
+ * zaps the enemies around the ship. Bosses are only chilled (frozen solid would stall them).
+ */
+const BURST_RADIUS = 9;
+const BURST_COLORS = { frost: '#8fe6ff', flame: '#ff8a3d', arc: '#9fb8ff' } as const;
+const burstPos = new THREE.Vector3();
+function fireBoostCharge(): void {
+  const st = ship.stats;
+  if (st.boostCharge === 'none' || !ship.alive) return;
+  const lv = st.boostChargeLevel;
+  const p = ship.root.position;
+  const radius = BURST_RADIUS * (1 + 0.3 * (lv - 1));
+  if (st.boostCharge === 'arc') {
+    // Lightning to the nearest few enemies.
+    const targets = enemies.nearest(p.x, p.z, radius * 1.6, 3 + lv);
+    for (const t of targets) {
+      burstPos.copy(t.root.position);
+      burstPos.y = p.y;
+      effects.lightning(p, burstPos, BURST_COLORS.arc);
+      combat.hit(t, 20 + 12 * (lv - 1), 'arc');
+    }
+    effects.burst(p, radius * 0.7, BURST_COLORS.arc);
+  } else {
+    const frost = st.boostCharge === 'frost';
+    enemies.forEachNear(p.x, p.z, radius, (e) => {
+      const boss = e.species === 'boss' || e.species === 'bosspart';
+      if (frost) {
+        if (boss) e.chill(2);
+        else e.freeze(1.2 + 0.6 * (lv - 1));
+      } else e.ignite(8 + 5 * (lv - 1), 3);
+      combat.hit(e, 4, 'burst');
+    });
+    effects.burst(p, radius, BURST_COLORS[st.boostCharge]);
+  }
+  audio.play('nova', { volume: 0.35, pitch: 1.5 });
+}
+
 function fireNova(): void {
   const p = ship.root.position;
   const radius = NOVA_RADIUS * ship.stats.novaRadiusMul;
