@@ -1,3 +1,4 @@
+import { uiScale } from './UiScale';
 export type ButtonName = 'gun' | 'missile' | 'boost' | 'special' | 'rollL' | 'rollR';
 /** Buttons that double as aiming sticks (hold and drag). */
 export type AimButton = 'gun' | 'missile';
@@ -183,16 +184,19 @@ export class Input {
   }
 
   private updateStick(px: number, py: number): void {
+    // The stick is drawn at the HUD's scale, so its reach scales too.
+    const s = uiScale();
+    const R = this.stickRadius * s;
     let dx = px - this.stickOriginX;
     let dy = py - this.stickOriginY;
     const dist = Math.hypot(dx, dy);
-    if (dist > this.stickRadius) {
-      dx = (dx / dist) * this.stickRadius;
-      dy = (dy / dist) * this.stickRadius;
+    if (dist > R) {
+      dx = (dx / dist) * R;
+      dy = (dy / dist) * R;
     }
-    this.el.stickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+    this.el.stickKnob.style.transform = `translate(${dx / s}px, ${dy / s}px)`;
 
-    const len = Math.min(dist, this.stickRadius) / this.stickRadius;
+    const len = Math.min(dist, R) / R;
     if (len < DEADZONE) {
       this.stickX = 0;
       this.stickY = 0;
@@ -200,8 +204,8 @@ export class Input {
     }
     // Rescale so movement starts smoothly just outside the deadzone.
     const scaled = (len - DEADZONE) / (1 - DEADZONE);
-    this.stickX = (dx / (len * this.stickRadius)) * scaled;
-    this.stickY = (-dy / (len * this.stickRadius)) * scaled;
+    this.stickX = (dx / (len * R)) * scaled;
+    this.stickY = (-dy / (len * R)) * scaled;
   }
 
   private bindButton(name: ButtonName, el: HTMLElement): void {
@@ -274,10 +278,11 @@ export class Input {
   }
 
   private updateAim(aim: AimStick, dx: number, dy: number): void {
+    const s = uiScale(); // the aim ring is drawn at the HUD's scale
     const dist = Math.hypot(dx, dy);
-    const k = dist > AIM_RADIUS ? AIM_RADIUS / dist : 1;
-    aim.knob.style.transform = `translate(${dx * k}px, ${dy * k}px)`;
-    if (dist < AIM_DEADZONE) {
+    const k = dist > AIM_RADIUS * s ? (AIM_RADIUS * s) / dist : 1;
+    aim.knob.style.transform = `translate(${(dx * k) / s}px, ${(dy * k) / s}px)`;
+    if (dist < AIM_DEADZONE * s) {
       aim.x = 0;
       aim.y = 0;
     } else {

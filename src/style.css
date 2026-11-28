@@ -58,8 +58,8 @@ body {
   width: 128px;
   height: 128px;
   margin: -64px 0 0 -64px;
-  left: calc(110px + env(safe-area-inset-left));
-  top: calc(100% - 110px - env(safe-area-inset-bottom));
+  left: calc(110px * var(--ui, 1) + env(safe-area-inset-left));
+  top: calc(100% - 110px * var(--ui, 1) - env(safe-area-inset-bottom));
   border-radius: 50%;
   border: 2px solid var(--gold-dim);
   background: radial-gradient(circle, rgba(122, 19, 40, 0.35), rgba(20, 5, 25, 0.25));
@@ -2273,4 +2273,19 @@ body.mode-base #coach {
 #run-end h1.returned,
 h1.returned {
   color: #ffd36b;
+}
+
+/* ---------- UI scale (see UiScale.ts): HUD groups scale from their screen corner ---------- */
+.ui-group {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transform: scale(var(--ui, 1));
+}
+/* Things placed in code at the touch point scale on their own. */
+#stick-base,
+.aim-ring,
+.thumb-demo .ring,
+.thumb-demo .thumb {
+  scale: var(--ui, 1);
 }

@@ -1,3 +1,4 @@
+import { setUserUiScale, userUiScale } from '../UiScale';
 import * as THREE from 'three';
 import { audio, type Volumes } from '../../audio/Audio';
 import { addOutlines, glow } from '../materials';
@@ -51,6 +52,9 @@ export class PauseMenu {
                  <label>Music<input type="range" min="0" max="100" data-vol="music"></label>
                  <label>Effects<input type="range" min="0" max="100" data-vol="sfx"></label>
                </div></section>
+               <section class="sound ui-size"><h3>UI SIZE</h3><div class="body">
+                 <label>Controls &amp; HUD <input type="range" min="50" max="130" step="5" class="ui-scale"></label>
+               </div></section>
              </div>
              <div class="info-col">
                <section class="stats"><h3>SHIP</h3><div class="body"></div></section>
@@ -86,6 +90,10 @@ export class PauseMenu {
       this.onDevToggle?.(on);
     });
     this.el.addEventListener('pointerdown', (e) => e.stopPropagation());
+    // UI size (saved on this device): the controls and HUD change size live behind the menu.
+    const uiInput = this.el.querySelector('.ui-scale') as HTMLInputElement;
+    uiInput.value = String(Math.round(userUiScale() * 100));
+    uiInput.addEventListener('input', () => setUserUiScale(Number(uiInput.value) / 100));
     // Volume sliders (saved on this device).
     for (const input of this.el.querySelectorAll<HTMLInputElement>('input[data-vol]')) {
       const key = input.dataset.vol as 'master' | 'music' | 'sfx';
