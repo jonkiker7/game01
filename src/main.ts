@@ -715,7 +715,8 @@ function updateGun(dt: number): void {
  * Boost charges (Armory): every boost and barrel roll sends out a ring that freezes, burns or
  * zaps the enemies around the ship. Bosses are only chilled (frozen solid would stall them).
  */
-const BURST_RADIUS = 9;
+/** Boost charge rings: nearly as big as the Nova (26), so they actually catch enemies. */
+const BURST_RADIUS = 22;
 const BURST_COLORS = { frost: '#8fe6ff', flame: '#ff8a3d', arc: '#9fb8ff' } as const;
 const burstPos = new THREE.Vector3();
 function fireBoostCharge(): void {
@@ -723,7 +724,7 @@ function fireBoostCharge(): void {
   if (st.boostCharge === 'none' || !ship.alive) return;
   const lv = st.boostChargeLevel;
   const p = ship.root.position;
-  const radius = BURST_RADIUS * (1 + 0.3 * (lv - 1));
+  const radius = BURST_RADIUS * (1 + 0.15 * (lv - 1));
   if (st.boostCharge === 'arc') {
     // Lightning to the nearest few enemies.
     const targets = enemies.nearest(p.x, p.z, radius * 1.6, 3 + lv);
@@ -733,7 +734,7 @@ function fireBoostCharge(): void {
       effects.lightning(p, burstPos, BURST_COLORS.arc);
       combat.hit(t, 20 + 12 * (lv - 1), 'arc');
     }
-    effects.burst(p, radius * 0.7, BURST_COLORS.arc);
+    effects.burst(p, radius, BURST_COLORS.arc);
   } else {
     const frost = st.boostCharge === 'frost';
     enemies.forEachNear(p.x, p.z, radius, (e) => {
