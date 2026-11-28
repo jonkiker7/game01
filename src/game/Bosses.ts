@@ -18,8 +18,9 @@ import { HOVER_HEIGHT, type Ship } from './Ship';
  *   Jungle Titan   rooted plant colossus: only its open pod can be hurt (the weak spot moves);
  *                  tentacle slams, lingering spore clouds, seed spirals, calls in swarmers
  *   Sandworm       the desert boss: tunnels under the sand (a dust cloud shows where it is and
- *                  where it'll surface), bursts up under you, spits sand, then slowly sinks.
- *                  It can only be hurt while it's above ground.
+ *                  where it'll surface), bursts up under you, sweeps a blast of sand breath,
+ *                  then sinks, leaving a quicksand sinkhole that drags you in. It can only be
+ *                  hurt while it's above ground.
  */
 
 export type BossId = 'flyer' | 'tank' | 'titan' | 'worm';
@@ -988,7 +989,23 @@ export class JungleTitan extends Boss {
 // ---------------------------------------------------------------- Sandworm (desert)
 
 const WORM_HEIGHT = 20; // how far the head rises above the sand
+const BREATH_RANGE = 38;
+const VORTEX_RADIUS = 22;
+/** Half-width (radians) of the stream of sand; it sweeps across a wider wedge. */
+const BREATH_BAND = 0.3;
+/** Warnings drawn on the sand: plain (not additive) red, which shows up on bright sand. */
+function sandWarn(): THREE.MeshBasicMaterial {
+  return new THREE.MeshBasicMaterial({ color: '#e8102a', transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide });
+}
 
+/**
+ * Its attacks are all its own:
+ *   Ambush      the dust swells and a red ring flashes, then it bursts up right there.
+ *   Sand breath a red wedge marks where it's aiming, then it blasts a stream of sand that
+ *               sweeps across the wedge (phase 2: wider, and back again).
+ *   Sinkhole    as it digs back down it leaves a swirling quicksand pit that drags you toward
+ *               the middle, which hurts (phase 2: pulls harder, lasts longer).
+ */
 export class Sandworm extends Boss {
   readonly id = 'worm';
   readonly kind = 'ground';
@@ -996,19 +1013,32 @@ export class Sandworm extends Boss {
   readonly aimHeight = 12;
   /** 0 = under the sand, 1 = fully up. */
   private rise = 0;
-  private state: 'burrow' | 'tell' | 'emerge' | 'up' | 'sink' = 'burrow';
+  private state: 'burrow' | 'tell' | 'emerge' | 'aim' | 'breath' | 'sink' = 'burrow';
   private t = 0;
-  private fireTimer = 0;
-  private spin = 0;
+  private aimAngle = 0;
+  private sweepDir = 1;
+  private tick = 0;
   private readonly target = new THREE.Vector2();
   private readonly body = new THREE.Group();
   private readonly head = new THREE.Group();
   private readonly dust = new THREE.Group();
   private readonly puffs: THREE.Mesh[] = [];
   private readonly warn: THREE.Mesh;
-  private readonly warnMaterial = warnMat();
+  private readonly warnMaterial = sandWarn();
   private readonly maw = glow(ENEMY_GLOW, {}, 1.8);
   private readonly tmp = new THREE.Vector3();
+  // Sand breath: a ground wedge (red while aiming, sand while blasting).
+  private readonly cone = new THREE.Group();
+  private readonly coneMesh: THREE.Mesh;
+  private readonly coneWarn = sandWarn();
+  private readonly coneSand = new THREE.MeshBasicMaterial({ color: '#b9783c', transparent: true, opacity: 0.6, depthWrite: false });
+  private readonly streams: THREE.Mesh[] = [];
+  // Sinkhole: swirling rings, placed in world space (the worm moves on without it).
+  private readonly vortex = new THREE.Group();
+  private readonly vortexRings: THREE.Object3D[] = [];
+  private readonly vortexAt = new THREE.Vector2();
+  private vortexT = -1;
+  private vortexTick = 0;
 
   get aimable(): boolean {
     return this.exposed;
@@ -1022,6 +1052,9 @@ export class Sandworm extends Boss {
   }
   get hitTop(): number {
     return this.exposed ? WORM_HEIGHT * this.rise + 3 : -998;
+  }
+  private get halfAngle(): number {
+    return this.phase2 ? 0.42 : 0.32;
   }
 
   constructor(hpMul = 1) {
@@ -1065,12 +1098,52 @@ export class Sandworm extends Boss {
     }
     this.root.add(this.dust);
     // Where it's about to surface.
-    this.warn = new THREE.Mesh(new THREE.RingGeometry(7.2, 8, 40), this.warnMaterial);
+    this.warn = new THREE.Mesh(new THREE.RingGeometry(6.6, 8, 40), this.warnMaterial);
     this.warn.rotation.x = -Math.PI / 2;
-    this.warn.position.y = 0.4;
+    this.warn.position.y = 3; // above the sand's bumps, so it's never hidden
     this.warn.visible = false;
     this.warn.userData.noOutline = true;
     this.root.add(this.warn);
+    // The breath wedge (pointing along +x before it's turned toward its aim).
+    this.coneMesh = new THREE.Mesh(new THREE.CircleGeometry(BREATH_RANGE, 28, -BREATH_BAND, BREATH_BAND * 2), this.coneWarn);
+    this.coneMesh.rotation.x = -Math.PI / 2;
+    this.coneMesh.position.y = 3;
+    this.coneMesh.userData.noOutline = true;
+    this.cone.add(this.coneMesh);
+    // Streaks of sand flying down the middle of the blast.
+    const streakGeo = new THREE.SphereGeometry(1, 8, 6);
+    for (let i = 0; i < 10; i++) {
+      const s = new THREE.Mesh(streakGeo, this.coneSand);
+      s.scale.set(2.4, 0.9, 0.9);
+      s.userData.noOutline = true;
+      this.streams.push(s);
+      this.cone.add(s);
+    }
+    this.cone.visible = false;
+    this.root.add(this.cone);
+    // The sinkhole: rings of sand swirling inward around a dark middle.
+    const pitMat = new THREE.MeshBasicMaterial({ color: '#4a2f1c', transparent: true, opacity: 0.75, depthWrite: false });
+    const pit = new THREE.Mesh(new THREE.CircleGeometry(4, 24), pitMat);
+    pit.rotation.x = -Math.PI / 2;
+    pit.position.y = 0.35;
+    pit.userData.noOutline = true;
+    this.vortex.add(pit);
+    const ringMat = new THREE.MeshBasicMaterial({ color: '#c8935a', transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide });
+    for (let i = 0; i < 4; i++) {
+      // A broken ring (three arcs) so you can see it spin.
+      const ring = new THREE.Group();
+      for (let j = 0; j < 3; j++) {
+        const arc = new THREE.Mesh(new THREE.RingGeometry(0.86, 1, 20, 1, (j / 3) * Math.PI * 2, 1.4), ringMat);
+        arc.rotation.x = -Math.PI / 2;
+        arc.userData.noOutline = true;
+        ring.add(arc);
+      }
+      ring.position.y = 0.3 + i * 0.02;
+      this.vortexRings.push(ring);
+      this.vortex.add(ring);
+    }
+    this.vortex.visible = false;
+    this.root.add(this.vortex);
     addOutlines(this.body);
   }
 
@@ -1080,10 +1153,12 @@ export class Sandworm extends Boss {
   }
 
   objectiveLine(): string {
-    return this.exposed ? `SHOOT ${this.name} NOW!` : 'WATCH THE DUST: IT SURFACES THERE';
+    if (this.exposed) return `SHOOT ${this.name} NOW!`;
+    if (this.vortexT >= 0) return 'STAY OUT OF THE SINKHOLE!';
+    return 'WATCH THE DUST: IT SURFACES THERE';
   }
 
-  protected think({ ship, shots, world, dt, effects }: Ctx): void {
+  protected think({ ship, world, dt, effects }: Ctx): void {
     const p = this.root.position;
     const s = ship.root.position;
     p.y = world.heightAt(p.x, p.z);
@@ -1091,7 +1166,7 @@ export class Sandworm extends Boss {
     const fast = this.phase2 ? 1.35 : 1;
     // The dust: churning puffs over the spot, bigger just before it surfaces.
     const churn = this.state === 'tell' ? 1.5 + this.t : this.state === 'burrow' ? 1 : 0.5;
-    this.dust.visible = this.state !== 'up';
+    this.dust.visible = this.state === 'burrow' || this.state === 'tell' || this.state === 'emerge' || this.state === 'sink';
     this.puffs.forEach((puff, i) => {
       const a = this.time * (1.5 + i * 0.3) + i;
       puff.position.set(Math.cos(a) * 2.6 * churn, 1 + Math.abs(Math.sin(a * 1.3)) * 1.6 * churn, Math.sin(a) * 2.6 * churn);
@@ -1116,43 +1191,73 @@ export class Sandworm extends Boss {
         if ((d <= step && this.t > 1) || this.t > 4.5) this.go('tell');
         break;
       }
-      case 'tell': {
+      case 'tell':
+        // Ambush: the ring flashes where it's about to burst out.
         this.warn.visible = true;
-        this.warnMaterial.opacity = 0.25 + 0.5 * Math.abs(Math.sin(this.t * 9));
+        this.warnMaterial.opacity = 0.35 + 0.5 * Math.abs(Math.sin(this.t * 9));
         if (this.t > 1.2 / fast) {
           this.warn.visible = false;
           this.go('emerge');
-          // Bursting out of the sand: anything on top of it gets hit.
           effects.explosion(this.tmp.set(p.x, p.y + 2, p.z), 7, p.y);
           const d = Math.hypot(s.x - p.x, s.z - p.z);
           if (ship.alive && ship.invulnerable <= 0 && d < 8 + ship.radius) ship.damage(22);
         }
         break;
-      }
       case 'emerge':
         this.rise = Math.min(1, this.t / 0.45);
-        if (this.rise >= 1) {
-          this.go('up');
-          this.fireTimer = 0.4;
-          // Phase 2: a ring of sand bursts out as it surfaces.
-          if (this.phase2) this.ring(shots, s.y, 14);
+        if (this.rise >= 1) this.go('aim');
+        break;
+      case 'aim':
+        // Rear back and mark the wedge it's about to blast (aim locks just before it fires).
+        if (this.t < 0.6) this.aimAngle = Math.atan2(s.z - p.z, s.x - p.x) - this.sweepDir * this.halfAngle * 0.8;
+        this.face(this.aimAngle);
+        this.cone.visible = true;
+        this.coneMesh.material = this.coneWarn;
+        this.coneWarn.opacity = 0.35 + 0.3 * Math.abs(Math.sin(this.t * 8));
+        this.streams.forEach((st) => (st.visible = false));
+        // The warning covers the whole sweep, centred on where it's aimed.
+        this.cone.rotation.y = -(this.aimAngle + this.sweepDir * this.halfAngle * 0.8);
+        this.coneMesh.scale.set(1, Math.tan(this.halfAngle * 0.8 + BREATH_BAND) / Math.tan(BREATH_BAND), 1);
+        if (this.t > 0.9 / fast) {
+          this.go('breath');
+          this.tick = 0;
         }
         break;
-      case 'up': {
-        // Turn to face the ship and spit fans of sand at it.
-        this.body.rotation.y = Math.atan2(s.x - p.x, s.z - p.z) - Math.PI / 2;
-        this.fireTimer -= dt;
-        if (this.fireTimer <= 0 && ship.alive) {
-          this.fireTimer = this.phase2 ? 0.7 : 1;
-          const base = Math.atan2(s.z - p.z, s.x - p.x);
-          const n = this.phase2 ? 7 : 5;
-          this.headPos();
-          for (let i = 0; i < n; i++) {
-            const a = base + (i - (n - 1) / 2) * 0.16;
-            shots.fire(this.tmp, Math.cos(a), Math.sin(a), 20, s.y, Math.hypot(s.x - p.x, s.z - p.z), 7, 4);
+      case 'breath': {
+        // The stream sweeps across the wedge (phase 2: there and back again).
+        const len = this.phase2 ? 2.6 : 1.6;
+        const k = Math.min(1, this.t / len);
+        const swing = this.phase2 ? Math.sin(k * Math.PI) * 2 - 1 : k * 2 - 1;
+        const dir = this.aimAngle + this.sweepDir * this.halfAngle * 0.8 * (1 + swing);
+        this.face(dir);
+        this.cone.rotation.y = -dir;
+        this.coneMesh.material = this.coneSand;
+        this.coneSand.opacity = 0.6 + 0.12 * Math.sin(this.t * 30);
+        this.coneMesh.scale.set(1, 1, 1);
+        this.streams.forEach((st, i) => {
+          st.visible = true;
+          const f = (this.t * 2.2 + i / this.streams.length) % 1;
+          st.position.set(f * BREATH_RANGE, 3 + Math.sin(i * 7.3) * 1.5 + f * 2, Math.sin(i * 3.1 + this.t * 9) * f * 4);
+          st.scale.set(2.4 + f * 2, 0.9 + f, 0.9 + f);
+        });
+        this.tick -= dt;
+        if (this.tick <= 0 && ship.alive && ship.invulnerable <= 0) {
+          const d = Math.hypot(s.x - p.x, s.z - p.z);
+          const off = Math.abs(Math.atan2(Math.sin(Math.atan2(s.z - p.z, s.x - p.x) - dir), Math.cos(Math.atan2(s.z - p.z, s.x - p.x) - dir)));
+          if (d < BREATH_RANGE && off < BREATH_BAND) {
+            ship.damage(5);
+            this.tick = 0.25;
           }
         }
-        if (this.t > (this.phase2 ? 4.5 : 3.5)) this.go('sink');
+        if (this.t > len + 0.3) {
+          this.cone.visible = false;
+          this.sweepDir = -this.sweepDir;
+          this.go('sink');
+          // Sinkhole: the sand caves in where it's digging down.
+          this.vortexAt.set(p.x, p.z);
+          this.vortexT = 0;
+          this.vortexTick = 0;
+        }
         break;
       }
       case 'sink':
@@ -1163,24 +1268,55 @@ export class Sandworm extends Boss {
     }
     this.body.visible = this.rise > 0;
     this.body.position.y = -WORM_HEIGHT * (1 - this.rise) - 1;
+    this.updateVortex(ship, world, dt);
+  }
+
+  private face(angle: number): void {
+    // The model's head leans along its local +x.
+    this.body.rotation.y = -angle;
+  }
+
+  /** The sinkhole drags the ship toward its middle; the middle hurts. */
+  private updateVortex(ship: Ctx['ship'], world: Ctx['world'], dt: number): void {
+    if (this.vortexT < 0) {
+      this.vortex.visible = false;
+      return;
+    }
+    this.vortexT += dt;
+    const life = this.phase2 ? 6 : 4.5;
+    const grow = Math.min(1, this.vortexT / 0.8) * Math.min(1, (life - this.vortexT) / 0.6);
+    const p = this.root.position;
+    const vx = this.vortexAt.x;
+    const vz = this.vortexAt.y;
+    this.vortex.visible = true;
+    this.vortex.position.set(vx - p.x, world.heightAt(vx, vz) - p.y, vz - p.z);
+    this.vortexRings.forEach((ring, i) => {
+      // Rings shrink toward the middle and spin, over and over.
+      const f = 1 - ((this.vortexT * 0.5 + i / this.vortexRings.length) % 1);
+      ring.scale.setScalar(Math.max(0.01, (4 + f * (VORTEX_RADIUS - 4)) * grow));
+      ring.rotation.y = this.vortexT * (2 + i * 0.4);
+    });
+    const s = ship.root.position;
+    const dx = vx - s.x;
+    const dz = vz - s.z;
+    const d = Math.hypot(dx, dz);
+    if (ship.alive && d < VORTEX_RADIUS && d > 0.5) {
+      const pull = (this.phase2 ? 11 : 7.5) * (0.4 + 0.6 * (1 - d / VORTEX_RADIUS)) * grow;
+      const step = Math.min(d, pull * dt);
+      s.x += (dx / d) * step;
+      s.z += (dz / d) * step;
+    }
+    this.vortexTick -= dt;
+    if (d < 4.5 && this.vortexTick <= 0 && ship.alive && ship.invulnerable <= 0 && grow > 0.5) {
+      ship.damage(6);
+      this.vortexTick = 0.5;
+    }
+    if (this.vortexT > life) this.vortexT = -1;
   }
 
   private go(state: Sandworm['state']): void {
     this.state = state;
     this.t = 0;
-  }
-
-  private headPos(): void {
-    this.head.getWorldPosition(this.tmp);
-  }
-
-  private ring(shots: Ctx['shots'], y: number, n: number): void {
-    this.headPos();
-    this.spin += 0.4;
-    for (let i = 0; i < n; i++) {
-      const a = this.spin + (i / n) * Math.PI * 2;
-      shots.fire(this.tmp, Math.cos(a), Math.sin(a), 15, y, 30, 6, 4);
-    }
   }
 }
 

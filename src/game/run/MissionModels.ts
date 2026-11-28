@@ -189,7 +189,7 @@ export const BRIEFINGS: Briefing[] = [
   {
     id: 'boss',
     name: 'Boss',
-    summary: 'Every planet ends with its own boss. On the desert, watch the dust: the Sandworm surfaces there, and can only be hurt above ground.',
+    summary: 'Every planet ends with its own boss. On the desert, watch the dust: the Sandworm surfaces there, and can only be hurt above ground. Dodge its sand breath and stay out of its sinkholes!',
     slides: [{ caption: 'Every sortie builds up to a boss. Watch for red warnings and dodge!', model: () => new Skyreaver(1).root }],
   },
   {
