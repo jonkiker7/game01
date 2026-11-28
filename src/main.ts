@@ -352,7 +352,8 @@ function showDevPanel(on: boolean): void {
       scene,
       bloom,
       shadows: sunShadows,
-      setCanyonFog: (c, d, h) => world.setCanyonFog(c, d, h),
+      setCanyonFog: (c, d, h) => world.setFogColors(c, d, h),
+      getBiome: () => world.biome,
       isHigh: () => quality === 'high',
       setShadows: (mode, strength) => {
         shadowStrength = strength;

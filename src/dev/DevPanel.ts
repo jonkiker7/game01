@@ -7,7 +7,7 @@ import { TUNING } from '../game/Tuning';
 import { sameValue } from '../game/Choices';
 import { CAMERA_DISTANCE } from '../game/CameraRig';
 import { DEFAULT_ENEMY_PALETTE, ENEMY_PALETTES, type EnemyPalette, setEnemyPalette } from '../game/EnemyBase';
-import { CANYON_FOG } from '../game/World';
+import { BIOME_FOG, type Biome, CANYON_FOG } from '../game/World';
 
 /**
  * Developer panel (open the game with `?dev`): sliders for lighting, shadows, fog, glow, the
@@ -22,8 +22,10 @@ export interface DevHooks {
   scene: THREE.Scene;
   bloom: UnrealBloomPass;
   shadows: SunShadows;
-  /** Canyon fog (colour, density 0..1, height 0..1 of the canyon depth). */
-  setCanyonFog: (color: string, density: number, height: number) => void;
+  /** Canyon fog (each planet's colour, density 0..1, height 0..1 of the canyon depth). */
+  setCanyonFog: (colors: Record<Biome, string>, density: number, height: number) => void;
+  /** Which planet you're on (the fog colour shown is that planet's). */
+  getBiome: () => Biome;
   /** Whether HIGH quality is on (real shadows only exist on HIGH). */
   isHigh: () => boolean;
   /** Shadow mode (baked / live / off) and strength 0..1. */
@@ -69,7 +71,9 @@ const LOOK_DEFAULTS = {
   glowThreshold: 1.2,
   haloStrength: 0.8,
   vignette: 0.9,
-  canyonFogColor: CANYON_FOG.color,
+  canyonFogColor: BIOME_FOG.jungle, // the jungle's
+  desertFogColor: BIOME_FOG.desert,
+  iceFogColor: BIOME_FOG.ice,
   canyonFogDensity: CANYON_FOG.density,
   canyonFogHeight: CANYON_FOG.height,
   vignetteSize: 62,
@@ -129,7 +133,7 @@ export function openDevPanel(h: DevHooks): void {
     h.bloom.radius = look.glowSpread;
     h.bloom.threshold = look.glowThreshold;
     h.halos.strength = look.haloStrength;
-    h.setCanyonFog(look.canyonFogColor, look.canyonFogDensity, look.canyonFogHeight);
+    h.setCanyonFog({ jungle: look.canyonFogColor, desert: look.desertFogColor, ice: look.iceFogColor }, look.canyonFogDensity, look.canyonFogHeight);
     h.setCameraDistance(look.cameraDistance);
     setEnemyPalette(look.enemyColors);
     const root = document.documentElement.style;
@@ -207,7 +211,22 @@ export function openDevPanel(h: DevHooks): void {
   }, 1000);
 
   const canyon = gui.addFolder('Canyon fog');
-  canyon.addColor(look, 'canyonFogColor').name('colour').onChange(changed);
+  // One colour per planet: only the one for the planet you're on shows.
+  const fogColor: Record<Biome, ReturnType<typeof canyon.addColor>> = {
+    jungle: canyon.addColor(look, 'canyonFogColor').name('colour (jungle)').onChange(changed),
+    desert: canyon.addColor(look, 'desertFogColor').name('colour (desert)').onChange(changed),
+    ice: canyon.addColor(look, 'iceFogColor').name('colour (ice)').onChange(changed),
+  };
+  let shownBiome: Biome | null = null;
+  const showFog = () => {
+    const b = h.getBiome();
+    if (b === shownBiome) return;
+    shownBiome = b;
+    for (const k of Object.keys(fogColor) as Biome[]) fogColor[k].show(k === b);
+    canyon.title(`Canyon fog: ${b} planet`);
+  };
+  showFog();
+  setInterval(showFog, 500);
   canyon.add(look, 'canyonFogDensity', 0, 0.6, 0.01).name('density').onChange(changed);
   canyon.add(look, 'canyonFogHeight', 0, 1, 0.01).name('height (0 = floor, 1 = rim)').onChange(changed);
 
