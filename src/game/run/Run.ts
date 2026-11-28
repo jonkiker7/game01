@@ -42,21 +42,24 @@ export interface RunResult {
   contract: { title: string; reward: number; done: boolean } | null;
 }
 /** Arena size per encounter: tower hunts are big (fly around and find them), swarms are tight. */
-const ARENA_RADIUS: Record<EncounterKind, number> = { outpost: 180, survive: 110, stronghold: 110, boss: 130, relays: 110, ...MISSION_RADIUS };
+const ARENA_RADIUS: Record<EncounterKind, number> = { outpost: 180, survive: 110, stronghold: 110, boss: 130, relays: 110, bonus: 110, ...MISSION_RADIUS };
 /** Escort runs left to right through a snaking corridor about one screen tall. */
 const CORRIDOR = { length: 330, halfWidth: 44 };
 const SURVIVE_TIME = 40;
 /** Flight training's practice arena. */
 const TRAINING_RADIUS = 90;
 
-type EncounterKind = 'outpost' | 'survive' | 'stronghold' | 'boss' | 'relays' | MissionKind;
+type EncounterKind = 'outpost' | 'survive' | 'stronghold' | 'boss' | 'relays' | 'bonus' | MissionKind;
+/** The bonus round after the boss: how long it lasts, and extra salvage per kill. */
+const BONUS_TIME = 90;
+const BONUS_SALVAGE_PER_KILL = 5;
 /** The warm-ups (the first WARMUPS missions are picked from these, no repeats). */
 const WARMUP_KINDS: EncounterKind[] = ['threats', 'relays', 'sweep', 'rescueLite', 'hive'];
 /** Warm-ups with a few drones about (3 at a time; the next 3 once they're shot down). */
 const SQUAD_WARMUPS: EncounterKind[] = ['relays', 'sweep', 'rescueLite'];
 /** Encounters the rounds before the boss can be. */
 const ROUND_KINDS: EncounterKind[] = ['outpost', 'survive', 'rescue', 'defend', 'escort', 'sabotage', 'hold', 'cargo'];
-type Phase = 'intro' | 'fight' | 'failed' | 'reward' | 'choosing' | 'gates' | 'transition' | 'over';
+type Phase = 'intro' | 'fight' | 'failed' | 'reward' | 'choosing' | 'gates' | 'transition' | 'victory' | 'over';
 
 /**
  * Mission clocks. `fail`: running out of time fails the mission (it ends the sortie). Without
@@ -84,6 +87,7 @@ const TITLES: Record<EncounterKind, string> = {
   stronghold: 'FINAL ASSAULT',
   boss: 'BOSS',
   relays: 'KNOCK OUT THE RELAYS',
+  bonus: 'BONUS ROUND',
   ...MISSION_TITLES,
 };
 
@@ -405,6 +409,11 @@ export class Run {
       // Warm-up: a few towers, nothing else.
       enemies.configure(bounds, hpMul, null);
       enemies.spawnTurrets(cx, cz, 3, 22, 45);
+    } else if (this.kind === 'bonus') {
+      // Drones and swarmers, fast and plenty, for as long as the clock runs.
+      enemies.configure(bounds, 1, { types: ['drone', 'swarmer'], max: 8, interval: 0.8 });
+      this.timer = BONUS_TIME;
+      this.bonusKills = 0;
     } else if (this.kind === 'boss') {
       // No waves: the boss calls in its own helpers.
       enemies.configure(bounds, hpMul, null);
@@ -503,6 +512,7 @@ export class Run {
   /** Called when the player destroys an enemy. */
   onKill(_kind: Enemy['kind'], enemy: Enemy): void {
     this.kills++;
+    if (this.kind === 'bonus' && this.phase === 'fight') this.bonusKills++;
     this.d.contracts.onKill(enemy);
     this.salvage += Math.round(enemy.salvage * this.stats.salvageMul);
   }
@@ -513,6 +523,17 @@ export class Run {
     if (this.training) {
       this.phase = 'over';
       this.respawnTimer = 2;
+      return;
+    }
+    if (this.phase === 'victory') {
+      // Shot down just after beating the boss: still a win.
+      this.phase = 'over';
+      this.overTimer = 2.5;
+      return;
+    }
+    if (this.kind === 'bonus' && this.phase === 'fight') {
+      // Shot down in the bonus round: the boss is still beaten, and the kills still pay.
+      this.endBonus();
       return;
     }
     this.phase = 'over';
@@ -543,8 +564,17 @@ export class Run {
           if (this.boss) this.d.hud.show(this.boss.name, 2.2, true);
         }
         break;
+      case 'victory':
+        this.overTimer -= dt;
+        if (this.overTimer <= 0) this.startBonus();
+        break;
       case 'fight': {
         this.elapsed += dt;
+        if (this.kind === 'bonus') {
+          this.timer -= dt;
+          if (this.timer <= 0) this.endBonus();
+          break;
+        }
         const c = CLOCK[this.kind];
         if (c?.fail && this.elapsed >= c.limit) {
           this.failEncounter('OUT OF TIME · MISSION FAILED');
@@ -643,8 +673,9 @@ export class Run {
       hud.show(this.boss ? `${this.boss.name} DESTROYED` : 'STRONGHOLD DESTROYED', 3);
       audio.play('victory');
       this.won = true;
-      this.phase = 'over';
-      this.overTimer = 2.5;
+      // A moment to enjoy it, then the bonus round.
+      this.phase = 'victory';
+      this.overTimer = 4;
       return;
     }
     hud.show('SECTOR CLEARED', 2.2);
@@ -759,6 +790,55 @@ export class Run {
     this.d.hud.show('CHOOSE YOUR PATH', 2);
   }
 
+  /** Kills in the bonus round (each one is worth extra salvage). */
+  private bonusKills = 0;
+
+  /** After the boss: a 90-second free-for-all against drones and swarmers. */
+  private startBonus(): void {
+    this.phase = 'transition';
+    this.d.ui.fade(() => {
+      const { arena, enemies, ship, world } = this.d;
+      arena.hideGates();
+      arena.hideReward();
+      this.endMission();
+      this.d.contracts.leaveSector();
+      this.d.clearField();
+      enemies.reset();
+      this.boss = null;
+      this.sector++;
+      this.kind = 'bonus';
+      this.buildArena();
+      ship.teleport(world, this.shape.entry.x, this.shape.entry.z);
+      ship.invulnerable = Math.max(ship.invulnerable, 1.5);
+      this.d.snapCamera();
+      this.enter();
+    });
+  }
+
+  /** The bonus round is over (time's up, or shot down): bank its salvage and end the sortie. */
+  private endBonus(): void {
+    const { enemies, hud } = this.d;
+    enemies.stopDrones();
+    enemies.destroyAll();
+    const extra = Math.round(this.bonusKills * BONUS_SALVAGE_PER_KILL * this.stats.salvageMul);
+    this.salvage += extra;
+    hud.show('BONUS ROUND OVER', 2.5);
+    audio.play('victory');
+    // Only damage counts toward the score here (it was added as it happened).
+    hud.showScore(
+      [['DAMAGE DEALT', this.missionDamage]],
+      [
+        ['KILLS', this.bonusKills],
+        ['BONUS SALVAGE ⬢', extra],
+        ['TOTAL SCORE', this.score],
+      ],
+      6,
+    );
+    this.won = true;
+    this.phase = 'over';
+    this.overTimer = 5;
+  }
+
   private takeGate(gate: Gate): void {
     this.phase = 'transition';
     this.reward = gate.reward;
@@ -800,6 +880,7 @@ export class Run {
   /** What the HUD should say under the radar. */
   objective(): string {
     if (this.training) return 'TRAINING\nPRACTICE';
+    if (this.kind === 'bonus' && this.phase === 'fight') return `BONUS ROUND\nKILLS ${this.bonusKills} · ⏱ ${clock(Math.max(0, this.timer))}`;
     const line = this.d.contracts.objectiveLine(this.sector);
     let text = this.baseObjective();
     // The mission clock (a hard limit, or the time bonus counting down).
@@ -848,7 +929,7 @@ export class Run {
     } else if (this.phase === 'fight') {
       for (const e of this.d.enemies.enemies) {
         if (!e.alive) continue;
-        if (!e.elite && e.species !== 'mine' && (e.kind === 'turret' || this.kind === 'survive')) out.push({ x: e.root.position.x, z: e.root.position.z, kind: 'target' });
+        if (!e.elite && e.species !== 'mine' && (e.kind === 'turret' || this.kind === 'survive' || this.kind === 'bonus')) out.push({ x: e.root.position.x, z: e.root.position.z, kind: 'target' });
       }
     } else if (this.phase === 'reward') {
       const r = this.d.arena.rewardPosition;
