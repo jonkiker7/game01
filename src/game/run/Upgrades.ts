@@ -8,6 +8,11 @@ export type SecondaryWeapon = 'missile' | 'cluster' | 'swarm';
 export interface Stats {
   primary: PrimaryWeapon;
   secondary: SecondaryWeapon;
+  // Special weapons (enhanced by the Armory once fitted)
+  scatterPellets: number; // pellets per Scatter Cannon blast
+  railDamageMul: number; // Rail Lance bolt damage (× gun damage)
+  clusterBomblets: number; // bomblets per Cluster Bomb
+  swarmBonus: number; // extra rockets per Swarm volley
   gunRate: number; // bullets per second
   gunDamage: number; // per bullet
   gunSideShots: number; // extra bullets fanned out either side
@@ -46,6 +51,10 @@ export function defaultStats(): Stats {
   return {
     primary: 'machinegun',
     secondary: 'missile',
+    scatterPellets: 6,
+    railDamageMul: 4.5,
+    clusterBomblets: 5,
+    swarmBonus: 0,
     gunRate: 11,
     gunDamage: 7,
     gunSideShots: 0,
@@ -174,22 +183,73 @@ UPGRADES.push(
   },
 );
 
-// ---- Weapons (offered by the Armory reward; each replaces the weapon in its slot) ----
+// ---- Weapons (offered by the Armory reward) ----
+// A slot still holding its default weapon is offered the special ones (they replace it for the
+// rest of the sortie: no going back). Once a special weapon is fitted, the Armory offers
+// enhancements for it instead, so the ship keeps getting stronger.
 export const PRIMARY_NAMES: Record<PrimaryWeapon, string> = { machinegun: 'Machine Gun', scatter: 'Scatter Cannon', rail: 'Rail Lance' };
 export const SECONDARY_NAMES: Record<SecondaryWeapon, string> = { missile: 'Missiles', cluster: 'Cluster Bomb', swarm: 'Swarm Rockets' };
 
 const WEAPONS: Upgrade[] = [
-  { id: 'w-machinegun', name: 'Machine Gun', category: 'weapon', text: 'Steady stream of bullets. Your trusty default.', max: 99, apply: (s) => (s.primary = 'machinegun'), requires: (s) => s.primary !== 'machinegun' },
-  { id: 'w-scatter', name: 'Scatter Cannon', category: 'weapon', text: 'Short-range blasts of 6 pellets. Devastating up close.', max: 99, apply: (s) => (s.primary = 'scatter'), requires: (s) => s.primary !== 'scatter' },
-  { id: 'w-rail', name: 'Rail Lance', category: 'weapon', text: 'Slow, heavy bolts that pierce every enemy in a line.', max: 99, apply: (s) => (s.primary = 'rail'), requires: (s) => s.primary !== 'rail' },
-  { id: 'w-missile', name: 'Missiles', category: 'weapon', text: 'Charged, aimable missile with lock-on. The default.', max: 99, apply: (s) => (s.secondary = 'missile'), requires: (s) => s.secondary !== 'missile' },
-  { id: 'w-cluster', name: 'Cluster Bomb', category: 'weapon', text: 'The blast splits into 5 bomblets that scatter and explode.', max: 99, apply: (s) => (s.secondary = 'cluster'), requires: (s) => s.secondary !== 'cluster' },
-  { id: 'w-swarm', name: 'Swarm Rockets', category: 'weapon', text: 'Release a volley of homing rockets; charge longer for more.', max: 99, apply: (s) => (s.secondary = 'swarm'), requires: (s) => s.secondary !== 'swarm' },
+  // New weapons: only while the slot still has its default.
+  { id: 'w-scatter', name: 'Scatter Cannon', category: 'weapon', text: 'Short-range blasts of 6 pellets. Devastating up close.', max: 1, apply: (s) => (s.primary = 'scatter'), requires: (s) => s.primary === 'machinegun' },
+  { id: 'w-rail', name: 'Rail Lance', category: 'weapon', text: 'Slow, heavy bolts that pierce every enemy in a line.', max: 1, apply: (s) => (s.primary = 'rail'), requires: (s) => s.primary === 'machinegun' },
+  { id: 'w-cluster', name: 'Cluster Bomb', category: 'weapon', text: 'The blast splits into 5 bomblets that scatter and explode.', max: 1, apply: (s) => (s.secondary = 'cluster'), requires: (s) => s.secondary === 'missile' },
+  { id: 'w-swarm', name: 'Swarm Rockets', category: 'weapon', text: 'Release a volley of homing rockets; charge longer for more.', max: 1, apply: (s) => (s.secondary = 'swarm'), requires: (s) => s.secondary === 'missile' },
+  // Enhancements for the special weapon you've fitted.
+  {
+    id: 'w-scatter-plus',
+    name: 'Scatter Cannon+',
+    category: 'weapon',
+    text: 'Two more pellets per blast, and 20% more damage.',
+    max: 3,
+    apply: (s) => {
+      s.scatterPellets += 2;
+      s.gunDamage *= 1.2;
+    },
+    requires: (s) => s.primary === 'scatter',
+  },
+  {
+    id: 'w-rail-plus',
+    name: 'Rail Lance+',
+    category: 'weapon',
+    text: 'Bolts deal 35% more damage and fire 20% faster.',
+    max: 3,
+    apply: (s) => {
+      s.railDamageMul *= 1.35;
+      s.gunRate *= 1.2;
+    },
+    requires: (s) => s.primary === 'rail',
+  },
+  {
+    id: 'w-cluster-plus',
+    name: 'Cluster Bomb+',
+    category: 'weapon',
+    text: 'Two more bomblets, and 20% bigger blasts.',
+    max: 3,
+    apply: (s) => {
+      s.clusterBomblets += 2;
+      s.missileRadiusMul *= 1.2;
+    },
+    requires: (s) => s.secondary === 'cluster',
+  },
+  {
+    id: 'w-swarm-plus',
+    name: 'Swarm Rockets+',
+    category: 'weapon',
+    text: 'Two more rockets per volley, and 20% more damage.',
+    max: 3,
+    apply: (s) => {
+      s.swarmBonus += 2;
+      s.missileDamageMul *= 1.2;
+    },
+    requires: (s) => s.secondary === 'swarm',
+  },
 ];
 
-/** Three weapons different from what's equipped (Armory reward). */
-export function rollWeapons(s: Stats, count = 3): Upgrade[] {
-  return shuffle(WEAPONS.filter((w) => !w.requires || w.requires(s))).slice(0, count);
+/** Up to three Armory choices: new weapons for default slots, enhancements for special ones. */
+export function rollWeapons(s: Stats, taken: Map<string, number>, count = 3): Upgrade[] {
+  return shuffle(WEAPONS.filter((w) => (taken.get(w.id) ?? 0) < w.max && (!w.requires || w.requires(s)))).slice(0, count);
 }
 
 function shuffle<T>(list: T[]): T[] {

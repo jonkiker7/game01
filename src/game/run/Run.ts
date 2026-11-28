@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { Contract } from '../../base/Save';
 import { type Enemy, type EnemyManager, type Species, ZONE_SPECIES } from '../Enemies';
 import { type Boss, BOSS_NAMES, type BossId } from '../Bosses';
+import { type EnemyPalette, setEnemyPalette } from '../EnemyBase';
 import type { Hud } from '../Hud';
 import type { Blip } from '../Radar';
 import type { Ship } from '../Ship';
@@ -16,11 +17,46 @@ import { TUNING } from '../Tuning';
 import { defaultStats, PRIMARY_NAMES, rollUpgrades, rollWeapons, SECONDARY_NAMES, type Stats, type Upgrade, UPGRADES } from './Upgrades';
 
 /**
- * A sortie: WARMUPS short, easy missions to ease you in, then the regular missions (getting
- * tougher each time), and the boss last. Change these two to rebalance the sortie's length.
+ * A sortie visits the planets in PLANETS in order. On each: (warm-ups on the first,) regular
+ * missions getting tougher each time, the planet's boss, then a bonus round. Change PLANETS to
+ * rebalance the sortie's length and difficulty.
  */
-export const WARMUPS = 3;
-export const SECTORS = 8; // 3 warm-ups + 4 regular missions + the boss
+export type Planet = 'jungle' | 'desert' | 'ice';
+interface PlanetSpec {
+  id: Planet;
+  name: string;
+  /** Easy missions to start with (only on the first planet). */
+  warmups: number;
+  /** Regular missions before this planet's boss. */
+  missions: number;
+  /** Enemies' armor and damage, × (the desert's are 50% stronger, the ice planet's twice as strong). */
+  power: number;
+  /** Enemy colours, picked to stand out against the planet. */
+  palette: EnemyPalette;
+}
+/** The planets of a sortie, in order: each ends with its own boss and a bonus round. */
+export const PLANETS: PlanetSpec[] = [
+  { id: 'jungle', name: 'JUNGLE PLANET', warmups: 3, missions: 4, power: 1, palette: 'orange' },
+  { id: 'desert', name: 'DESERT PLANET', warmups: 0, missions: 5, power: 1.5, palette: 'purple' },
+  { id: 'ice', name: 'ICE PLANET', warmups: 0, missions: 5, power: 2, palette: 'crimson' },
+];
+type StageKind = 'warmup' | 'mission' | 'boss' | 'bonus';
+interface Stage {
+  planet: number;
+  kind: StageKind;
+  /** 1 = the planet's first regular mission (difficulty ramps up from there). */
+  level: number;
+  /** The planet's first stage (its name shows with the mission title). */
+  first: boolean;
+}
+/** Every stage of a sortie, in order. */
+export const SCHEDULE: Stage[] = PLANETS.flatMap((p, planet): Stage[] => [
+  ...Array.from({ length: p.warmups }, (_, i): Stage => ({ planet, kind: 'warmup', level: 1, first: i === 0 })),
+  ...Array.from({ length: p.missions }, (_, i): Stage => ({ planet, kind: 'mission', level: i + 1, first: p.warmups === 0 && i === 0 })),
+  { planet, kind: 'boss', level: p.missions + 1, first: false },
+  { planet, kind: 'bonus', level: p.missions + 1, first: false },
+]);
+export const SECTORS = SCHEDULE.length;
 /** Enemy health in the warm-ups (regular missions start at 1 and rise 15% each). */
 const WARMUP_HP = 0.8;
 
@@ -53,15 +89,15 @@ const TRAINING_RADIUS = 90;
 
 type EncounterKind = 'outpost' | 'survive' | 'stronghold' | 'boss' | 'relays' | 'bonus' | MissionKind;
 /** The bonus round after the boss: how long it lasts, and extra salvage per kill. */
-const BONUS_TIME = 90;
+const BONUS_TIME = 45;
 const BONUS_SALVAGE_PER_KILL = 5;
-/** The warm-ups (the first WARMUPS missions are picked from these, no repeats). */
+/** The warm-ups (picked from these, no repeats). */
 const WARMUP_KINDS: EncounterKind[] = ['threats', 'relays', 'sweep', 'rescueLite', 'hive'];
 /** Warm-ups with a few drones about (3 at a time; the next 3 once they're shot down). */
 const SQUAD_WARMUPS: EncounterKind[] = ['relays', 'sweep', 'rescueLite'];
 /** Encounters the rounds before the boss can be. */
 const ROUND_KINDS: EncounterKind[] = ['outpost', 'survive', 'rescue', 'defend', 'escort', 'sabotage', 'hold', 'cargo'];
-type Phase = 'intro' | 'fight' | 'failed' | 'reward' | 'choosing' | 'gates' | 'transition' | 'victory' | 'over';
+type Phase = 'intro' | 'fight' | 'failed' | 'reward' | 'choosing' | 'gates' | 'transition' | 'victory' | 'travel' | 'over';
 
 /**
  * Mission clocks. `fail`: running out of time fails the mission (it ends the sortie). Without
@@ -164,6 +200,16 @@ export class Run {
 
   constructor(private readonly d: Deps) {}
 
+  /** The current stage of the sortie, and its planet. */
+  get stage(): Stage {
+    return SCHEDULE[Math.max(0, Math.min(this.sector, SECTORS) - 1)];
+  }
+  get planet(): PlanetSpec {
+    return PLANETS[this.stage.planet];
+  }
+  /** Bosses already fought this sortie (each planet has a different one). */
+  private readonly usedBosses = new Set<BossId>();
+
   get arenaCenter(): THREE.Vector2 {
     return this.center;
   }
@@ -203,6 +249,9 @@ export class Run {
     this.endMission();
     this.d.arena.hideGates();
     this.d.arena.hideReward();
+    world.setBiome('jungle');
+    setEnemyPalette('orange');
+    ship.incomingMul = 1;
     this.shape = blobArena(TRAINING_RADIUS, this.seed * 10 + 1);
     world.generate(this.shape, this.seed * 10 + 1);
     this.center.set(this.shape.center.x, this.shape.center.z);
@@ -293,7 +342,12 @@ export class Run {
     this.d.arena.hideGates();
     this.d.arena.hideReward();
     // `?boss=flyer|tank|titan` (or `?boss`) skips straight to a boss fight, for testing.
-    if (new URLSearchParams(location.search).has('boss')) this.sector = SECTORS;
+    // `?planet=desert|ice` starts on that planet; `?boss` skips to its boss fight (for testing).
+    const params = new URLSearchParams(location.search);
+    const planet = PLANETS.findIndex((p) => p.id === params.get('planet'));
+    if (planet > 0) this.sector = SCHEDULE.findIndex((st) => st.planet === planet) + 1;
+    if (params.has('boss')) this.sector = SCHEDULE.findIndex((st) => st.kind === 'boss' && st.planet === Math.max(0, planet)) + 1;
+    this.usedBosses.clear();
     this.kind = this.pickKind();
     this.buildArena();
     ship.reset(world, this.shape.entry.x, this.shape.entry.z, this.stats);
@@ -303,6 +357,7 @@ export class Run {
 
   /** Generate this round's level: an organic arena shaped for the mission, fresh terrain. */
   private buildArena(): void {
+    this.d.world.setBiome(this.planet.id);
     const seed = this.seed * 10 + this.sector;
     this.shape =
       CORRIDOR_MISSIONS.includes(this.kind as MissionKind)
@@ -360,7 +415,9 @@ export class Run {
     this.introTimer = INTRO_TIME;
     audio.song(boss ? 'boss' : 'sortie');
     audio.play(boss ? 'bossAppear' : 'sectorStart');
-    this.d.hud.show(TITLES[this.kind], INTRO_TIME, true); // just the mission (which sector doesn't matter)
+    // Just the mission (which sector doesn't matter); arriving on a new planet, its name too.
+    const title = this.stage.first && this.stage.planet > 0 ? `${this.planet.name}\n${TITLES[this.kind]}` : TITLES[this.kind];
+    this.d.hud.show(title, INTRO_TIME, true);
   }
 
   /** True while the mission title is up: the game holds still. */
@@ -403,8 +460,12 @@ export class Run {
     const bounds = { x: cx, z: cz, r: R, inside: (x: number, z: number, m: number) => shape.depth(x, z) > m };
     // Difficulty: warm-ups are easy; regular missions get 15% tougher each, the boss toughest.
     const warmup = WARMUP_KINDS.includes(this.kind);
-    const level = Math.max(1, s - WARMUPS); // 1 = the first regular mission
-    const hpMul = warmup ? WARMUP_HP : 1 + 0.15 * (level - 1);
+    const level = this.stage.level; // 1 = the planet's first regular mission
+    const power = this.planet.power;
+    const hpMul = warmup ? WARMUP_HP : (1 + 0.15 * (level - 1)) * power;
+    // This planet's enemy colours, and how hard they hit.
+    setEnemyPalette(this.planet.palette);
+    this.d.ship.incomingMul = warmup ? 1 : power;
     const types = (this.pair = this.kind === 'boss' || warmup ? [] : this.pickPair());
     this.boss = null;
     if (this.kind === 'relays') {
@@ -413,7 +474,7 @@ export class Run {
       enemies.spawnTurrets(cx, cz, 3, 22, 45);
     } else if (this.kind === 'bonus') {
       // Drones and swarmers, fast and plenty, for as long as the clock runs.
-      enemies.configure(bounds, 1, { types: ['drone', 'swarmer'], max: 8, interval: 0.8 });
+      enemies.configure(bounds, power, { types: ['drone', 'swarmer'], max: 8, interval: 0.8 });
       this.timer = BONUS_TIME;
       this.bonusKills = 0;
     } else if (this.kind === 'boss') {
@@ -471,7 +532,7 @@ export class Run {
   private usedKinds = new Set<EncounterKind>();
 
   private randomRoundKind(): EncounterKind {
-    const pool = this.sector <= WARMUPS ? WARMUP_KINDS : ROUND_KINDS;
+    const pool = this.stage.kind === 'warmup' ? WARMUP_KINDS : ROUND_KINDS;
     let options = pool.filter((k) => !this.usedKinds.has(k));
     if (!options.length) options = pool.filter((k) => k !== this.lastRoundKind); // (more missions than types)
     const kind = options[Math.floor(Math.random() * options.length)];
@@ -484,8 +545,13 @@ export class Run {
   private pickBoss(): BossId {
     const forced = new URLSearchParams(location.search).get('boss') as BossId | null;
     if (forced && forced in BOSS_NAMES) return forced;
-    const ids = Object.keys(BOSS_NAMES) as BossId[];
-    return ids[Math.floor(Math.random() * ids.length)];
+    // A boss not fought yet this sortie (each planet gets a different one).
+    const all = Object.keys(BOSS_NAMES) as BossId[];
+    const fresh = all.filter((id) => !this.usedBosses.has(id));
+    const pool = fresh.length ? fresh : all;
+    const id = forced && forced in BOSS_NAMES ? forced : pool[Math.floor(Math.random() * pool.length)];
+    this.usedBosses.add(id);
+    return id;
   }
 
   /** Every sortie opens with Eliminate the Threats. */
@@ -499,14 +565,18 @@ export class Run {
   private pickKind(): EncounterKind {
     const s = this.sector;
     const forced = new URLSearchParams(location.search).get('mission') as EncounterKind | null;
+    const st = this.stage;
+    if (st.first) this.usedKinds.clear(); // a new planet: any mission can come up again
     const kind: EncounterKind =
-      s === SECTORS
+      st.kind === 'boss'
         ? 'boss'
-        : forced && (ROUND_KINDS.includes(forced) || WARMUP_KINDS.includes(forced))
-          ? forced
-          : s === 1
-            ? this.firstKind()
-            : this.randomRoundKind();
+        : st.kind === 'bonus'
+          ? 'bonus'
+          : forced && (ROUND_KINDS.includes(forced) || WARMUP_KINDS.includes(forced))
+            ? forced
+            : s === 1
+              ? this.firstKind()
+              : this.randomRoundKind();
     this.radius = ARENA_RADIUS[kind];
     return kind;
   }
@@ -534,8 +604,8 @@ export class Run {
       return;
     }
     if (this.kind === 'bonus' && this.phase === 'fight') {
-      // Shot down in the bonus round: the boss is still beaten, and the kills still pay.
-      this.endBonus();
+      // Shot down in the bonus round: the kills still pay, but the sortie ends.
+      this.endBonus(true);
       return;
     }
     this.phase = 'over';
@@ -569,6 +639,10 @@ export class Run {
       case 'victory':
         this.overTimer -= dt;
         if (this.overTimer <= 0) this.startBonus();
+        break;
+      case 'travel':
+        this.overTimer -= dt;
+        if (this.overTimer <= 0) this.startNextPlanet();
         break;
       case 'fight': {
         this.elapsed += dt;
@@ -671,10 +745,11 @@ export class Run {
     this.awardBonus();
     enemies.stopDrones();
     enemies.destroyAll();
-    if (this.sector === SECTORS) {
+    if (this.stage.kind === 'boss') {
       hud.show(this.boss ? `${this.boss.name} DESTROYED` : 'STRONGHOLD DESTROYED', 3);
       audio.play('victory');
-      this.won = true;
+      // Beating the last planet's boss wins the sortie (there's still its bonus round).
+      if (this.stage.planet === PLANETS.length - 1) this.won = true;
       // A moment to enjoy it, then the bonus round.
       this.phase = 'victory';
       this.overTimer = 4;
@@ -764,18 +839,21 @@ export class Run {
 
   /** Armory options, with the card text saying which weapon each one replaces. */
   private weaponOptions(): Upgrade[] {
-    return rollWeapons(this.stats).map((w) => {
-      const primary = ['w-machinegun', 'w-scatter', 'w-rail'].includes(w.id);
+    const options = rollWeapons(this.stats, this.levels).map((w) => {
+      if (w.id.endsWith('-plus')) return w; // an enhancement for a weapon you have
+      const primary = ['w-scatter', 'w-rail'].includes(w.id);
       const current = primary ? PRIMARY_NAMES[this.stats.primary] : SECONDARY_NAMES[this.stats.secondary];
-      return { ...w, text: `${w.text} Replaces your ${current}.` };
+      return { ...w, text: `${w.text} Replaces your ${current} for good.` };
     });
+    // Everything maxed out: fall back to regular power-ups.
+    return options.length ? options : rollUpgrades(this.levels, this.stats);
   }
 
   /** Two gates on the far side of the arena, each showing the next encounter's reward. */
   private openGates(): void {
     const y = this.d.ship.root.position.y;
     const [g1, g2] = this.shape.exits;
-    if (this.sector + 1 === SECTORS) {
+    if (SCHEDULE[this.sector]?.kind === 'boss') {
       this.gates = [{ x: (g1.x + g2.x) / 2, z: (g1.z + g2.z) / 2, reward: 'final' }];
     } else {
       const pool: Reward[] = ['upgrade', 'upgrade', 'upgrade', 'weapon', 'salvage', 'repair'];
@@ -818,7 +896,7 @@ export class Run {
   }
 
   /** The bonus round is over (time's up, or shot down): bank its salvage and end the sortie. */
-  private endBonus(): void {
+  private endBonus(died = false): void {
     const { enemies, hud } = this.d;
     enemies.stopDrones();
     enemies.destroyAll();
@@ -836,9 +914,38 @@ export class Run {
       ],
       6,
     );
-    this.won = true;
-    this.phase = 'over';
-    this.overTimer = 5;
+    if (died || this.sector >= SECTORS) {
+      // Shot down, or the last planet's bonus round: the sortie ends here.
+      this.phase = 'over';
+      this.overTimer = 5;
+    } else {
+      // On to the next planet once the results have been read.
+      this.phase = 'travel';
+      this.overTimer = 5;
+    }
+  }
+
+  /** Off to the next planet: its first mission, in a fresh arena. */
+  private startNextPlanet(): void {
+    this.phase = 'transition';
+    this.d.ui.fade(() => {
+      const { arena, enemies, ship, world } = this.d;
+      arena.hideGates();
+      arena.hideReward();
+      this.endMission();
+      this.d.contracts.leaveSector();
+      this.d.clearField();
+      enemies.reset();
+      this.boss = null;
+      this.sector++;
+      this.reward = 'upgrade';
+      this.kind = this.pickKind();
+      this.buildArena();
+      ship.teleport(world, this.shape.entry.x, this.shape.entry.z);
+      ship.invulnerable = Math.max(ship.invulnerable, 1.5);
+      this.d.snapCamera();
+      this.enter();
+    });
   }
 
   private takeGate(gate: Gate): void {

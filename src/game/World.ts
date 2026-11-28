@@ -26,6 +26,52 @@ export const JUNGLE = {
   relicDark: '#5b5226',
 };
 
+export type Palette = typeof JUNGLE;
+
+/** The desert planet: sun-baked sand, red rock, cacti, and tall mesas around the edge. */
+export const DESERT: Palette = {
+  sky: '#f2c48a',
+  hemiSky: '#fff2d8',
+  hemiGround: '#5a2e2a',
+  groundLow: '#c98a4e', // dusty orange in the hollows
+  groundHigh: '#ecc888', // pale sand on the rises
+  groundPink: '#d8724a', // patches of red sand
+  path: '#f6e2b6', // dry, pale riverbeds
+  rock: ['#9a5a3c', '#b4704a', '#7e4a36'],
+  trunk: ['#4f8a4a', '#5f9a52', '#467f44'], // cactus greens
+  leaves: ['#b5583a', '#c76a42', '#a14a32', '#d27a4c'], // mesa reds
+  pinkLeaf: ['#e0a060', '#f0b878', '#d89050'], // mesa caps
+  stalk: '#6f9a52',
+  bulb: '#ff8a5c',
+  fern: ['#a8915a', '#8a7a4a', '#b9a36a'], // dry brush
+  spore: '#ffd37a',
+  relic: ['#c9b04a', '#b39a3c', '#d6c063'],
+  relicDark: '#5b5226',
+};
+
+/** The ice planet: snowfields, frozen streams, snowy pines, ice crystals, and ice spires. */
+export const ICE: Palette = {
+  sky: '#cfe8f7',
+  hemiSky: '#f4fbff',
+  hemiGround: '#3a4f6e',
+  groundLow: '#9cc4e2', // blue shadows in the hollows
+  groundHigh: '#f4f9ff', // bright snow on the rises
+  groundPink: '#c9dcf2', // wind-packed snow
+  path: '#7cc0ec', // frozen streams
+  rock: ['#8aa6c0', '#a7bdd2', '#6f8eaa'],
+  trunk: ['#4a3a3a', '#5a4644'], // pine trunks
+  leaves: ['#2f5a6a', '#346a72', '#28505e'], // pine needles
+  pinkLeaf: ['#d8f0ff', '#b8e2fa', '#eaf7ff'], // ice spires
+  stalk: '#6f8eaa',
+  bulb: '#7fe8ff',
+  fern: ['#b8cfe2', '#a2bdd4', '#d0e2f0'], // frosted shrubs
+  spore: '#bff4ff',
+  relic: ['#c9b04a', '#b39a3c', '#d6c063'],
+  relicDark: '#5b5226',
+};
+
+export type Biome = 'jungle' | 'desert' | 'ice';
+
 type Placer = (rand: () => number) => { x: number; z: number };
 
 /** Flat-shaded (faceted) version of a material: every polygon face shows crisply. */
@@ -42,6 +88,31 @@ export const CANYON = {
   floor: '#22405a',
   fog: '#e856ed', // haze in the canyons (darker and bluer the deeper you look)
   redGlow: '#ff5a4a',
+};
+
+export type CanyonColors = typeof CANYON;
+/** Desert canyons: red rock walls over a deep plum floor, with an orange dust haze. */
+const DESERT_CANYON: CanyonColors = {
+  sandstone: '#c46a3c',
+  sandstoneDark: '#8e4426',
+  deep: '#3a1f2e',
+  floor: '#5a2e2e',
+  fog: '#ff9a5a',
+  redGlow: '#ff5a4a',
+};
+/** Ice canyons: pale ice walls dropping to deep blue, with a cold blue mist. */
+const ICE_CANYON: CanyonColors = {
+  sandstone: '#cfe8f7',
+  sandstoneDark: '#86b6d8',
+  deep: '#0e2238',
+  floor: '#1e4a6e',
+  fog: '#8fdcff',
+  redGlow: '#7fe8ff',
+};
+const BIOMES: Record<Biome, { palette: Palette; canyon: CanyonColors }> = {
+  jungle: { palette: JUNGLE, canyon: CANYON },
+  desert: { palette: DESERT, canyon: DESERT_CANYON },
+  ice: { palette: ICE, canyon: ICE_CANYON },
 };
 
 /** How far the canyons drop below the rock tops. */
@@ -69,7 +140,18 @@ const EDGE_EXTRA = 70;
 export class World {
   /** Far bound for anything clamping to the map (arenas confine the ship themselves). */
   readonly halfSize = 2000;
-  readonly palette = JUNGLE;
+  palette: Palette = JUNGLE;
+  private canyon: CanyonColors = CANYON;
+  biome: Biome = 'jungle';
+
+  /** Which planet the next generate() builds (jungle, desert or ice). */
+  setBiome(b: Biome): void {
+    if (b === this.biome) return;
+    this.biome = b;
+    this.palette = BIOMES[b].palette;
+    this.canyon = BIOMES[b].canyon;
+    this.fog.color = this.canyon.fog;
+  }
   readonly group = new THREE.Group();
   private readonly bulbMat: THREE.MeshBasicMaterial;
   private readonly fogLayers: THREE.Mesh[] = [];
@@ -101,15 +183,32 @@ export class World {
     // Prop counts were tuned for a 720×720 map: scale them to this arena's area.
     const per = (n: number) => Math.round((n * area) / (720 * 720));
     this.buildGround();
-    this.buildTrees(this.placer(1.8), per(1500));
-    this.buildGiantTrees(this.placer(0.8), per(190));
-    this.buildPinkFans(this.placer(1.2), per(2400));
-    this.buildBulbStalks(this.placer(1), per(460));
-    this.buildFerns(this.placer(0.6), per(4000));
-    this.buildRocks(this.placer(0.3), per(300));
-    this.buildRelics(this.placer(0), Math.max(2, per(45)));
-    this.buildSpores(this.placer(0.5), per(600));
-    this.buildEdgeTrees();
+    if (this.biome === 'desert') {
+      this.buildCacti(this.placer(1.2), per(800));
+      this.buildBarrelCacti(this.placer(0.8), per(900));
+      this.buildFerns(this.placer(0.6), per(2600)); // dry brush
+      this.buildHoodoos(this.placer(0.4), per(140));
+      this.buildRocks(this.placer(0.3), per(600));
+      this.buildRelics(this.placer(0), Math.max(2, per(45)));
+      this.buildEdgeMesas();
+    } else if (this.biome === 'ice') {
+      this.buildPines(this.placer(1.6), per(1100));
+      this.buildIceCrystals(this.placer(0.7), per(500));
+      this.buildFerns(this.placer(0.6), per(2600)); // frosted shrubs
+      this.buildRocks(this.placer(0.3), per(500));
+      this.buildRelics(this.placer(0), Math.max(2, per(45)));
+      this.buildEdgeIce();
+    } else {
+      this.buildTrees(this.placer(1.8), per(1500));
+      this.buildGiantTrees(this.placer(0.8), per(190));
+      this.buildPinkFans(this.placer(1.2), per(2400));
+      this.buildBulbStalks(this.placer(1), per(460));
+      this.buildFerns(this.placer(0.6), per(4000));
+      this.buildRocks(this.placer(0.3), per(300));
+      this.buildRelics(this.placer(0), Math.max(2, per(45)));
+      this.buildSpores(this.placer(0.5), per(600));
+      this.buildEdgeTrees();
+    }
     castShadows(this.group);
     // Everything that casts a shadow here is static: it can go into the baked shadows.
     this.group.traverse((o) => {
@@ -309,10 +408,10 @@ export class World {
     const high = new THREE.Color(this.palette.groundHigh);
     const pink = new THREE.Color(this.palette.groundPink);
     const path = new THREE.Color(this.palette.path);
-    const sand = new THREE.Color(CANYON.sandstone);
-    const sandDark = new THREE.Color(CANYON.sandstoneDark);
-    const deep = new THREE.Color(CANYON.deep);
-    const floor = new THREE.Color(CANYON.floor);
+    const sand = new THREE.Color(this.canyon.sandstone);
+    const sandDark = new THREE.Color(this.canyon.sandstoneDark);
+    const deep = new THREE.Color(this.canyon.deep);
+    const floor = new THREE.Color(this.canyon.floor);
     const c = new THREE.Color();
 
     const jitter = mulberry32(this.seed * 31 + 13);
@@ -422,8 +521,9 @@ export class World {
       }
     }
     const block = new THREE.DodecahedronGeometry(1, 0);
-    this.instanced([{ geo: block, mat: faceted(toon('#ffffff')), colors: [CANYON.sandstone, CANYON.sandstoneDark, '#e8d08e'] }], rim, 41);
-    this.instanced([{ geo: block, mat: faceted(toon('#ffffff')), colors: [CANYON.deep, CANYON.floor, '#2b3d5c'] }], rubble, 42);
+    const k = this.canyon;
+    this.instanced([{ geo: block, mat: faceted(toon('#ffffff')), colors: [k.sandstone, k.sandstoneDark, this.biome === 'jungle' ? '#e8d08e' : k.sandstone] }], rim, 41);
+    this.instanced([{ geo: block, mat: faceted(toon('#ffffff')), colors: [k.deep, k.floor, this.biome === 'jungle' ? '#2b3d5c' : k.floor] }], rubble, 42);
   }
 
   // ---------------------------------------------------------------- placement
@@ -679,6 +779,270 @@ export class World {
       54,
     );
   }
+}
+
+// ---------------------------------------------------------------- desert and ice props
+// (added to the World class's prototype below, to keep the jungle code above untouched)
+
+declare module './World' {
+  interface World {
+    buildCacti(place: Placer, count: number): void;
+    buildBarrelCacti(place: Placer, count: number): void;
+    buildHoodoos(place: Placer, count: number): void;
+    buildEdgeMesas(): void;
+    buildPines(place: Placer, count: number): void;
+    buildIceCrystals(place: Placer, count: number): void;
+    buildEdgeIce(): void;
+  }
+}
+
+type WorldInternals = {
+  seed: number;
+  palette: Palette;
+  shape: ArenaShape;
+  heightAt(x: number, z: number): number;
+  matrix(x: number, y: number, z: number, yaw: number, sx: number, sy: number, sz: number, tilt?: number): THREE.Matrix4;
+  instanced(parts: { geo: THREE.BufferGeometry; mat: THREE.Material; colors?: string[]; outline?: boolean }[], matrices: THREE.Matrix4[], seed: number): void;
+};
+const W = World.prototype as unknown as Record<string, unknown>;
+
+/** Saguaro cacti: a tall green column with an arm or two. Below the ship's flying height. */
+W.buildCacti = function (this: WorldInternals, place: Placer, count: number): void {
+  const rand = mulberry32(131 + this.seed * 7);
+  const m: THREE.Matrix4[] = [];
+  for (let i = 0; i < count; i++) {
+    const { x, z } = place(rand);
+    const s = 0.8 + rand() * 0.6;
+    m.push(this.matrix(x, this.heightAt(x, z) - 0.2, z, rand() * Math.PI * 2, s, s * (0.85 + rand() * 0.35), s, (rand() - 0.5) * 0.08));
+  }
+  this.instanced([{ geo: saguaro(), mat: toon('#ffffff'), colors: this.palette.trunk }], m, 132);
+};
+
+/** Round, ribbed barrel cacti with a pink flower on top. */
+W.buildBarrelCacti = function (this: WorldInternals, place: Placer, count: number): void {
+  const rand = mulberry32(141 + this.seed * 7);
+  const m: THREE.Matrix4[] = [];
+  for (let i = 0; i < count; i++) {
+    const { x, z } = place(rand);
+    const s = 0.5 + rand() * 0.6;
+    m.push(this.matrix(x, this.heightAt(x, z) - 0.1, z, rand() * Math.PI * 2, s, s * (0.8 + rand() * 0.5), s));
+  }
+  const { body, flower } = barrelCactus();
+  this.instanced(
+    [
+      { geo: body, mat: toon('#ffffff'), colors: this.palette.trunk },
+      { geo: flower, mat: toon('#ff7aa8'), outline: false },
+    ],
+    m,
+    142,
+  );
+};
+
+/** Hoodoos: stacked sandstone pillars in the play area (well below the ship). */
+W.buildHoodoos = function (this: WorldInternals, place: Placer, count: number): void {
+  const rand = mulberry32(151 + this.seed * 7);
+  const m: THREE.Matrix4[] = [];
+  for (let i = 0; i < count; i++) {
+    const { x, z } = place(rand);
+    const s = 1.2 + rand() * 1.1;
+    m.push(this.matrix(x, this.heightAt(x, z) - 0.4, z, rand() * Math.PI * 2, s, s * (0.8 + rand() * 0.5), s));
+  }
+  this.instanced([{ geo: hoodoo(), mat: faceted(toon('#ffffff')), colors: this.palette.leaves }], m, 152);
+};
+
+/** Tall flat-topped mesas all around the arena edge (they wall it in), fading to black. */
+W.buildEdgeMesas = function (this: WorldInternals): void {
+  const rand = mulberry32(this.seed * 19 + 61);
+  const b = this.shape.bounds;
+  const mrg = EDGE_BAND + 10;
+  const spacing = 13;
+  const m: THREE.Matrix4[] = [];
+  for (let x = b.x0 - mrg; x <= b.x1 + mrg; x += spacing) {
+    for (let z = b.z0 - mrg; z <= b.z1 + mrg; z += spacing) {
+      const px = x + (rand() - 0.5) * spacing * 0.8;
+      const pz = z + (rand() - 0.5) * spacing * 0.8;
+      const out = -this.shape.depth(px, pz);
+      if (out < 2 || out > EDGE_BAND + 8) continue;
+      const k = Math.min(1, out / EDGE_BAND);
+      const r = 7 + rand() * 4;
+      // Lower on the camera's side (south), so they never hide the play area; tall beyond.
+      const h = (8 + k * 8 + rand() * 6) * nearSide(this.shape, pz);
+      m.push(this.matrix(px, this.heightAt(px, pz) - 1, pz, rand() * Math.PI * 2, r, h, r * (0.8 + rand() * 0.4)));
+    }
+  }
+  const { body, cap } = mesa();
+  this.instanced(
+    [
+      { geo: body, mat: faceted(toon('#ffffff')), colors: this.palette.leaves },
+      { geo: cap, mat: faceted(toon('#ffffff')), colors: this.palette.pinkLeaf },
+    ],
+    m,
+    62,
+  );
+};
+
+/** Snowy pines: stacked dark-green tiers with snow on each. */
+W.buildPines = function (this: WorldInternals, place: Placer, count: number): void {
+  const rand = mulberry32(161 + this.seed * 7);
+  const m: THREE.Matrix4[] = [];
+  for (let i = 0; i < count; i++) {
+    const { x, z } = place(rand);
+    const s = 0.7 + rand() * 0.6;
+    m.push(this.matrix(x, this.heightAt(x, z) - 0.2, z, rand() * Math.PI * 2, s, s * (0.85 + rand() * 0.3), s, (rand() - 0.5) * 0.08));
+  }
+  const { trunk, needles, snow } = pine();
+  this.instanced(
+    [
+      { geo: trunk, mat: toon('#ffffff'), colors: this.palette.trunk, outline: false },
+      { geo: needles, mat: toon('#ffffff'), colors: this.palette.leaves },
+      { geo: snow, mat: toon('#f4f9ff'), outline: false },
+    ],
+    m,
+    162,
+  );
+};
+
+/** Clusters of glassy ice crystals. */
+W.buildIceCrystals = function (this: WorldInternals, place: Placer, count: number): void {
+  const rand = mulberry32(171 + this.seed * 7);
+  const m: THREE.Matrix4[] = [];
+  for (let i = 0; i < count; i++) {
+    const { x, z } = place(rand);
+    const s = 0.6 + rand() * 0.9;
+    m.push(this.matrix(x, this.heightAt(x, z) - 0.2, z, rand() * Math.PI * 2, s, s * (0.8 + rand() * 0.6), s));
+  }
+  this.instanced([{ geo: crystalCluster(), mat: faceted(toon('#ffffff')), colors: ['#8fe6ff', '#b8f2ff', '#6fd0f5'] }], m, 172);
+};
+
+/** Tall jagged ice spires all around the arena edge (they wall it in), fading to black. */
+W.buildEdgeIce = function (this: WorldInternals): void {
+  const rand = mulberry32(this.seed * 19 + 71);
+  const b = this.shape.bounds;
+  const mrg = EDGE_BAND + 8;
+  const spacing = 8;
+  const m: THREE.Matrix4[] = [];
+  for (let x = b.x0 - mrg; x <= b.x1 + mrg; x += spacing) {
+    for (let z = b.z0 - mrg; z <= b.z1 + mrg; z += spacing) {
+      const px = x + (rand() - 0.5) * spacing * 0.9;
+      const pz = z + (rand() - 0.5) * spacing * 0.9;
+      const out = -this.shape.depth(px, pz);
+      if (out < 0 || out > EDGE_BAND + 6) continue;
+      const k = Math.min(1, out / EDGE_BAND);
+      const r = 3.5 + rand() * 3;
+      const h = (8 + k * 9 + rand() * 6) * nearSide(this.shape, pz);
+      m.push(this.matrix(px, this.heightAt(px, pz) - 1, pz, rand() * Math.PI * 2, r, h, r * (0.7 + rand() * 0.6), (rand() - 0.5) * 0.25));
+    }
+  }
+  this.instanced([{ geo: iceSpire(), mat: faceted(toon('#ffffff')), colors: this.palette.pinkLeaf }], m, 72);
+};
+
+/** Height factor for edge walls: low on the south (camera) side, tall on the far side. */
+function nearSide(shape: ArenaShape, z: number): number {
+  const t = (z - shape.center.z) / Math.max(1, shape.radius);
+  return 1.35 - 0.95 * smoothstep(-0.2, 0.7, t);
+}
+
+/** A saguaro: a ribbed column (about 5 units tall) with two arms. */
+function saguaro(): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = [];
+  const trunk = new THREE.CapsuleGeometry(0.45, 4.2, 3, 8);
+  trunk.translate(0, 2.5, 0);
+  parts.push(trunk);
+  for (const [side, h, up] of [
+    [1, 2.0, 1.4],
+    [-1, 2.8, 1.0],
+  ] as const) {
+    const out = new THREE.CapsuleGeometry(0.3, 0.8, 3, 6);
+    out.rotateZ(Math.PI / 2);
+    out.translate(side * 0.75, h, 0);
+    const rise = new THREE.CapsuleGeometry(0.3, up, 3, 6);
+    rise.translate(side * 1.2, h + up / 2 + 0.1, 0);
+    parts.push(out, rise);
+  }
+  return mergeAll(parts);
+}
+
+/** A ribbed barrel cactus and the flower on top. */
+function barrelCactus(): { body: THREE.BufferGeometry; flower: THREE.BufferGeometry } {
+  const body = new THREE.SphereGeometry(0.9, 10, 7);
+  body.scale(1, 1.1, 1);
+  body.translate(0, 0.8, 0);
+  const flower = new THREE.ConeGeometry(0.35, 0.4, 6);
+  flower.rotateX(Math.PI);
+  flower.translate(0, 1.95, 0);
+  return { body: mergeAll([body]), flower: mergeAll([flower]) };
+}
+
+/** A hoodoo: a tapering pillar with a wider rock balanced on top (about 6 units tall). */
+function hoodoo(): THREE.BufferGeometry {
+  const base = new THREE.CylinderGeometry(0.7, 1.2, 3.6, 7);
+  base.translate(0, 1.8, 0);
+  const neck = new THREE.CylinderGeometry(0.45, 0.7, 1.2, 7);
+  neck.translate(0, 4.2, 0);
+  const cap = new THREE.DodecahedronGeometry(1.1, 0);
+  cap.scale(1.1, 0.6, 1.1);
+  cap.translate(0, 5.2, 0);
+  return mergeAll([base, neck, cap]);
+}
+
+/** A mesa: a steep, slightly tapered block (unit size, scaled per instance) and its flat cap. */
+function mesa(): { body: THREE.BufferGeometry; cap: THREE.BufferGeometry } {
+  const body = new THREE.CylinderGeometry(0.82, 1, 1, 7);
+  body.translate(0, 0.5, 0);
+  const cap = new THREE.CylinderGeometry(0.84, 0.84, 0.05, 7);
+  cap.translate(0, 1.0, 0);
+  return { body: mergeAll([body]), cap: mergeAll([cap]) };
+}
+
+/** A pine: a short trunk, three tiers of needles, and snow on each tier. */
+function pine(): { trunk: THREE.BufferGeometry; needles: THREE.BufferGeometry; snow: THREE.BufferGeometry } {
+  const trunk = new THREE.CylinderGeometry(0.22, 0.3, 1.4, 6);
+  trunk.translate(0, 0.7, 0);
+  const needles: THREE.BufferGeometry[] = [];
+  const snow: THREE.BufferGeometry[] = [];
+  const tiers = [
+    [1.6, 1.8, 1.2],
+    [1.25, 1.6, 2.4],
+    [0.85, 1.4, 3.5],
+  ];
+  for (const [r, h, y] of tiers) {
+    const cone = new THREE.ConeGeometry(r, h, 7);
+    cone.translate(0, y + h / 2, 0);
+    needles.push(cone);
+    const cap = new THREE.ConeGeometry(r * 0.62, h * 0.42, 7);
+    cap.translate(0, y + h - h * 0.21 + 0.02, 0);
+    snow.push(cap);
+  }
+  return { trunk: mergeAll([trunk]), needles: mergeAll(needles), snow: mergeAll(snow) };
+}
+
+/** A few long ice crystals leaning out of the snow. */
+function crystalCluster(): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = [];
+  const specs = [
+    [0, 0, 1.0, 0],
+    [0.6, 0.2, 0.7, 0.5],
+    [-0.5, -0.3, 0.6, -0.45],
+    [0.1, -0.6, 0.5, 0.3],
+  ];
+  for (const [x, z, s, lean] of specs) {
+    const c = new THREE.OctahedronGeometry(0.5, 0);
+    c.scale(0.7 * s, 2.4 * s, 0.7 * s);
+    c.rotateZ(lean);
+    c.translate(x, 1.1 * s, z);
+    parts.push(c);
+  }
+  return mergeAll(parts);
+}
+
+/** A tall, jagged ice spire (unit radius, scaled per instance). */
+function iceSpire(): THREE.BufferGeometry {
+  const main = new THREE.ConeGeometry(1, 1, 5);
+  main.translate(0, 0.5, 0);
+  const side = new THREE.ConeGeometry(0.55, 0.6, 5);
+  side.rotateZ(0.3);
+  side.translate(0.6, 0.3, 0.2);
+  return mergeAll([main, side]);
 }
 
 // ---------------------------------------------------------------- prop shapes
