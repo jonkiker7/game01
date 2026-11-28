@@ -5,6 +5,8 @@ import { buildShipDesign, type ShipDesignId } from '../ShipDesigns';
 import { PRIMARY_NAMES, SECONDARY_NAMES, type Stats, UPGRADES } from './Upgrades';
 
 export interface PauseInfo {
+  /** In flight training (the leave button exits training instead). */
+  training?: boolean;
   stats: Stats;
   armor: number;
   ship: ShipDesignId;
@@ -31,6 +33,8 @@ export class PauseMenu {
   private shown: ShipDesignId | null = null;
   private frame = 0;
   onResume?: () => void;
+  /** Leave the sortie now, keeping the salvage earned so far. */
+  onReturnToBase?: () => void;
   onDevToggle?: (on: boolean) => void;
 
   constructor(root: HTMLElement) {
@@ -55,7 +59,7 @@ export class PauseMenu {
                <section class="station"><h3>BASE UPGRADES</h3><div class="body"></div></section>
              </div>
            </div>
-           <div class="buttons"><button class="dev"></button><button class="resume">RESUME ▸</button></div>
+           <div class="buttons"><button class="dev"></button><button class="leave">⌂ RETURN TO BASE</button><button class="resume">RESUME ▸</button></div>
          </div>
        </div>`,
     );
@@ -66,6 +70,15 @@ export class PauseMenu {
         fn();
       });
     tap('.resume', () => this.onResume?.());
+    // Return to base: a second tap confirms (so a stray tap doesn't end the sortie).
+    const leave = this.el.querySelector('.leave') as HTMLElement;
+    tap('.leave', () => {
+      if (leave.classList.contains('confirm')) this.onReturnToBase?.();
+      else {
+        leave.classList.add('confirm');
+        leave.textContent = 'TAP AGAIN TO LEAVE';
+      }
+    });
     tap('.dev', () => {
       const on = !devModeOn();
       setDevMode(on);
@@ -98,6 +111,9 @@ export class PauseMenu {
   }
 
   show(info: PauseInfo): void {
+    const leave = this.el.querySelector('.leave') as HTMLElement;
+    leave.classList.remove('confirm');
+    leave.textContent = info.training ? '⌂ EXIT TRAINING' : '⌂ RETURN TO BASE';
     this.fill(info);
     this.updateDevButton();
     this.el.classList.add('visible');

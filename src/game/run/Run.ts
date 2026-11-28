@@ -33,6 +33,8 @@ export interface RunResult {
   tally: { damage: number; clear: number; time: number; protect: number };
   /** Lost by failing a mission (the generator or convoy was destroyed) rather than being shot down. */
   failed?: boolean;
+  /** Left early from the pause menu (salvage so far is kept). */
+  returned?: boolean;
   sectorsCleared: number;
   totalSectors: number;
   kills: number;
@@ -861,9 +863,23 @@ export class Run {
     });
   }
 
+  /** Return to base from the pause menu: the sortie ends here, keeping what you've earned. */
+  returnToBase(): void {
+    if (this.phase === 'over' || this.phase === 'transition') return;
+    this.d.enemies.stopDrones();
+    this.returned = true;
+    this.phase = 'over';
+    this.overTimer = -10;
+    this.finish();
+  }
+  private returned = false;
+
   private finish(): void {
     this.d.releaseInput();
+    const returned = this.returned;
+    this.returned = false;
     this.d.onFinish({
+      returned,
       won: this.won,
       score: Math.round(this.score),
       tally: { ...this.tally },

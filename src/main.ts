@@ -239,7 +239,7 @@ const run = new Run({
     const prevBest = save.best;
     if (newBest) save.best = r.score;
     if (r.won) save.wins++;
-    else save.deaths++;
+    else if (!r.returned) save.deaths++; // leaving early isn't being shot down
     writeSave(save);
     runUI.showEnd({ ...r, totalSalvage: save.salvage, best: Math.max(prevBest, r.score), newBest }, () => runUI.fade(() => goToBase('landed')), 'RETURN TO STATION ▸');
   },
@@ -473,6 +473,7 @@ function openPause(): void {
   const r = run;
   const active = save.contracts.active;
   pauseMenu.show({
+    training: r.training,
     stats: r.stats,
     armor: ship.armor,
     ship: save.ship,
@@ -493,6 +494,12 @@ pauseMenu.pauseButton.addEventListener('pointerdown', (e) => {
   openPause();
 });
 pauseMenu.onResume = closePause;
+// Return to base from the pause menu (in training: leave training).
+pauseMenu.onReturnToBase = () => {
+  closePause();
+  if (run.training) coach.onExit?.();
+  else run.returnToBase();
+};
 pauseMenu.onDevToggle = (on) => showDevPanel(on);
 window.addEventListener('keydown', (e) => {
   if (e.code === 'Escape' || e.code === 'KeyP') {

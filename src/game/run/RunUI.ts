@@ -20,6 +20,8 @@ export interface RunSummary {
   best: number;
   newBest: boolean;
   failed?: boolean;
+  /** Left early from the pause menu. */
+  returned?: boolean;
   sectorsCleared: number;
   totalSectors: number;
   kills: number;
@@ -84,7 +86,7 @@ export class RunUI {
 
   showEnd(s: RunSummary, restart: () => void, buttonLabel = 'NEW SORTIE ▸'): void {
     this.endEl.innerHTML = `
-      <h1 class="${s.won ? 'won' : 'lost'}">${s.won ? 'SORTIE COMPLETE' : s.failed ? 'MISSION FAILED' : 'SHOT DOWN'}</h1>
+      <h1 class="${s.won ? 'won' : s.returned ? 'returned' : 'lost'}">${s.won ? 'SORTIE COMPLETE' : s.returned ? 'RETURNED TO BASE' : s.failed ? 'MISSION FAILED' : 'SHOT DOWN'}</h1>
       <div class="end-score"><b>${s.score.toLocaleString('en-US')}</b><span>${s.newBest ? '★ NEW HIGH SCORE ★' : `SCORE · BEST ${s.best.toLocaleString('en-US')}`}</span></div>
       <div class="end-breakdown">${(
         [
