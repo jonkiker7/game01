@@ -159,6 +159,8 @@ export class World {
   /** The current round's arena, and the noise offsets that make its terrain unique. */
   shape: ArenaShape = blobArena(150, 1);
   private ox = 0;
+  /** How far around the arena's centre stays canyon-free (the Sandworm's arena clears a lot). */
+  centerClear = 26;
   private oz = 0;
   private fog = { ...CANYON_FOG };
 
@@ -371,7 +373,7 @@ export class World {
     // Solid rock around the arena's centre and where you fly in, and canyons die out toward
     // the arena edge (the trees outside stand on solid ground).
     const sh = this.shape;
-    let clear = smoothstep(26, 42, Math.hypot(x - sh.center.x, z - sh.center.z));
+    let clear = smoothstep(this.centerClear, this.centerClear + 16, Math.hypot(x - sh.center.x, z - sh.center.z));
     clear = Math.min(clear, smoothstep(14, 26, Math.hypot(x - sh.entry.x, z - sh.entry.z)));
     clear = Math.min(clear, smoothstep(4, 18, sh.depth(x, z)));
     t = t * 1.25 - (1 - clear) * 1.3;
